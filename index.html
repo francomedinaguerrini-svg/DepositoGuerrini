@@ -730,7 +730,12 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
   <div class="grupos-wrap">
     <div class="grupos-header">
       <span style="font-size:13px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px">👥 Grupos del día</span>
-      <span id="grupos-fecha" style="font-size:12px;color:#86868b"></span>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span id="grupos-fecha" style="font-size:12px;color:#86868b"></span>
+        <input type="date" id="grupos-fecha-sel" 
+          style="padding:4px 8px;border:1px solid #d2d2d7;border-radius:8px;font-size:11px;color:#1d1d1f;background:#fff;outline:none"
+          onchange="cambiarFechaGrupos(this.value)">
+      </div>
     </div>
     <div class="grupos-tabs">
       <button class="grupos-tab active" onclick="setGruposTab('hoy',this)">📅 Hoy</button>
@@ -756,7 +761,15 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 
     <!-- Formulario -->
     <div class="prod-form">
-      <div class="prod-form-title">+ Registrar movimiento</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="prod-form-title" style="margin-bottom:0">+ Registrar movimiento</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:11px;color:#86868b">Fecha:</span>
+          <input type="date" id="prod-fecha-manual" 
+            style="padding:4px 8px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;color:#1d1d1f;background:#fff;outline:none"
+            onchange="checkFechaManual(this.value)">
+        </div>
+      </div>
       <div class="prod-tipo-row">
         <button class="prod-tipo-btn carga active" id="ptb-carga" onclick="setProdTipo('carga',this)">📥 Carga</button>
         <button class="prod-tipo-btn descarga" id="ptb-descarga" onclick="setProdTipo('descarga',this)">📤 Descarga</button>
@@ -793,7 +806,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
           <input type="time" id="prod-fin" class="prod-input">
         </div>
       </div>
-      <button class="prod-save-btn" onclick="guardarMovimiento()">💾 Guardar movimiento</button>
+      <button class="prod-save-btn" onclick="guardarMovimientoFecha()">💾 Guardar movimiento</button>
     </div>
 
     <!-- Lista del día -->
@@ -1412,6 +1425,12 @@ function init(){
   disenos.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;seld.appendChild(o)});
   document.getElementById('fechahoy').textContent=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
   actualizarUltimaFecha();
+  // Set today as default date in forms
+  const hoyISO = new Date().toISOString().split('T')[0];
+  const pfm = document.getElementById('prod-fecha-manual');
+  if(pfm) pfm.value = hoyISO;
+  const gfs = document.getElementById('grupos-fecha-sel');
+  if(gfs) gfs.value = hoyISO;
   // Set initial badge
   const badge = document.getElementById('sug-activa-badge');
   if(badge){
@@ -3069,7 +3088,7 @@ function getTodayKey(){
 }
 
 function getGruposHoy(){
-  const key = getTodayKey();
+  const key = getTodayKeyFecha();
   const saved = localStorage.getItem(key);
   if(saved) return JSON.parse(saved);
   // Default: todos presentes en su grupo base
@@ -3386,6 +3405,118 @@ function saveMovimiento(mov){
   localStorage.setItem(histKey, JSON.stringify(hist));
 }
 
+
+let _prodFechaManual = null;
+
+function checkFechaManual(val){
+  _prodFechaManual = val || null;
+  // Update lista to show movements for selected date
+  renderProdLista();
+  renderProdResumen();
+}
+
+function getProdKeyFecha(fecha){
+  if(!fecha) return getProdKey();
+  // Convert YYYY-MM-DD to DD/MM/YYYY format for key
+  const parts = fecha.split('-');
+  return 'prod_'+parts[2]+'-'+parts[1]+'-'+parts[0];
+}
+
+function getMovimientosFecha(){
+  const key = _prodFechaManual ? getProdKeyFecha(_prodFechaManual) : getProdKey();
+  return JSON.parse(localStorage.getItem(key)||'[]');
+}
+
+// Override guardarMovimiento to use manual date
+function guardarMovimientoFecha(){
+  const unidades = parseInt(document.getElementById('prod-unidades').value||0);
+  const semis = parseInt(document.getElementById('prod-semis').value||1);
+  const inicio = document.getElementById('prod-inicio').value||'';
+  const fin = document.getElementById('prod-fin').value||'';
+  const darsena = document.getElementById('prod-darsena').value||'';
+  const destino = document.getElementById('prod-destino-mov').value||'';
+
+  if(!unidades){ showToast('❌ Ingresá las unidades'); return; }
+  if(!_prodGrupo){ showToast('❌ Seleccioná un grupo'); return; }
+
+  let durMin = 0;
+  if(inicio && fin){
+    const [ih,im] = inicio.split(':').map(Number);
+    const [fh,fm] = fin.split(':').map(Number);
+    durMin = (fh*60+fm) - (ih*60+im);
+  }
+
+  // Use manual date if set, otherwise today
+  let fechaMov, horaMov;
+  if(_prodFechaManual){
+    const parts = _prodFechaManual.split('-');
+    fechaMov = parts[2]+'/'+parts[1]+'/'+parts[0];
+    horaMov = inicio||'--:--';
+  } else {
+    fechaMov = new Date().toLocaleDateString('es-AR');
+    horaMov = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  }
+
+  const mov = {
+    fecha: fechaMov,
+    hora: horaMov,
+    tipo: _prodTipo,
+    grupo: _prodGrupo,
+    darsena, destino, unidades, semis, inicio, fin, durMin,
+  };
+
+  // Save to day key
+  const dayKey = _prodFechaManual ? getProdKeyFecha(_prodFechaManual) : getProdKey();
+  const movsDia = JSON.parse(localStorage.getItem(dayKey)||'[]');
+  movsDia.push(mov);
+  localStorage.setItem(dayKey, JSON.stringify(movsDia));
+
+  // Save to monthly history
+  const mes = _prodFechaManual 
+    ? _prodFechaManual.substring(0,7).replace('-','_').replace('-','_')
+    : new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+  const histKey = 'prod_hist_'+mes;
+  const hist = JSON.parse(localStorage.getItem(histKey)||'[]');
+  hist.push(mov);
+  localStorage.setItem(histKey, JSON.stringify(hist));
+
+  // Reset form
+  document.getElementById('prod-unidades').value='';
+  document.getElementById('prod-semis').value='1';
+  document.getElementById('prod-destino-mov').value='';
+  document.getElementById('prod-darsena').value='';
+  const finEl = document.getElementById('prod-fin');
+  if(finEl) finEl.value='';
+  const inicioEl = document.getElementById('prod-inicio');
+  if(inicioEl && fin) inicioEl.value = fin;
+
+  renderProdResumen();
+  renderProdLista();
+  const fechaLabel = _prodFechaManual ? ' ('+fechaMov+')' : '';
+  showToast('✅ Movimiento registrado'+fechaLabel);
+}
+
+// Grupos date handling
+let _gruposFechaManual = null;
+
+function cambiarFechaGrupos(val){
+  _gruposFechaManual = val || null;
+  renderGruposHoy();
+  const el = document.getElementById('grupos-fecha');
+  if(el && val){
+    const parts = val.split('-');
+    el.textContent = parts[2]+'/'+parts[1]+'/'+parts[0];
+  }
+}
+
+function getTodayKeyFecha(){
+  if(_gruposFechaManual){
+    const parts = _gruposFechaManual.split('-');
+    return 'grupos_'+parts[2]+'-'+parts[1]+'-'+parts[0];
+  }
+  return getTodayKey();
+}
+
 function renderProductividad(){
   // Render grupo buttons from today's groups
   const personal = getGruposHoy();
@@ -3474,7 +3605,7 @@ function guardarMovimiento(){
 }
 
 function renderProdResumen(){
-  const movs = getMovimientos();
+  const movs = getMovimientosFecha();
   const totalUnid = movs.reduce((s,m)=>s+m.unidades,0);
   const totalSemis = movs.reduce((s,m)=>s+m.semis,0);
   const totalDurMin = movs.filter(m=>m.durMin>0).reduce((s,m)=>s+m.durMin,0);
@@ -3488,7 +3619,7 @@ function renderProdResumen(){
 }
 
 function renderProdLista(){
-  const movs = getMovimientos().slice().reverse();
+  const movs = getMovimientosFecha().slice().reverse();
   const el = document.getElementById('prod-lista');
   if(!el) return;
   if(!movs.length){ el.innerHTML='<div class="empty">Sin movimientos hoy</div>'; return; }
