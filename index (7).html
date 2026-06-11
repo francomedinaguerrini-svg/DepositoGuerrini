@@ -4539,6 +4539,50 @@ function closeSubMenu(){
   document.getElementById('ng-'+group)?.classList.add('active');
 }
 
+// === CONTRASEÑA ===
+const LIBRE = ['mapa','nave'];
+const PWD = 'deposito';
+let _pendingView = null;
+let _pwaUnlocked = false;
+
+function showPwd(view){
+  const nombres = {
+    stock:'📦 Stock', pedidos:'📋 Pedidos', repo:'🔄 Reposición',
+    dot:'📅 DOTs', dash:'📊 Dashboard', inv:'🔢 Inventario',
+    dif:'⚠️ Diferencias', grupos:'👥 Grupos', prod:'⚡ Productividad'
+  };
+  document.getElementById('pwd-module-name').textContent = nombres[view]||view;
+  document.getElementById('pwd-input').value='';
+  document.getElementById('pwd-input').classList.remove('error');
+  document.getElementById('pwd-overlay').classList.add('show');
+  setTimeout(()=>document.getElementById('pwd-input').focus(), 100);
+}
+
+function checkPwd(){
+  const val = document.getElementById('pwd-input').value;
+  if(val === PWD){
+    _pwaUnlocked = true;
+    document.getElementById('pwd-overlay').classList.remove('show');
+    if(_pendingView){
+      document.getElementById('home-screen').classList.remove('show');
+      navTo(_pendingView);
+      document.getElementById('back-home-btn').style.display='flex';
+      _pendingView = null;
+    }
+  } else {
+    const input = document.getElementById('pwd-input');
+    input.classList.add('error');
+    input.value='';
+    setTimeout(()=>input.classList.remove('error'), 300);
+    showToast('❌ Contraseña incorrecta');
+  }
+}
+
+function closePwd(){
+  document.getElementById('pwd-overlay').classList.remove('show');
+  _pendingView = null;
+}
+
 // === HOME ===
 function goHome(view){
   if(!LIBRE.includes(view) && !_pwaUnlocked){
