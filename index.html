@@ -64,6 +64,29 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 .stat-val.big{font-size:28px;font-weight:700;color:#1d1d1f}
 .stat-lbl{font-size:10px;color:#86868b;margin-top:1px}
 .empty{text-align:center;padding:40px 20px;color:#86868b}
+/* HOME SCREEN */
+.home-screen{display:none;position:fixed;inset:0;background:#f5f5f7;z-index:300;overflow-y:auto;padding-bottom:20px}
+.home-screen.show{display:block}
+.home-header{background:#1d1d1f;padding:20px 16px 16px;text-align:center}
+.home-logo{font-size:22px;font-weight:700;color:#fff;margin-bottom:2px}
+.home-sub{font-size:12px;color:#a0a0a5}
+.home-date{font-size:11px;color:#86868b;margin-top:4px}
+.home-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px}
+.home-btn{background:#fff;border-radius:16px;padding:20px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;border:none;box-shadow:0 1px 4px rgba(0,0,0,.08);transition:transform .1s,box-shadow .1s;width:100%}
+.home-btn:active{transform:scale(.95);box-shadow:0 0 0 rgba(0,0,0,0)}
+.home-btn-icon{font-size:32px;line-height:1}
+.home-btn-label{font-size:12px;font-weight:600;color:#1d1d1f;text-align:center;line-height:1.2}
+.home-btn-sub{font-size:9px;color:#86868b;text-align:center}
+.home-btn.accent-blue{border-top:3px solid #0071e3}
+.home-btn.accent-green{border-top:3px solid #34c759}
+.home-btn.accent-orange{border-top:3px solid #ff9500}
+.home-btn.accent-purple{border-top:3px solid #af52de}
+.home-btn.accent-red{border-top:3px solid #d70015}
+.home-btn.accent-teal{border-top:3px solid #00c7be}
+.home-btn.accent-yellow{border-top:3px solid #ffcc00}
+.home-btn.accent-gray{border-top:3px solid #86868b}
+.home-section-title{font-size:11px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px;padding:4px 16px 0}
+
 /* BOTTOM NAV */
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#1d1d1f;z-index:150;padding-bottom:env(safe-area-inset-bottom)}
 .nav-groups{display:flex;border-top:1px solid #3a3a3c}
@@ -444,6 +467,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 <body>
 
 <header>
+  <button id="back-home-btn" onclick="showHome()" style="display:none;background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0;margin-right:4px">←</button>
   <h1>WMS Depósito</h1>
   <span id="sug-activa-badge" style="font-size:10px;background:#0071e3;color:#fff;padding:3px 8px;border-radius:10px;font-weight:600;white-space:nowrap">🚗 Chasis</span>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
@@ -465,6 +489,88 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
   <div class="tab" onclick="switchTab('grupos',this)">👥 Grupos</div>
   <div class="tab" onclick="switchTab('dot',this)">📅 DOTs</div>
   <div class="tab" onclick="switchTab('prod',this)">⚡ Productividad</div>
+</div>
+
+
+<!-- HOME SCREEN -->
+<div class="home-screen show" id="home-screen">
+  <div class="home-header">
+    <div class="home-logo">📦 WMS Depósito</div>
+    <div class="home-sub">Halpern Neumaticos · Mendoza</div>
+    <div class="home-date" id="home-date"></div>
+  </div>
+
+  <div class="home-section-title" style="margin-top:12px">Operaciones</div>
+  <div class="home-grid">
+    <button class="home-btn accent-blue" onclick="goHome('stock')">
+      <div class="home-btn-icon">📦</div>
+      <div class="home-btn-label">Stock</div>
+      <div class="home-btn-sub">Consulta y búsqueda</div>
+    </button>
+    <button class="home-btn accent-blue" onclick="goHome('pedidos')">
+      <div class="home-btn-icon">📋</div>
+      <div class="home-btn-label">Pedidos</div>
+      <div class="home-btn-sub">Preparación y despacho</div>
+    </button>
+    <button class="home-btn accent-orange" onclick="goHome('mapa')">
+      <div class="home-btn-icon">🗺️</div>
+      <div class="home-btn-label">Mapa Racks</div>
+      <div class="home-btn-sub">462 posiciones</div>
+    </button>
+    <button class="home-btn accent-orange" onclick="goHome('repo')">
+      <div class="home-btn-icon">🔄</div>
+      <div class="home-btn-label">Reposición</div>
+      <div class="home-btn-sub">Alertas diarias</div>
+    </button>
+    <button class="home-btn accent-gray" onclick="goHome('nave')">
+      <div class="home-btn-icon">🏭</div>
+      <div class="home-btn-label">Nave</div>
+      <div class="home-btn-sub">10 bloques</div>
+    </button>
+    <button class="home-btn accent-teal" onclick="goHome('dot')">
+      <div class="home-btn-icon">📅</div>
+      <div class="home-btn-label">DOTs</div>
+      <div class="home-btn-sub">Fechas elaboración</div>
+    </button>
+  </div>
+
+  <div class="home-section-title">Control & Análisis</div>
+  <div class="home-grid">
+    <button class="home-btn accent-green" onclick="goHome('dash')">
+      <div class="home-btn-icon">📊</div>
+      <div class="home-btn-label">Dashboard</div>
+      <div class="home-btn-sub">Resumen general</div>
+    </button>
+    <button class="home-btn accent-yellow" onclick="goHome('inv')">
+      <div class="home-btn-icon">🔢</div>
+      <div class="home-btn-label">Inventario</div>
+      <div class="home-btn-sub">Conteo por diseño</div>
+    </button>
+    <button class="home-btn accent-red" onclick="goHome('dif')">
+      <div class="home-btn-icon">⚠️</div>
+      <div class="home-btn-label">Diferencias</div>
+      <div class="home-btn-sub">Control despachos</div>
+    </button>
+  </div>
+
+  <div class="home-section-title">RRHH & Productividad</div>
+  <div class="home-grid">
+    <button class="home-btn accent-purple" onclick="goHome('grupos')">
+      <div class="home-btn-icon">👥</div>
+      <div class="home-btn-label">Grupos</div>
+      <div class="home-btn-sub">Asistencia diaria</div>
+    </button>
+    <button class="home-btn accent-purple" onclick="goHome('prod')">
+      <div class="home-btn-icon">⚡</div>
+      <div class="home-btn-label">Productividad</div>
+      <div class="home-btn-sub">Movimientos y tiempos</div>
+    </button>
+    <button class="home-btn accent-gray" onclick="toggleUpdate()">
+      <div class="home-btn-icon">⬆️</div>
+      <div class="home-btn-label">Actualizar</div>
+      <div class="home-btn-sub" id="home-last-update">Stock del día</div>
+    </button>
+  </div>
 </div>
 
 <div class="update-bar" id="update-bar">
@@ -1579,6 +1685,7 @@ function init(){
   disenos.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;seld.appendChild(o)});
   document.getElementById('fechahoy').textContent=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
   actualizarUltimaFecha();
+  showHome();
   // Set today as default date in forms
   const hoyISO = new Date().toISOString().split('T')[0];
   const pfm = document.getElementById('prod-fecha-manual');
@@ -4428,6 +4535,24 @@ function navTo(view){
   if(view==='grupos'){ renderGrupos(); renderGruposHoy(); }
   if(view==='prod') renderProductividad();
   if(view==='dot') renderDOTs();
+}
+
+
+function goHome(view){
+  document.getElementById('home-screen').classList.remove('show');
+  navTo(view);
+  // Show back button
+  document.getElementById('back-home-btn').style.display='flex';
+}
+
+function showHome(){
+  document.getElementById('home-screen').classList.add('show');
+  document.getElementById('back-home-btn').style.display='none';
+  // Update date and last update
+  document.getElementById('home-date').textContent = new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const lu = localStorage.getItem('wms_last_update');
+  const el = document.getElementById('home-last-update');
+  if(el) el.textContent = lu ? '⟳ '+lu : 'Stock del día';
 }
 
 function renderNave(){
