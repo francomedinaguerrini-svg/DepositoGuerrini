@@ -947,69 +947,99 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
   <div class="prod-wrap">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <span style="font-size:13px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px">⚡ Productividad</span>
-      <div style="display:flex;gap:6px">
-        <button onclick="exportarProductividad()" style="padding:6px 12px;background:#1d1d1f;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">📄 Informe</button>
+      <button onclick="exportarProductividad()" style="padding:6px 12px;background:#1d1d1f;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">📄 Informe</button>
+    </div>
+
+    <!-- Tabs internos -->
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button class="sort-btn active" id="ptab-movs" onclick="setProdTab('movs',this)">📦 Movimientos</button>
+      <button class="sort-btn" id="ptab-cola" onclick="setProdTab('cola',this)">🟡 Cola pedidos</button>
+      <button class="sort-btn" id="ptab-resumen" onclick="setProdTab('resumen',this)">📊 Resumen</button>
+    </div>
+
+    <!-- TAB: MOVIMIENTOS -->
+    <div id="prod-tab-movs">
+      <!-- Resumen del día -->
+      <div class="prod-resumen" id="prod-resumen"></div>
+
+      <!-- Formulario -->
+      <div class="prod-form">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="prod-form-title" style="margin-bottom:0">+ Registrar movimiento</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;color:#86868b">Fecha:</span>
+            <input type="date" id="prod-fecha-manual" 
+              style="padding:4px 8px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;color:#1d1d1f;background:#fff;outline:none"
+              onchange="checkFechaManual(this.value)">
+          </div>
+        </div>
+        <div class="prod-tipo-row">
+          <button class="prod-tipo-btn carga active" id="ptb-carga" onclick="setProdTipo('carga',this)">📥 Carga</button>
+          <button class="prod-tipo-btn descarga" id="ptb-descarga" onclick="setProdTipo('descarga',this)">📤 Descarga</button>
+          <button class="prod-tipo-btn chasis" id="ptb-chasis" onclick="setProdTipo('chasis',this)">🚗 Chasis</button>
+        </div>
+        <div class="prod-grupo-row" id="prod-grupos-btns"></div>
+        <div class="prod-input-row">
+          <div>
+            <div class="prod-label">Dársena</div>
+            <input type="text" id="prod-darsena" class="prod-input" placeholder="Ej: D1">
+          </div>
+          <div>
+            <div class="prod-label">Destino / Origen</div>
+            <input type="text" id="prod-destino-mov" class="prod-input" placeholder="Cliente / Proveedor">
+          </div>
+        </div>
+        <div class="prod-input-row">
+          <div>
+            <div class="prod-label">Unidades</div>
+            <input type="number" id="prod-unidades" class="prod-input" placeholder="0">
+          </div>
+          <div>
+            <div class="prod-label">Semis / Pedidos</div>
+            <input type="number" id="prod-semis" class="prod-input" placeholder="1">
+          </div>
+        </div>
+        <div class="prod-input-row">
+          <div>
+            <div class="prod-label">Hora inicio</div>
+            <input type="time" id="prod-inicio" class="prod-input">
+          </div>
+          <div>
+            <div class="prod-label">Hora fin</div>
+            <input type="time" id="prod-fin" class="prod-input">
+          </div>
+        </div>
+        <div>
+          <div class="prod-label">Observaciones</div>
+          <input type="text" id="prod-obs" class="prod-input" placeholder="Opcional...">
+        </div>
+        <button class="prod-save-btn" onclick="guardarMovimientoFecha()" style="margin-top:8px">💾 Guardar movimiento</button>
+      </div>
+
+      <!-- Lista del día -->
+      <div style="font-size:11px;font-weight:600;color:#86868b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Movimientos de hoy</div>
+      <div id="prod-lista"></div>
+    </div>
+
+    <!-- TAB: COLA DE PEDIDOS -->
+    <div id="prod-tab-cola" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:12px;color:#86868b">Pedidos del día en standby</span>
+        <button onclick="limpiarColaPedidos()" style="padding:5px 10px;background:#ffd6d9;color:#d70015;border:none;border-radius:8px;font-size:11px;cursor:pointer">🗑️ Limpiar</button>
+      </div>
+      <div id="prod-cola-lista"></div>
+      <div style="font-size:11px;color:#86868b;margin-top:8px;padding:8px;background:#f5f5f7;border-radius:8px">
+        💡 Los pedidos se agregan acá desde el módulo de Pedidos al procesar
       </div>
     </div>
 
-    <!-- Resumen del día -->
-    <div class="prod-resumen" id="prod-resumen"></div>
-
-    <!-- Formulario -->
-    <div class="prod-form">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div class="prod-form-title" style="margin-bottom:0">+ Registrar movimiento</div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:11px;color:#86868b">Fecha:</span>
-          <input type="date" id="prod-fecha-manual" 
-            style="padding:4px 8px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;color:#1d1d1f;background:#fff;outline:none"
-            onchange="checkFechaManual(this.value)">
-        </div>
-      </div>
-      <div class="prod-tipo-row">
-        <button class="prod-tipo-btn carga active" id="ptb-carga" onclick="setProdTipo('carga',this)">📥 Carga</button>
-        <button class="prod-tipo-btn descarga" id="ptb-descarga" onclick="setProdTipo('descarga',this)">📤 Descarga</button>
-        <button class="prod-tipo-btn chasis" id="ptb-chasis" onclick="setProdTipo('chasis',this)">🚗 Chasis</button>
-      </div>
-      <div class="prod-grupo-row" id="prod-grupos-btns"></div>
-      <div class="prod-input-row">
-        <div>
-          <div class="prod-label">Dársena</div>
-          <input type="text" id="prod-darsena" class="prod-input" placeholder="Ej: D1">
-        </div>
-        <div>
-          <div class="prod-label">Destino / Origen</div>
-          <input type="text" id="prod-destino-mov" class="prod-input" placeholder="Cliente / Proveedor">
-        </div>
-      </div>
-      <div class="prod-input-row">
-        <div>
-          <div class="prod-label">Unidades</div>
-          <input type="number" id="prod-unidades" class="prod-input" placeholder="0">
-        </div>
-        <div>
-          <div class="prod-label">Semis / Pedidos</div>
-          <input type="number" id="prod-semis" class="prod-input" placeholder="1">
-        </div>
-      </div>
-      <div class="prod-input-row">
-        <div>
-          <div class="prod-label">Hora inicio</div>
-          <input type="time" id="prod-inicio" class="prod-input">
-        </div>
-        <div>
-          <div class="prod-label">Hora fin</div>
-          <input type="time" id="prod-fin" class="prod-input">
-        </div>
-      </div>
-      <button class="prod-save-btn" onclick="guardarMovimientoFecha()">💾 Guardar movimiento</button>
+    <!-- TAB: RESUMEN -->
+    <div id="prod-tab-resumen" style="display:none">
+      <div id="prod-resumen-content"></div>
     </div>
-
-    <!-- Lista del día -->
-    <div style="font-size:11px;font-weight:600;color:#86868b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Movimientos de hoy</div>
-    <div id="prod-lista"></div>
   </div>
 </div>
+
 
 <!-- DOTs -->
 <div class="view" id="view-dot">
@@ -2389,6 +2419,7 @@ function renderPedido(conRack, conBloque, sinUbic, todos){
 
     <div class="ped-actions">
       <button class="ped-btn-export" onclick="exportarPedido()">📥 Exportar Excel</button>
+      <button class="ped-btn-export" onclick="imprimirPedido()" style="background:#1d1d1f">🖨️ Imprimir</button>
       <button onclick="abrirConfirmacion()" style="flex:1;padding:11px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">✅ Confirmar despacho</button>
       <button class="ped-btn-clear" onclick="limpiarPedido()">🗑️</button>
     </div>
@@ -2425,8 +2456,20 @@ function exportarPedido(){
   if(!nroPedEl.value) nroPedEl.value = generarNroPedido();
   const nroPedido = nroPedEl.value;
 
-  const {rack,bloque,sin} = window._pedidoActual;
-  // Orden: rack primero, bloque después, sin ubicación al final
+  let {rack,bloque,sin} = window._pedidoActual;
+
+  // Re-aplicar orden lógico al exportar
+  rack = [...rack].sort((a,b)=>getPosOrder(a.posRack||'')-getPosOrder(b.posRack||''));
+
+  function getBloqueOrderExp(bl){
+    if(!bl) return 999;
+    const match = bl.match(/(\d+)/);
+    const num = match ? parseInt(match[1]) : 99;
+    const lado = bl.includes('S') ? 0.5 : 0;
+    return num * 10 + lado;
+  }
+  bloque = [...bloque].sort((a,b)=>getBloqueOrderExp(a.bloque||'')-getBloqueOrderExp(b.bloque||''));
+
   const todos = [...rack,...bloque,...sin];
 
   const wb = XLSX.utils.book_new();
@@ -2440,22 +2483,23 @@ function exportarPedido(){
     ['ORIGEN:', 'HALPERN', '', 'FECHA:', fecha, '', 'DESTINO:', destino, '', preparador?'PREPARADOR: '+preparador:''],
     [],
     // Fila 5: headers tabla
-    ['ARTÍCULO', 'DESCRIPCIÓN', 'PROVEEDOR', 'CANT.', 'STOCK FP', 'UBIC. RACK', 'UBIC. BLOQUE', 'CONDICIÓN', 'DETALLE'],
+    ['#', 'ARTÍCULO', 'DESCRIPCIÓN', 'PROVEEDOR', 'CANT.', 'STOCK FP', 'UBIC. RACK', 'UBIC. BLOQUE', 'CONDICIÓN', 'DETALLE'],
   ];
 
+  let paso = 1;
   // Separador rack
   if(rack.length>0){
-    wsData.push(['--- RACK ---','','','','','','','','']);
-    rack.forEach(r=>wsData.push([r.art, r.med+' '+r.diseno, r.prov, r.cant, r.stock||0, r.posRack||'', '', r.cond||'', '']));
+    wsData.push(['--- RACK ---','','','','','','','','','']);
+    rack.forEach(r=>wsData.push([paso++, r.art, r.med+' '+r.diseno, r.prov, r.cant, r.stock||0, r.posRack||'', '', r.cond||'', '']));
   }
   // Separador bloques
   if(bloque.length>0){
-    wsData.push(['--- BLOQUES ---','','','','','','','','']);
-    bloque.forEach(r=>wsData.push([r.art, r.med+' '+r.diseno, r.prov, r.cant, r.stock||0, '', r.bloque||'', r.cond||'', '']));
+    wsData.push(['--- BLOQUES ---','','','','','','','','','']);
+    bloque.forEach(r=>wsData.push([paso++, r.art, r.med+' '+r.diseno, r.prov, r.cant, r.stock||0, '', r.bloque||'', r.cond||'', '']));
   }
   if(sin.length>0){
-    wsData.push(['--- SIN UBICACIÓN ---','','','','','','','','']);
-    sin.forEach(r=>wsData.push([r.art, r.med+' '+r.diseno, r.prov, r.cant, r.stock||0, '', '', r.cond||'', '']));
+    wsData.push(['--- SIN UBICACIÓN ---','','','','','','','','','']);
+    sin.forEach(r=>wsData.push([paso++, r.art, r.med+' '+r.diseno, r.prov, r.cant, r.stock||0, '', '', r.cond||'', '']));
   }
 
   // Total
@@ -2465,18 +2509,104 @@ function exportarPedido(){
 
   const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-  // Anchos de columna
+  // Anchos de columna apaisado para entrar en una hoja
   ws['!cols'] = [
-    {wch:10},{wch:30},{wch:12},{wch:7},{wch:9},
-    {wch:16},{wch:14},{wch:12},{wch:25}
+    {wch:4},   // #
+    {wch:8},   // Artículo
+    {wch:26},  // Descripción
+    {wch:11},  // Proveedor
+    {wch:6},   // Cant
+    {wch:8},   // Stock
+    {wch:14},  // Rack
+    {wch:10},  // Bloque
+    {wch:11},  // Condición
+    {wch:22},  // Detalle
   ];
 
-  // Orientación apaisada
-  ws['!pageSetup'] = {orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0};
-  ws['!margins'] = {left:0.5,right:0.5,top:0.75,bottom:0.75,header:0.3,footer:0.3};
-  ws['!printOptions'] = {gridLines:false};
+  // Orientación apaisada, ajustar a 1 hoja
+  ws['!pageSetup'] = {
+    orientation:'landscape',
+    fitToPage:true,
+    fitToWidth:1,
+    fitToHeight:1,
+    paperSize:9  // A4
+  };
+  ws['!margins'] = {left:0.3,right:0.3,top:0.4,bottom:0.4,header:0.2,footer:0.2};
 
-  // Estilos con SheetJS Pro — usamos workaround con HTML table para mejor formato
+  // Aplicar estilos con xlsx-style workaround usando cell styles
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const headerRow = 4; // fila de headers (0-indexed)
+  const dataStartRow = 5;
+
+  for(let R = range.s.r; R <= range.e.r; R++){
+    for(let C = range.s.c; C <= range.e.c; C++){
+      const cellAddr = XLSX.utils.encode_cell({r:R, c:C});
+      if(!ws[cellAddr]) ws[cellAddr] = {v:'', t:'s'};
+      if(!ws[cellAddr].s) ws[cellAddr].s = {};
+
+      // Borde en todas las celdas de datos
+      if(R >= headerRow){
+        ws[cellAddr].s.border = {
+          top:{style:'thin',color:{rgb:'CCCCCC'}},
+          bottom:{style:'thin',color:{rgb:'CCCCCC'}},
+          left:{style:'thin',color:{rgb:'CCCCCC'}},
+          right:{style:'thin',color:{rgb:'CCCCCC'}}
+        };
+      }
+
+      // Header principal (fila 0)
+      if(R === 0){
+        ws[cellAddr].s.font = {bold:true, sz:10};
+      }
+
+      // Fila de headers de tabla
+      if(R === headerRow){
+        ws[cellAddr].s.font = {bold:true, sz:9, color:{rgb:'FFFFFF'}};
+        ws[cellAddr].s.fill = {fgColor:{rgb:'1D1D1F'}};
+        ws[cellAddr].s.alignment = {horizontal:'center'};
+        ws[cellAddr].s.border = {
+          top:{style:'medium',color:{rgb:'000000'}},
+          bottom:{style:'medium',color:{rgb:'000000'}},
+          left:{style:'thin',color:{rgb:'666666'}},
+          right:{style:'thin',color:{rgb:'666666'}}
+        };
+      }
+
+      // Filas separadoras (--- RACK ---, --- BLOQUES ---)
+      const cellVal = String(ws[cellAddr].v||'');
+      if(cellVal.startsWith('---')){
+        ws[cellAddr].s.font = {bold:true, sz:9, color:{rgb:'FFFFFF'}};
+        ws[cellAddr].s.fill = {fgColor:{rgb:'0071E3'}};
+      }
+
+      // Bajo stock → fila en rojo claro
+      if(R > headerRow && C === 8){
+        const condVal = String(ws[cellAddr].v||'');
+        if(condVal === 'bajo stock'){
+          ws[cellAddr].s.font = {color:{rgb:'D70015'}, bold:true, sz:8};
+        }
+      }
+
+      // Fuente general datos
+      if(R > headerRow && !String(ws[cellAddr].v||'').startsWith('---')){
+        if(!ws[cellAddr].s.font) ws[cellAddr].s.font = {sz:8};
+        else ws[cellAddr].s.font.sz = ws[cellAddr].s.font.sz || 8;
+      }
+
+      // Total row
+      if(R === range.e.r - 1 || R === range.e.r){
+        if(!ws[cellAddr].s.font) ws[cellAddr].s.font = {};
+        ws[cellAddr].s.font.bold = true;
+      }
+    }
+  }
+
+  // Filas altas para headers
+  if(!ws['!rows']) ws['!rows'] = [];
+  ws['!rows'][0] = {hpt:18};
+  ws['!rows'][2] = {hpt:16};
+  ws['!rows'][headerRow] = {hpt:15};
+
   XLSX.utils.book_append_sheet(wb, ws, 'PEDIDO');
 
   const fileName = `Pedido_${nroPedido.replace(/[/\\]/g,'-')}.xlsx`;
@@ -4983,6 +5113,383 @@ function aplicarRotacionReal(){
   saveDataStock();
   // Recalculate suggestions will use new rot values
   showToast('✅ Rotación real aplicada a '+updated+' artículos · Recargá las sugerencias de rack');
+}
+
+
+function imprimirPedido(){
+  if(!window._pedidoActual){ showToast('❌ No hay pedido cargado'); return; }
+
+  const tte = document.getElementById('ped-tte').value||'';
+  const destino = document.getElementById('ped-destino').value||'';
+  const tipo = _modoPedido==='chasis'?'CHASIS':'FLETE ORIGEN';
+  const darsena = document.getElementById('ped-darsena').value||'';
+  const preparador = document.getElementById('ped-preparador').value||'';
+  const fecha = new Date().toLocaleDateString('es-AR');
+  let nroPedEl = document.getElementById('ped-nropedido');
+  if(!nroPedEl.value) nroPedEl.value = generarNroPedido();
+  const nroPedido = nroPedEl.value;
+
+  let {rack, bloque, sin} = window._pedidoActual;
+
+  // Ordenar
+  rack = [...rack].sort((a,b)=>getPosOrder(a.posRack||'')-getPosOrder(b.posRack||''));
+  function getBloqueOrderPrint(bl){
+    if(!bl) return 999;
+    const match = bl.match(/(\d+)/);
+    const num = match ? parseInt(match[1]) : 99;
+    const lado = bl.includes('S') ? 0.5 : 0;
+    return num * 10 + lado;
+  }
+  bloque = [...bloque].sort((a,b)=>getBloqueOrderPrint(a.bloque||'')-getBloqueOrderPrint(b.bloque||''));
+
+  const totalCant = [...rack,...bloque,...sin].reduce((s,r)=>s+r.cant,0);
+
+  let paso = 1;
+  function filas(items, esRack){
+    return items.map(r=>`
+      <tr style="${r.cond==='bajo stock'?'color:#d70015':''}">
+        <td style="text-align:center;color:#86868b">${paso++}</td>
+        <td>${r.art}</td>
+        <td><strong>${r.med||''}</strong> ${r.diseno||''}</td>
+        <td>${r.prov||''}</td>
+        <td style="text-align:center;font-weight:700;font-size:13px">${r.cant}</td>
+        <td style="text-align:center">${r.stock||0}</td>
+        <td style="color:#0071e3;font-weight:600">${esRack?(r.posRack||''):(r.bloque||'')}</td>
+        <td style="font-size:9px;color:${r.cond==='bajo stock'?'#d70015':'#86868b'}">${r.cond||''}</td>
+      </tr>`).join('');
+  }
+
+  const printHTML = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Pedido ${nroPedido}</title>
+<style>
+  @page { size: A4 landscape; margin: 8mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+  body { font-size: 9px; color: #1d1d1f; }
+
+  .header { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; border: 2px solid #1d1d1f; border-radius: 4px; padding: 6px 8px; margin-bottom: 6px; }
+  .header-col { display: flex; flex-direction: column; gap: 3px; }
+  .h-label { font-size: 8px; color: #86868b; text-transform: uppercase; }
+  .h-val { font-size: 11px; font-weight: 700; }
+  .h-title { font-size: 14px; font-weight: 700; text-align: right; }
+  .h-sub { font-size: 10px; color: #86868b; text-align: right; }
+  .h-nro { font-size: 13px; font-weight: 700; color: #0071e3; text-align: right; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #1d1d1f; color: #fff; padding: 4px 5px; font-size: 8px; text-transform: uppercase; letter-spacing: .3px; }
+  td { padding: 3px 5px; border-bottom: 1px solid #e5e5ea; font-size: 9px; vertical-align: middle; }
+  tr:nth-child(even) td { background: #fafafa; }
+  .sep td { background: #0071e3; color: #fff; font-weight: 700; font-size: 8px; padding: 2px 5px; }
+  .sep.blq td { background: #ff9500; }
+  .total td { border-top: 2px solid #1d1d1f; font-weight: 700; font-size: 10px; }
+  .footer { margin-top: 8px; display: flex; justify-content: space-between; font-size: 8px; color: #86868b; border-top: 1px solid #e5e5ea; padding-top: 4px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-col">
+    <span class="h-label">Transportista</span>
+    <span class="h-val">${tte||'—'}</span>
+    <span class="h-label" style="margin-top:4px">Tipo</span>
+    <span class="h-val">${tipo}</span>
+  </div>
+  <div class="header-col">
+    <span class="h-label">Origen</span>
+    <span class="h-val">HALPERN</span>
+    <span class="h-label" style="margin-top:4px">Destino</span>
+    <span class="h-val">${destino||'—'}</span>
+  </div>
+  <div class="header-col" style="align-items:flex-end">
+    <span class="h-title">PREPARACIÓN DE PEDIDOS</span>
+    <span class="h-nro">Nº ${nroPedido}</span>
+    <span class="h-sub">Fecha: ${fecha} ${darsena?'· Dársena: '+darsena:''}</span>
+    ${preparador?`<span class="h-sub">Preparador: <strong>${preparador}</strong></span>`:''}
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:24px">#</th>
+      <th style="width:55px">Artículo</th>
+      <th>Descripción</th>
+      <th style="width:80px">Proveedor</th>
+      <th style="width:40px">Cant.</th>
+      <th style="width:50px">Stock FP</th>
+      <th style="width:90px">Ubicación</th>
+      <th style="width:65px">Condición</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${rack.length>0?`<tr class="sep"><td colspan="8">📦 RACK — ${rack.length} artículos · Preparar primero</td></tr>${filas(rack,true)}`:''}
+    ${bloque.length>0?`<tr class="sep blq"><td colspan="8">🏭 BLOQUES — ${bloque.length} artículos</td></tr>${filas(bloque,false)}`:''}
+    ${sin.length>0?`<tr class="sep" style="background:#86868b"><td colspan="8">Sin ubicación — ${sin.length} artículos</td></tr>${filas(sin,false)}`:''}
+    <tr class="total"><td colspan="3">TOTAL</td><td style="text-align:center;font-size:13px">${totalCant}</td><td colspan="4"></td></tr>
+  </tbody>
+</table>
+
+<div class="footer">
+  <span>WMS Depósito Halpern · ${new Date().toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
+  <span>${rack.length+bloque.length+sin.length} artículos en total</span>
+</div>
+
+<scr'+'ipt>window.onload=function(){window.print();}<\/scr'+'ipt>
+</body>
+</html>`;
+
+  const win = window.open('','_blank');
+  win.document.write(printHTML);
+  win.document.close();
+}
+
+
+// === COLA DE PEDIDOS & PROD TABS ===
+let _prodTab = 'movs';
+
+function setProdTab(tab, btn){
+  _prodTab = tab;
+  document.querySelectorAll('[id^="ptab-"]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('prod-tab-movs').style.display = tab==='movs'?'block':'none';
+  document.getElementById('prod-tab-cola').style.display = tab==='cola'?'block':'none';
+  document.getElementById('prod-tab-resumen').style.display = tab==='resumen'?'block':'none';
+  if(tab==='cola') renderColaPedidos();
+  if(tab==='resumen') renderResumenProd();
+}
+
+// Cola de pedidos
+function getColaPedidos(){
+  return JSON.parse(localStorage.getItem('wms_cola_pedidos')||'[]');
+}
+function saveColaPedidos(cola){
+  localStorage.setItem('wms_cola_pedidos', JSON.stringify(cola));
+}
+
+function agregarPedidoCola(pedido){
+  // Called from pedidos module when processing
+  const cola = getColaPedidos();
+  const nroPed = document.getElementById('ped-nropedido')?.value || generarNroPedido();
+  const destino = document.getElementById('ped-destino')?.value || '';
+  const tipo = _modoPedido==='chasis'?'CHASIS':'FLETE ORIGEN';
+  const totalUnid = [...pedido.rack,...pedido.bloque,...pedido.sin].reduce((s,r)=>s+r.cant,0);
+  const totalArts = pedido.rack.length + pedido.bloque.length + pedido.sin.length;
+
+  cola.push({
+    id: Date.now(),
+    nroPed,
+    destino,
+    tipo,
+    totalUnid,
+    totalArts,
+    fecha: new Date().toLocaleDateString('es-AR'),
+    hora: new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),
+    estado: 'pendiente', // pendiente, despachado, cancelado
+    grupo: '',
+    inicio: '',
+    fin: '',
+    unidReal: totalUnid,
+    obs: '',
+    pedidoData: pedido,
+  });
+  saveColaPedidos(cola);
+}
+
+function renderColaPedidos(){
+  const cola = getColaPedidos();
+  const el = document.getElementById('prod-cola-lista');
+  if(!el) return;
+  if(!cola.length){
+    el.innerHTML='<div class="empty">Sin pedidos en cola hoy</div>';
+    return;
+  }
+
+  const personal = getGruposHoy();
+  const gruposHoy = [...new Set(personal.filter(p=>p.presente).map(p=>p.grupoHoy))];
+  const zfHoy = JSON.parse(localStorage.getItem(getZFKey())||'{"presente":false}');
+  if(zfHoy.presente) gruposHoy.push('ZF');
+
+  el.innerHTML = cola.map((p,i)=>{
+    const estadoColor = p.estado==='despachado'?'#34c759':p.estado==='cancelado'?'#d70015':'#ff9500';
+    const estadoLabel = p.estado==='despachado'?'✅ Despachado':p.estado==='cancelado'?'❌ Cancelado':'🟡 Pendiente';
+    return `<div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;margin-bottom:8px;overflow:hidden">
+      <div style="padding:10px 12px;display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700">${p.destino||'Sin destino'}</div>
+          <div style="font-size:11px;color:#86868b">${p.nroPed} · ${p.tipo} · ${p.totalArts} arts · ${p.totalUnid.toLocaleString('es-AR')} un.</div>
+          <div style="font-size:10px;color:#86868b">${p.hora}</div>
+        </div>
+        <span style="font-size:11px;font-weight:600;color:${estadoColor};background:${estadoColor}20;padding:3px 8px;border-radius:10px;flex-shrink:0">${estadoLabel}</span>
+      </div>
+      ${p.estado==='pendiente'?`
+      <div style="border-top:1px solid #f5f5f7;padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:10px;color:#86868b;margin-bottom:3px">Grupo</div>
+          <select onchange="updateColaPedido(${i},'grupo',this.value)" style="width:100%;padding:6px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;outline:none">
+            <option value="">Seleccionar...</option>
+            ${gruposHoy.map(g=>`<option value="${g}" ${p.grupo===g?'selected':''}>${g}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#86868b;margin-bottom:3px">Unidades reales</div>
+          <input type="number" value="${p.unidReal}" onchange="updateColaPedido(${i},'unidReal',parseInt(this.value)||0)"
+            style="width:100%;padding:6px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;outline:none">
+        </div>
+        <div>
+          <div style="font-size:10px;color:#86868b;margin-bottom:3px">Inicio</div>
+          <input type="time" value="${p.inicio}" onchange="updateColaPedido(${i},'inicio',this.value)"
+            style="width:100%;padding:6px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;outline:none">
+        </div>
+        <div>
+          <div style="font-size:10px;color:#86868b;margin-bottom:3px">Fin</div>
+          <input type="time" value="${p.fin}" onchange="updateColaPedido(${i},'fin',this.value)"
+            style="width:100%;padding:6px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;outline:none">
+        </div>
+        <div style="grid-column:span 2">
+          <div style="font-size:10px;color:#86868b;margin-bottom:3px">Observaciones</div>
+          <input type="text" value="${p.obs||''}" placeholder="Opcional..." onchange="updateColaPedido(${i},'obs',this.value)"
+            style="width:100%;padding:6px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;outline:none">
+        </div>
+        <button onclick="confirmarColaPedido(${i})" style="padding:8px;background:#34c759;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">✅ Confirmar despacho</button>
+        <button onclick="cancelarColaPedido(${i})" style="padding:8px;background:#ffd6d9;color:#d70015;border:none;border-radius:8px;font-size:12px;cursor:pointer">❌ Cancelar</button>
+      </div>`:`
+      <div style="border-top:1px solid #f5f5f7;padding:8px 12px;font-size:11px;color:#86868b">
+        ${p.grupo?'Grupo: '+p.grupo+' · ':''} ${p.unidReal} un. reales · ${p.inicio&&p.fin?p.inicio+' → '+p.fin:''} ${p.obs?'· '+p.obs:''}
+      </div>`}
+    </div>`;
+  }).join('');
+}
+
+function updateColaPedido(idx, field, val){
+  const cola = getColaPedidos();
+  cola[idx][field] = val;
+  saveColaPedidos(cola);
+}
+
+function confirmarColaPedido(idx){
+  const cola = getColaPedidos();
+  const p = cola[idx];
+  if(!p.grupo){ showToast('❌ Seleccioná el grupo'); return; }
+
+  // Mark as dispatched
+  cola[idx].estado = 'despachado';
+  saveColaPedidos(cola);
+
+  // Register movement in productividad
+  const durMin = p.inicio&&p.fin ? (()=>{
+    const [ih,im]=p.inicio.split(':').map(Number);
+    const [fh,fm]=p.fin.split(':').map(Number);
+    return (fh*60+fm)-(ih*60+im);
+  })() : 0;
+
+  const mov = {
+    fecha: p.fecha,
+    hora: p.hora,
+    tipo: 'despacho',
+    grupo: p.grupo,
+    darsena: '',
+    destino: p.destino,
+    unidades: p.unidReal,
+    semis: 1,
+    inicio: p.inicio,
+    fin: p.fin,
+    durMin,
+    obs: p.obs,
+    nroPed: p.nroPed,
+  };
+
+  const dayKey = 'prod_'+p.fecha.replace(/\//g,'-');
+  const movsDia = JSON.parse(localStorage.getItem(dayKey)||'[]');
+  movsDia.push(mov);
+  localStorage.setItem(dayKey, JSON.stringify(movsDia));
+
+  // Monthly history
+  const partes = p.fecha.split('/');
+  const mesKey = 'prod_hist_'+partes[1]+'_'+partes[2];
+  const hist = JSON.parse(localStorage.getItem(mesKey)||'[]');
+  hist.push(mov);
+  localStorage.setItem(mesKey, JSON.stringify(hist));
+
+  renderColaPedidos();
+  showToast('✅ Despacho confirmado — '+p.unidReal+' un. · '+p.grupo);
+}
+
+function cancelarColaPedido(idx){
+  const cola = getColaPedidos();
+  cola[idx].estado = 'cancelado';
+  saveColaPedidos(cola);
+  renderColaPedidos();
+  showToast('❌ Pedido cancelado');
+}
+
+function limpiarColaPedidos(){
+  if(!confirm('¿Limpiar toda la cola del día?')) return;
+  localStorage.removeItem('wms_cola_pedidos');
+  renderColaPedidos();
+  showToast('🗑️ Cola limpiada');
+}
+
+// Resumen mensual
+function renderResumenProd(){
+  const el = document.getElementById('prod-resumen-content');
+  if(!el) return;
+  const mes = new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+  const hist = JSON.parse(localStorage.getItem('prod_hist_'+mes)||'[]');
+
+  if(!hist.length){ el.innerHTML='<div class="empty">Sin movimientos este mes</div>'; return; }
+
+  // Stats totales
+  const totalUnid = hist.reduce((s,m)=>s+m.unidades,0);
+  const totalMovs = hist.length;
+  const dias = [...new Set(hist.map(m=>m.fecha))].length;
+
+  // Por grupo
+  const grupos = ['G1','G2','G3','R','ZF','C'];
+  const porGrupo = {};
+  grupos.forEach(g=>{ porGrupo[g]={unid:0,movs:0,tiempo:0}; });
+  hist.forEach(m=>{
+    if(porGrupo[m.grupo]){
+      porGrupo[m.grupo].unid += m.unidades;
+      porGrupo[m.grupo].movs++;
+      porGrupo[m.grupo].tiempo += m.durMin||0;
+    }
+  });
+
+  // Por tipo
+  const porTipo = {};
+  hist.forEach(m=>{ porTipo[m.tipo]=(porTipo[m.tipo]||0)+m.unidades; });
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
+      <div class="prod-res-card"><div class="prod-res-val" style="color:#0071e3">${totalUnid.toLocaleString('es-AR')}</div><div style="font-size:10px;color:#86868b">Unidades del mes</div></div>
+      <div class="prod-res-card"><div class="prod-res-val">${totalMovs}</div><div style="font-size:10px;color:#86868b">Movimientos</div></div>
+      <div class="prod-res-card"><div class="prod-res-val">${dias}</div><div style="font-size:10px;color:#86868b">Días trabajados</div></div>
+    </div>
+
+    <div style="font-size:11px;font-weight:600;color:#86868b;margin-bottom:6px;text-transform:uppercase">Por grupo</div>
+    ${grupos.filter(g=>porGrupo[g].movs>0).map(g=>`
+      <div style="background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+        <div style="font-size:13px;font-weight:700;color:${GRUPOS_COLORES[g]||'#86868b'};width:30px">${g}</div>
+        <div style="flex:1">
+          <div style="height:6px;background:#f0f0f0;border-radius:3px;overflow:hidden">
+            <div style="width:${Math.round(porGrupo[g].unid/totalUnid*100)}%;height:100%;background:${GRUPOS_COLORES[g]||'#86868b'};border-radius:3px"></div>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:14px;font-weight:700">${porGrupo[g].unid.toLocaleString('es-AR')} un.</div>
+          <div style="font-size:10px;color:#86868b">${porGrupo[g].movs} movs · ${porGrupo[g].tiempo>0?Math.round(porGrupo[g].tiempo/60)+'h':'—'}</div>
+        </div>
+      </div>`).join('')}
+
+    <div style="font-size:11px;font-weight:600;color:#86868b;margin:10px 0 6px;text-transform:uppercase">Por tipo</div>
+    ${Object.entries(porTipo).sort((a,b)=>b[1]-a[1]).map(([tipo,unid])=>`
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #e5e5ea;margin-bottom:4px">
+        <span style="font-size:12px;font-weight:500">${tipo==='carga'?'📥 Carga':tipo==='descarga'?'📤 Descarga':tipo==='despacho'?'📋 Despacho':'🚗 Chasis'}</span>
+        <span style="font-size:13px;font-weight:700">${unid.toLocaleString('es-AR')} un.</span>
+      </div>`).join('')}
+  `;
 }
 
 function renderNave(){
