@@ -1178,8 +1178,18 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
       <select id="pall-filtro" onchange="renderPalletizado()" 
         style="padding:8px;border:1px solid #d2d2d7;border-radius:10px;font-size:12px;background:#fff;outline:none">
         <option value="todos">Todos</option>
-        <option value="ajustados">⚠️ Ajustados</option>
+        <option value="ajustados">✏️ Ajustados</option>
         <option value="sin">Sin datos</option>
+      </select>
+      <select id="pall-orden" onchange="renderPalletizado()"
+        style="padding:8px;border:1px solid #d2d2d7;border-radius:10px;font-size:12px;background:#fff;outline:none">
+        <option value="med">Medida A-Z</option>
+        <option value="ancho_desc">Más ancho ↓</option>
+        <option value="ancho_asc">Más angosto ↑</option>
+        <option value="rack_desc">Mayor P rack ↓</option>
+        <option value="rack_asc">Menor P rack ↑</option>
+        <option value="piso_desc">Mayor P piso ↓</option>
+        <option value="dext_desc">Mayor diam ext ↓</option>
       </select>
     </div>
 
@@ -5651,6 +5661,20 @@ function renderPalletizado(){
     if(filtro==='ajustados') return p?.ajustado;
     if(filtro==='sin') return !p;
     return true;
+  });
+
+  // Sort
+  const pOrd = document.getElementById('pall-orden')?.value||'med';
+  lista.sort((a,b)=>{
+    const pa = pallData[a.art]||{};
+    const pb = pallData[b.art]||{};
+    if(pOrd==='ancho_desc') return (pb.ae||0)-(pa.ae||0);
+    if(pOrd==='ancho_asc') return (pa.ae||0)-(pb.ae||0);
+    if(pOrd==='rack_desc') return (pb.p_rack||0)-(pa.p_rack||0);
+    if(pOrd==='rack_asc') return (pa.p_rack||0)-(pb.p_rack||0);
+    if(pOrd==='piso_desc') return (pb.p_piso||0)-(pa.p_piso||0);
+    if(pOrd==='dext_desc') return (pb.ag||0)-(pa.ag||0);
+    return a.med.localeCompare(b.med);
   });
 
   const el = document.getElementById('pall-lista');
