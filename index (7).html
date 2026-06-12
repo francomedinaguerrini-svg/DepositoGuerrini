@@ -64,6 +64,28 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 .stat-val.big{font-size:28px;font-weight:700;color:#1d1d1f}
 .stat-lbl{font-size:10px;color:#86868b;margin-top:1px}
 .empty{text-align:center;padding:40px 20px;color:#86868b}
+.rot-wrap{padding:12px;padding-bottom:120px}
+.rot-upload-card{background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:14px;margin-bottom:10px}
+.rot-upload-title{font-size:13px;font-weight:600;margin-bottom:10px}
+.rot-upload-zone{border:2px dashed #d2d2d7;border-radius:10px;padding:16px;text-align:center;cursor:pointer;margin-bottom:8px;transition:border-color .2s}
+.rot-upload-zone:hover{border-color:#0071e3}
+.rot-upload-zone.loaded{border-color:#34c759;background:#f0fff4}
+.rot-stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+.rot-stat{background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:10px;text-align:center}
+.rot-stat-val{font-size:20px;font-weight:700;color:#0071e3}
+.rot-stat-lbl{font-size:10px;color:#86868b;margin-top:2px}
+.rot-card{background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.rot-info{flex:1;min-width:0}
+.rot-med{font-size:13px;font-weight:700}
+.rot-sub{font-size:11px;color:#86868b}
+.rot-vals{display:flex;gap:12px;flex-shrink:0;align-items:center}
+.rot-val{text-align:center}
+.rot-val-num{font-size:16px;font-weight:700}
+.rot-val-lbl{font-size:9px;color:#86868b}
+.rot-trend{font-size:18px}
+.rot-filters{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.rot-select{flex:1;padding:8px;border:1px solid #d2d2d7;border-radius:10px;font-size:12px;background:#fff;outline:none;min-width:100px}
+
 /* PASSWORD */
 .pwd-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:none;align-items:center;justify-content:center}
 .pwd-overlay.show{display:flex}
@@ -564,6 +586,11 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
       <div class="home-btn-label">Diferencias</div>
       <div class="home-btn-sub">Control despachos</div>
     </button>
+    <button class="home-btn accent-blue" onclick="goHome('rot')">
+      <div class="home-btn-icon">🔥</div>
+      <div class="home-btn-label">Rotación Real</div>
+      <div class="home-btn-sub">6m y 12m reales</div>
+    </button>
   </div>
 
   <div class="home-section-title">RRHH & Productividad</div>
@@ -1027,6 +1054,60 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     <div id="dot-lista"></div>
   </div>
 </div>
+
+<!-- ROTACION -->
+<div class="view" id="view-rot">
+  <div class="rot-wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-size:13px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px">🔥 Rotación Real</span>
+      <button onclick="aplicarRotacionReal()" id="btn-aplicar-rot" style="display:none;padding:7px 12px;background:#34c759;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">✅ Aplicar al WMS</button>
+    </div>
+
+    <!-- Upload section - solo visible si no hay datos o querés actualizar -->
+    <div id="rot-upload-toggle" style="margin-bottom:8px">
+      <button onclick="toggleRotUpload()" id="btn-rot-toggle" 
+        style="width:100%;padding:9px;background:#f5f5f7;color:#86868b;border:1px solid #d2d2d7;border-radius:10px;font-size:12px;font-weight:500;cursor:pointer">
+        📂 Actualizar archivos de ventas
+      </button>
+    </div>
+    <div class="rot-upload-card" id="rot-upload-panel" style="display:none">
+      <div class="rot-upload-title">📂 Subir archivos de ventas</div>
+      <div class="rot-upload-zone" id="rot-zone-cli" onclick="document.getElementById('rot-file-cli').click()">
+        <input type="file" id="rot-file-cli" accept=".xlsx,.xls" style="display:none" onchange="handleRotFile(this,'cli')">
+        <div id="rot-cli-label">📋 Remitos a Clientes<br><span style="font-size:11px;color:#86868b">Col A=Artículo · Col N=Cantidad</span></div>
+      </div>
+      <div class="rot-upload-zone" id="rot-zone-int" onclick="document.getElementById('rot-file-int').click()">
+        <input type="file" id="rot-file-int" accept=".xlsx,.xls" style="display:none" onchange="handleRotFile(this,'int')">
+        <div id="rot-int-label">🏭 Remitos Internos / Sucursales<br><span style="font-size:11px;color:#86868b">Col A=Artículo · Col I=Cantidad</span></div>
+      </div>
+      <button onclick="procesarRotacion()" id="btn-procesar-rot" style="display:none;width:100%;padding:11px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">🔥 Calcular Rotación Real</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="rot-stat-row" id="rot-stats" style="display:none"></div>
+
+    <!-- Comparativa banner -->
+    <div id="rot-banner" style="display:none"></div>
+
+    <!-- Filtros -->
+    <div class="rot-filters" id="rot-filters" style="display:none">
+      <input type="text" id="rot-buscar" placeholder="🔍 Buscar medida, diseño..." oninput="renderRotacion()"
+        style="flex:2;padding:8px 12px;border:1px solid #d2d2d7;border-radius:10px;font-size:13px;background:#fff;outline:none">
+      <select id="rot-f-diseno" onchange="renderRotacion()" class="rot-select"><option value="">Todos los diseños</option></select>
+      <select id="rot-f-llanta" onchange="renderRotacion()" class="rot-select"><option value="">Todas las llantas</option></select>
+      <select id="rot-f-prov" onchange="renderRotacion()" class="rot-select"><option value="">Todos los proveedores</option></select>
+      <select id="rot-f-orden" onchange="renderRotacion()" class="rot-select">
+        <option value="rot12">Mayor rot. 12m</option>
+        <option value="rot6">Mayor rot. 6m</option>
+        <option value="sube">↑ Acelerando</option>
+        <option value="baja">↓ Frenando</option>
+      </select>
+    </div>
+
+    <!-- Lista -->
+    <div id="rot-lista"></div>
+  </div>
+</div>
 <!-- MODAL -->
 <div class="modal-bg" id="modal-bg" onclick="closeModal(event)">
   <div class="modal">
@@ -1320,6 +1401,7 @@ function switchTab(name,btn){
   if(name==='dif') renderDiferencias();
   if(name==='grupos') { renderGrupos(); renderGruposHoy(); }
   if(name==='dot') renderDOTs();
+  if(name==='rot') renderRotacion();
   if(name==='prod') renderProductividad();
   if(name==='inv') renderInventario();
   if(name==='repo') renderReposicion();
@@ -4633,6 +4715,274 @@ function navTo(view){
   if(view==='grupos'){ renderGrupos(); renderGruposHoy(); }
   if(view==='prod') renderProductividad();
   if(view==='dot') renderDOTs();
+}
+
+
+// === ROTACIÓN REAL ===
+let _rotData = null;
+let _rotRawCli = null;
+let _rotRawInt = null;
+
+function handleRotFile(input, tipo){
+  const file = input.files[0];
+  if(!file) return;
+  const zoneId = tipo==='cli' ? 'rot-zone-cli' : 'rot-zone-int';
+  const labelId = tipo==='cli' ? 'rot-cli-label' : 'rot-int-label';
+  const reader = new FileReader();
+  reader.onload = e=>{
+    if(tipo==='cli') _rotRawCli = e.target.result;
+    else _rotRawInt = e.target.result;
+    document.getElementById(zoneId).classList.add('loaded');
+    document.getElementById(labelId).innerHTML = `✅ ${file.name}<br><span style="font-size:11px;color:#34c759">Cargado correctamente</span>`;
+    if(_rotRawCli && _rotRawInt){
+      document.getElementById('btn-procesar-rot').style.display='block';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function procesarRotacion(){
+  showToast('⏳ Procesando archivos...');
+  setTimeout(()=>{
+    try{
+      const ahora = new Date();
+      const hace6m = new Date(ahora); hace6m.setMonth(ahora.getMonth()-6);
+      const hace12m = new Date(ahora); hace12m.setFullYear(ahora.getFullYear()-1);
+
+      // Process clientes file
+      const wbCli = XLSX.read(_rotRawCli, {type:'array', cellDates:true});
+      const wsCli = wbCli.Sheets[wbCli.SheetNames[0]];
+      const rowsCli = XLSX.utils.sheet_to_json(wsCli, {header:1, defval:null});
+
+      // Find header row
+      let hCli = -1;
+      for(let i=0;i<rowsCli.length;i++){
+        if(rowsCli[i] && rowsCli[i].some && rowsCli[i].some(v=>String(v||'').includes('Cantidad'))){
+          hCli = i; break;
+        }
+      }
+
+      const vtas12 = {}, vtas6 = {};
+      for(let i=hCli+1; i<rowsCli.length; i++){
+        const r = rowsCli[i];
+        if(!r||!r[7]) continue;
+        const art = parseInt(r[7]);
+        const cant = parseFloat(r[13]||0);
+        const fecha = r[6] instanceof Date ? r[6] : new Date(r[6]);
+        if(!art||cant>=0||isNaN(fecha.getTime())) continue;
+        const abs = Math.abs(cant);
+        if(fecha >= hace12m){ vtas12[art] = (vtas12[art]||0) + abs; }
+        if(fecha >= hace6m){ vtas6[art] = (vtas6[art]||0) + abs; }
+      }
+
+      // Process internos file
+      const wbInt = XLSX.read(_rotRawInt, {type:'array', cellDates:true});
+      const wsInt = wbInt.Sheets[wbInt.SheetNames[0]];
+      const rowsInt = XLSX.utils.sheet_to_json(wsInt, {header:1, defval:null});
+
+      let hInt = -1;
+      for(let i=0;i<rowsInt.length;i++){
+        if(rowsInt[i] && rowsInt[i][0]==='Articulo'){ hInt=i; break; }
+      }
+
+      for(let i=hInt+1; i<rowsInt.length; i++){
+        const r = rowsInt[i];
+        if(!r||!r[0]) continue;
+        const art = parseInt(r[0]);
+        const cant = parseFloat(r[8]||0);
+        const fecha = r[4] instanceof Date ? r[4] : new Date(r[4]);
+        if(!art||cant<=0||isNaN(fecha.getTime())) continue;
+        if(fecha >= hace12m){ vtas12[art] = (vtas12[art]||0) + cant; }
+        if(fecha >= hace6m){ vtas6[art] = (vtas6[art]||0) + cant; }
+      }
+
+      // Build rotacion data
+      const rotData = {};
+      const allArts = new Set([...Object.keys(vtas12), ...Object.keys(vtas6)]);
+      allArts.forEach(artStr=>{
+        const art = parseInt(artStr);
+        const t12 = vtas12[art]||0;
+        const t6 = vtas6[art]||0;
+        const rot12 = Math.round(t12/12*10)/10;
+        const rot6 = Math.round(t6/6*10)/10;
+        rotData[art] = {rot12, rot6, t12:Math.round(t12), t6:Math.round(t6)};
+      });
+
+      _rotData = rotData;
+      localStorage.setItem('wms_rot_real', JSON.stringify(rotData));
+      localStorage.setItem('wms_rot_fecha', new Date().toLocaleDateString('es-AR'));
+
+      renderRotacion();
+      document.getElementById('rot-stats').style.display='grid';
+      document.getElementById('rot-banner').style.display='block';
+      document.getElementById('rot-filters').style.display='flex';
+      document.getElementById('btn-aplicar-rot').style.display='block';
+      showToast('✅ Rotación calculada — '+Object.keys(rotData).length+' artículos');
+    }catch(err){
+      showToast('❌ Error al procesar: '+err.message);
+      console.error(err);
+    }
+  }, 100);
+}
+
+function toggleRotUpload(){
+  const panel = document.getElementById('rot-upload-panel');
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  document.getElementById('btn-rot-toggle').textContent = isOpen ? '📂 Actualizar archivos de ventas' : '✕ Cerrar';
+}
+
+function renderRotacion(){
+  if(!_rotData){
+    const saved = localStorage.getItem('wms_rot_real');
+    if(saved){
+      _rotData = JSON.parse(saved);
+      // Apply to DATA automatically
+      let updated = 0;
+      DATA.forEach(r=>{
+        if(_rotData[r.art]){
+          r.rot = _rotData[r.art].rot12;
+          r.rot6 = _rotData[r.art].rot6;
+          updated++;
+        }
+      });
+      document.getElementById('rot-stats').style.display='grid';
+      document.getElementById('rot-banner').style.display='block';
+      document.getElementById('rot-filters').style.display='flex';
+      document.getElementById('btn-aplicar-rot').style.display='block';
+    } else {
+      // No data yet - show upload panel automatically
+      document.getElementById('rot-upload-panel').style.display='block';
+      document.getElementById('btn-rot-toggle').textContent = '✕ Cerrar';
+      document.getElementById('rot-lista').innerHTML='<div class="empty">Subí los archivos para calcular la rotación real</div>';
+      return;
+    }
+  }
+
+  const q = (document.getElementById('rot-buscar')?.value||'').toLowerCase();
+  const fDiseno = document.getElementById('rot-f-diseno')?.value||'';
+  const fLlanta = document.getElementById('rot-f-llanta')?.value||'';
+  const fProv = document.getElementById('rot-f-prov')?.value||'';
+  const orden = document.getElementById('rot-f-orden')?.value||'rot12';
+
+  function getLlanta(med){ try{return med.trim().split(' ').pop()}catch{return ''} }
+
+  // Join with DATA
+  let lista = DATA.filter(r=>{
+    if(!_rotData[r.art] && !r.rot) return false;
+    const rot = _rotData[r.art];
+    if(!rot) return false;
+    if(q){
+      const s=(r.art+' '+r.med+' '+r.diseno+' '+r.prov).toLowerCase();
+      if(!s.includes(q)) return false;
+    }
+    if(fDiseno && r.diseno!==fDiseno) return false;
+    if(fLlanta && getLlanta(r.med)!==fLlanta) return false;
+    if(fProv && r.prov!==fProv) return false;
+    return true;
+  });
+
+  // Populate selects
+  const selDis = document.getElementById('rot-f-diseno');
+  const selLlan = document.getElementById('rot-f-llanta');
+  const selProv = document.getElementById('rot-f-prov');
+  if(selDis && selDis.options.length<=1){
+    [...new Set(DATA.map(r=>r.diseno).filter(Boolean))].sort().forEach(d=>{
+      const o=document.createElement('option');o.value=d;o.textContent=d;selDis.appendChild(o);
+    });
+  }
+  if(selLlan && selLlan.options.length<=1){
+    [...new Set(DATA.map(r=>getLlanta(r.med)).filter(Boolean))].sort((a,b)=>parseFloat(a)-parseFloat(b)).forEach(d=>{
+      const o=document.createElement('option');o.value=d;o.textContent=d;selLlan.appendChild(o);
+    });
+  }
+  if(selProv && selProv.options.length<=1){
+    [...new Set(DATA.map(r=>r.prov).filter(Boolean))].sort().forEach(d=>{
+      const o=document.createElement('option');o.value=d;o.textContent=d;selProv.appendChild(o);
+    });
+  }
+
+  // Sort
+  lista.sort((a,b)=>{
+    const ra = _rotData[a.art]||{rot12:0,rot6:0};
+    const rb = _rotData[b.art]||{rot12:0,rot6:0};
+    if(orden==='rot12') return rb.rot12-ra.rot12;
+    if(orden==='rot6') return rb.rot6-ra.rot6;
+    if(orden==='sube') return (rb.rot6-rb.rot12)-(ra.rot6-ra.rot12);
+    if(orden==='baja') return (ra.rot6-ra.rot12)-(rb.rot6-rb.rot12);
+    return 0;
+  });
+
+  // Stats
+  const totalArts = Object.keys(_rotData).length;
+  const acelerando = DATA.filter(r=>{
+    const d=_rotData[r.art]; return d && d.rot6>d.rot12*1.1;
+  }).length;
+  const frenando = DATA.filter(r=>{
+    const d=_rotData[r.art]; return d && d.rot6<d.rot12*0.9;
+  }).length;
+  const fechaRot = localStorage.getItem('wms_rot_fecha')||'';
+
+  document.getElementById('rot-stats').innerHTML = `
+    <div class="rot-stat"><div class="rot-stat-val">${totalArts}</div><div class="rot-stat-lbl">Arts con rotación real</div></div>
+    <div class="rot-stat"><div class="rot-stat-val" style="color:#34c759">${acelerando}</div><div class="rot-stat-lbl">↑ Acelerando</div></div>
+    <div class="rot-stat"><div class="rot-stat-val" style="color:#d70015">${frenando}</div><div class="rot-stat-lbl">↓ Frenando</div></div>
+  `;
+
+  document.getElementById('rot-banner').innerHTML = `
+    <div style="background:#f5f5f7;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:11px;color:#86868b">
+      🔥 Rotación calculada el ${fechaRot} · Período: últimos 12 meses y 6 meses
+    </div>
+  `;
+
+  // Render list
+  const el = document.getElementById('rot-lista');
+  if(!lista.length){ el.innerHTML='<div class="empty">Sin resultados</div>'; return; }
+
+  el.innerHTML = lista.slice(0,300).map(r=>{
+    const rot = _rotData[r.art]||{rot12:0,rot6:0};
+    const diff = rot.rot6 - rot.rot12;
+    const trend = diff > rot.rot12*0.1 ? '↑' : diff < -rot.rot12*0.1 ? '↓' : '→';
+    const trendColor = trend==='↑'?'#34c759':trend==='↓'?'#d70015':'#86868b';
+    const rotApp = r.rot||0;
+    const diffApp = rot.rot12 - rotApp;
+    const diffPct = rotApp>0 ? Math.round(diffApp/rotApp*100) : 0;
+
+    return `<div class="rot-card">
+      <div class="rot-info">
+        <div class="rot-med">${r.med} — ${r.diseno}</div>
+        <div class="rot-sub">${r.prov} · stock: ${(r.stock||0).toLocaleString('es-AR')} un.</div>
+        ${Math.abs(diffPct)>20?`<div style="font-size:10px;color:${diffPct>0?'#34c759':'#d70015'};margin-top:2px">
+          vs Excel: ${diffPct>0?'+':''}${diffPct}% (era ${rotApp}/mes)</div>`:''}
+      </div>
+      <div class="rot-vals">
+        <div class="rot-val">
+          <div class="rot-val-num" style="color:#0071e3">${rot.rot12}</div>
+          <div class="rot-val-lbl">12 meses</div>
+        </div>
+        <div class="rot-val">
+          <div class="rot-val-num" style="color:#ff9500">${rot.rot6}</div>
+          <div class="rot-val-lbl">6 meses</div>
+        </div>
+        <div class="rot-trend" style="color:${trendColor}">${trend}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function aplicarRotacionReal(){
+  if(!_rotData){ showToast('❌ Primero calculá la rotación'); return; }
+  let updated = 0;
+  DATA.forEach(r=>{
+    if(_rotData[r.art]){
+      r.rot = _rotData[r.art].rot12; // usar 12m como rot principal
+      r.rot6 = _rotData[r.art].rot6;
+      updated++;
+    }
+  });
+  saveDataStock();
+  // Recalculate suggestions will use new rot values
+  showToast('✅ Rotación real aplicada a '+updated+' artículos · Recargá las sugerencias de rack');
 }
 
 function renderNave(){
