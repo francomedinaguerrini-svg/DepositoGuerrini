@@ -1,29 +1,23 @@
-const CACHE_NAME = 'wms-deposito-v1';
+const CACHE_NAME = 'wms-deposito-v2';
+const BASE = '/DepositoGuerrini';
 const urlsToCache = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
+  BASE + '/',
+  BASE + '/index.html',
+  BASE + '/manifest.json',
+  BASE + '/icon-192.png',
+  BASE + '/icon-512.png',
 ];
 
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache).catch(()=>{}))
   );
 });
 
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request).then(response => {
-      if(response) return response;
-      return fetch(event.request).then(response => {
-        if(!response || response.status !== 200 || response.type !== 'basic') return response;
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseToCache));
-        return response;
-      });
-    }).catch(() => caches.match('./index.html'))
+    fetch(event.request).catch(() => caches.match(event.request))
   );
 });
 
@@ -33,4 +27,5 @@ self.addEventListener('activate', event => {
       keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
     ))
   );
+  self.clients.claim();
 });
