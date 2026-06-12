@@ -3849,6 +3849,17 @@ function generarInforme(){
   </div>
 </div>
 
+
+  <!-- PWA Service Worker -->
+  <script>
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', ()=>{
+        navigator.serviceWorker.register('sw.js')
+          .then(()=>console.log('SW registrado'))
+          .catch(e=>console.log('SW error:', e));
+      });
+    }
+  </script>
 </body>
 </html>`;
 
@@ -5412,6 +5423,17 @@ function imprimirPedido(){
 </div>
 
 <scr'+'ipt>window.onload=function(){window.print();}<\/scr'+'ipt>
+
+  <!-- PWA Service Worker -->
+  <script>
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', ()=>{
+        navigator.serviceWorker.register('sw.js')
+          .then(()=>console.log('SW registrado'))
+          .catch(e=>console.log('SW error:', e));
+      });
+    }
+  </script>
 </body>
 </html>`;
 
@@ -6029,5 +6051,16 @@ if('serviceWorker' in navigator){
   </div>
 </div>
 
+
+  <!-- PWA Service Worker -->
+  <script>
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', ()=>{
+        navigator.serviceWorker.register('sw.js')
+          .then(()=>console.log('SW registrado'))
+          .catch(e=>console.log('SW error:', e));
+      });
+    }
+  </script>
 </body>
 </html>

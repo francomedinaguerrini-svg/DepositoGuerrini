@@ -1,0 +1,24 @@
+{
+  "name": "WMS Depósito Halpern",
+  "short_name": "WMS Depósito",
+  "description": "Sistema de gestión de depósito de neumáticos Halpern Mendoza",
+  "start_url": "/DepositoGuerrini/",
+  "display": "standalone",
+  "background_color": "#1d1d1f",
+  "theme_color": "#1d1d1f",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
