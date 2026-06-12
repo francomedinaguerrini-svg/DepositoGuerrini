@@ -5326,15 +5326,16 @@ function imprimirPedido(){
   let paso = 1;
   function filas(items, esRack){
     return items.map(r=>`
-      <tr style="${r.cond==='bajo stock'?'color:#d70015':''}">
-        <td style="text-align:center;color:#86868b">${paso++}</td>
-        <td>${r.art}</td>
-        <td><strong>${r.med||''}</strong> ${r.diseno||''}</td>
+      <tr>
+        <td style="text-align:center;color:#86868b;font-size:7px">${paso++}</td>
+        <td style="font-size:8px">${r.art}</td>
+        <td class="${r.cond==='bajo stock'?'bajo':''}"><strong>${r.med||''}</strong> ${r.diseno||''}</td>
         <td>${r.prov||''}</td>
-        <td style="text-align:center;font-weight:700;font-size:13px">${r.cant}</td>
-        <td style="text-align:center">${r.stock||0}</td>
+        <td style="text-align:center;font-weight:700;font-size:10px">${r.cant}</td>
+        <td style="text-align:center;color:${(r.stock||0)<r.cant?'#d70015':'#1d1d1f'}">${r.stock||0}</td>
         <td style="color:#0071e3;font-weight:600">${esRack?(r.posRack||''):(r.bloque||'')}</td>
-        <td style="font-size:9px;color:${r.cond==='bajo stock'?'#d70015':'#86868b'}">${r.cond||''}</td>
+        <td style="color:${r.cond==='bajo stock'?'#d70015':'#86868b'}">${r.cond||''}</td>
+        <td class="anot"></td>
       </tr>`).join('');
   }
 
