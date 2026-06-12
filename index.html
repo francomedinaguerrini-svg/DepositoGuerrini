@@ -120,12 +120,12 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 .home-logo{font-size:22px;font-weight:700;color:#fff;margin-bottom:2px}
 .home-sub{font-size:12px;color:#a0a0a5}
 .home-date{font-size:11px;color:#86868b;margin-top:4px}
-.home-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px}
-.home-btn{background:#fff;border-radius:16px;padding:20px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;border:none;box-shadow:0 1px 4px rgba(0,0,0,.08);transition:transform .1s,box-shadow .1s;width:100%}
+.home-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px}
+.home-btn{background:#fff;border-radius:12px;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;border:none;box-shadow:0 1px 4px rgba(0,0,0,.08);transition:transform .1s,box-shadow .1s;width:100%}
 .home-btn:active{transform:scale(.95);box-shadow:0 0 0 rgba(0,0,0,0)}
-.home-btn-icon{font-size:32px;line-height:1}
-.home-btn-label{font-size:12px;font-weight:600;color:#1d1d1f;text-align:center;line-height:1.2}
-.home-btn-sub{font-size:9px;color:#86868b;text-align:center}
+.home-btn-icon{font-size:24px;line-height:1}
+.home-btn-label{font-size:11px;font-weight:600;color:#1d1d1f;text-align:center;line-height:1.2}
+.home-btn-sub{font-size:8px;color:#86868b;text-align:center}
 .home-btn.accent-blue{border-top:3px solid #0071e3}
 .home-btn.accent-green{border-top:3px solid #34c759}
 .home-btn.accent-orange{border-top:3px solid #ff9500}
@@ -134,7 +134,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 .home-btn.accent-teal{border-top:3px solid #00c7be}
 .home-btn.accent-yellow{border-top:3px solid #ffcc00}
 .home-btn.accent-gray{border-top:3px solid #86868b}
-.home-section-title{font-size:11px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px;padding:4px 16px 0}
+.home-section-title{font-size:10px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px;padding:2px 10px 0}
 
 /* BOTTOM NAV */
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#1d1d1f;z-index:150;padding-bottom:env(safe-area-inset-bottom)}
@@ -1879,9 +1879,10 @@ function init(){
   const seld=document.getElementById('f-diseno');
   seld.innerHTML='<option value="">Todos los diseños</option>';
   disenos.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;seld.appendChild(o)});
-  document.getElementById('fechahoy').textContent=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const _fh=document.getElementById('fechahoy'); if(_fh) _fh.textContent=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
   actualizarUltimaFecha();
-  showHome();
+  // Start at home screen
+  setTimeout(()=>{ showHome(); }, 50);
   // Set today as default date in forms
   const hoyISO = new Date().toISOString().split('T')[0];
   const pfm = document.getElementById('prod-fecha-manual');
@@ -1935,10 +1936,10 @@ function render(){
     if(typeof av==='number')return(av-bv)*sortDir;
     return String(av).localeCompare(String(bv))*sortDir;
   });
-  document.getElementById('m-bajo').textContent=rows.filter(r=>r.cond==='bajo stock').length;
-  document.getElementById('m-pall').textContent=rows.reduce((s,r)=>s+(r.pall||0),0).toLocaleString('es-AR');
-  document.getElementById('m-stock').textContent=rows.reduce((s,r)=>s+(r.stock||0),0).toLocaleString('es-AR');
-  document.getElementById('count-lbl').textContent=rows.length+' artículos';
+  const _mbajo=document.getElementById('m-bajo'); if(_mbajo) _mbajo.textContent=rows.filter(r=>r.cond==='bajo stock').length;
+  const _mpall=document.getElementById('m-pall'); if(_mpall) _mpall.textContent=rows.reduce((s,r)=>s+(r.pall||0),0).toLocaleString('es-AR');
+  const _mstock=document.getElementById('m-stock'); if(_mstock) _mstock.textContent=rows.reduce((s,r)=>s+(r.stock||0),0).toLocaleString('es-AR');
+  const _clbl=document.getElementById('count-lbl'); if(_clbl) _clbl.textContent=rows.length+' artículos';
   const list=document.getElementById('list');
   if(!rows.length){list.innerHTML='<div class="empty">Sin resultados</div>';return;}
   list.innerHTML=rows.slice(0,300).map(r=>`
@@ -2131,7 +2132,7 @@ function showModalVacia(posId){
 
 function cambiarUnidades(delta){
   currentUnidades=Math.max(0,Math.min(currentMax||999,currentUnidades+delta));
-  document.getElementById('unid-num').textContent=currentUnidades;
+  const _unum=document.getElementById('unid-num'); if(_unum) _unum.textContent=currentUnidades;
   const pct=currentMax?Math.round((currentUnidades/currentMax)*100):0;
   const barColor=pct>=66?'#34c759':pct>=33?'#ff9500':'#d70015';
   const fill=document.getElementById('barra-fill');
@@ -2943,7 +2944,7 @@ function renderInventario(){
   const pct = totalDis>0?Math.round((contadosDis/totalDis)*100):0;
 
   document.getElementById('inv-progress-fill').style.width=pct+'%';
-  document.getElementById('inv-progress-lbl').textContent=`${contadosDis}/${totalDis} diseños contados (${pct}%)`;
+  const _ipl=document.getElementById('inv-progress-lbl'); if(_ipl) _ipl.textContent=`${contadosDis}/${totalDis} diseños contados (${pct}%)`;
 
   const q=(document.getElementById('inv-buscar')?.value||'').toLowerCase();
   const filtro=document.getElementById('inv-filtro')?.value||'sugerido';
@@ -3824,6 +3825,7 @@ function generarInforme(){
   <div class="nav-sub-item" id="sub-inv" onclick="navTo('inv')"><span class="nav-sub-icon">🔢</span><span class="nav-sub-label">Inventario</span></div>
   <div class="nav-sub-item" id="sub-dif" onclick="navTo('dif')"><span class="nav-sub-icon">📊</span><span class="nav-sub-label">Diferencias</span></div>
   <div class="nav-sub-item" id="sub-dot" onclick="navTo('dot')"><span class="nav-sub-icon">📅</span><span class="nav-sub-label">DOTs</span></div>
+  <div class="nav-sub-item" id="sub-pall" onclick="navTo('pall')"><span class="nav-sub-icon">📐</span><span class="nav-sub-label">Palletizado</span></div>
 </div>
 
 <div class="nav-submenu" id="sub-rrhh">
@@ -3850,16 +3852,7 @@ function generarInforme(){
 </div>
 
 
-  <!-- PWA Service Worker -->
-  <script>
-    if('serviceWorker' in navigator){
-      window.addEventListener('load', ()=>{
-        navigator.serviceWorker.register('/DepositoGuerrini/sw.js', {scope: '/DepositoGuerrini/'})
-          .then(()=>console.log('SW registrado'))
-          .catch(e=>console.log('SW error:', e));
-      });
-    }
-  </script>
+
 </body>
 </html>`;
 
@@ -4904,7 +4897,7 @@ function exportarAlertasDOT(){
 const NAV_GROUPS = {
   stock:'operaciones', pedidos:'operaciones',
   mapa:'racks', repo:'racks', nave:'racks',
-  inv:'control', dif:'control', dot:'control',
+  inv:'control', dif:'control', dot:'control', pall:'control',
   grupos:'rrhh', prod:'rrhh',
   dash:'dash'
 };
@@ -4997,7 +4990,7 @@ function showHome(){
   _pwaUnlocked = false;
   document.getElementById('home-screen').classList.add('show');
   document.getElementById('back-home-btn').style.display='none';
-  document.getElementById('home-date').textContent = new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const _hd=document.getElementById('home-date'); if(_hd) _hd.textContent = new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   const lu = localStorage.getItem('wms_last_update');
   const el = document.getElementById('home-last-update');
   if(el) el.textContent = lu ? '⟳ '+lu : 'Stock del día';
@@ -5424,16 +5417,7 @@ function imprimirPedido(){
 
 <scr'+'ipt>window.onload=function(){window.print();}<\/scr'+'ipt>
 
-  <!-- PWA Service Worker -->
-  <script>
-    if('serviceWorker' in navigator){
-      window.addEventListener('load', ()=>{
-        navigator.serviceWorker.register('/DepositoGuerrini/sw.js', {scope: '/DepositoGuerrini/'})
-          .then(()=>console.log('SW registrado'))
-          .catch(e=>console.log('SW error:', e));
-      });
-    }
-  </script>
+
 </body>
 </html>`;
 
@@ -6026,6 +6010,7 @@ if('serviceWorker' in navigator){
   <div class="nav-sub-item" id="sub-inv" onclick="navTo('inv')"><span class="nav-sub-icon">🔢</span><span class="nav-sub-label">Inventario</span></div>
   <div class="nav-sub-item" id="sub-dif" onclick="navTo('dif')"><span class="nav-sub-icon">📊</span><span class="nav-sub-label">Diferencias</span></div>
   <div class="nav-sub-item" id="sub-dot" onclick="navTo('dot')"><span class="nav-sub-icon">📅</span><span class="nav-sub-label">DOTs</span></div>
+  <div class="nav-sub-item" id="sub-pall" onclick="navTo('pall')"><span class="nav-sub-icon">📐</span><span class="nav-sub-label">Palletizado</span></div>
 </div>
 
 <div class="nav-submenu" id="sub-rrhh">
@@ -6052,15 +6037,6 @@ if('serviceWorker' in navigator){
 </div>
 
 
-  <!-- PWA Service Worker -->
-  <script>
-    if('serviceWorker' in navigator){
-      window.addEventListener('load', ()=>{
-        navigator.serviceWorker.register('/DepositoGuerrini/sw.js', {scope: '/DepositoGuerrini/'})
-          .then(()=>console.log('SW registrado'))
-          .catch(e=>console.log('SW error:', e));
-      });
-    }
-  </script>
+
 </body>
 </html>
