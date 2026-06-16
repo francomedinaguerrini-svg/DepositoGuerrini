@@ -5358,7 +5358,8 @@ function imprimirPedido(){
       <tr>
         <td style="text-align:center;color:#86868b;font-size:7px">${paso++}</td>
         <td style="font-size:8px">${r.art}</td>
-        <td class="${r.cond==='bajo stock'?'bajo':''}" style="overflow:hidden;white-space:nowrap"><strong>${r.med||''}</strong> ${r.diseno||''} ${RANGOS&&RANGOS[r.art]?'<span style="color:#0071e3;font-size:7px">'+RANGOS[r.art]+'</span>':''}</td>
+        <td class="${r.cond==='bajo stock'?'bajo':''}" style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:120px"><strong>${r.med||''}</strong> ${r.diseno||''}</td>
+        <td style="text-align:center;font-size:7px;font-weight:700;color:#0071e3;white-space:nowrap">${RANGOS&&RANGOS[r.art]?RANGOS[r.art]:''}</td>
         <td>${r.prov||''}</td>
         <td style="text-align:center;font-weight:700;font-size:10px">${r.cant}</td>
         <td style="text-align:center;color:${(r.stock||0)<r.cant?'#d70015':'#1d1d1f'}">${r.stock||0}</td>
@@ -5398,7 +5399,7 @@ function imprimirPedido(){
 
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   th { background: #1d1d1f; color: #fff; padding: 4px 5px; font-size: 8px; text-transform: uppercase; letter-spacing: .3px; }
-  td { padding: 3px 5px; border-bottom: 1px solid #e5e5ea; font-size: 9px; vertical-align: middle; }
+  td { padding: 3px 5px; border-bottom: 1px solid #e5e5ea; font-size: 9px; vertical-align: middle; height: 16px; overflow: hidden; white-space: nowrap; }
   tr:nth-child(even) td { background: #fafafa; }
   .sep td { background: #0071e3; color: #fff; font-weight: 700; font-size: 8px; padding: 2px 5px; }
   .sep.blq td { background: #ff9500; }
@@ -5432,14 +5433,26 @@ function imprimirPedido(){
 <table>
   <thead>
     <tr>
-      <th style="width:24px">#</th>
-      <th style="width:55px">Artículo</th>
-      <th>Descripción</th>
-      <th style="width:80px">Proveedor</th>
-      <th style="width:40px">Cant.</th>
-      <th style="width:50px">Stock FP</th>
-      <th style="width:90px">Ubicación</th>
-      <th style="width:65px">Condición</th>
+      <th style="width:20px">#</th>
+      <th style="width:52px">Artículo</th>
+      <th style="width:130px">Descripción</th>
+      <th style="width:76px">Rango</th>
+      <th style="width:70px">Proveedor</th>
+      <th style="width:36px">Cant.</th>
+      <th style="width:46px">Stock FP</th>
+      <th style="width:70px">Ubicación</th>
+      <th style="width:60px">Condición</th>
+      <th style="width:22px"></th>
+      <th style="width:22px"></th>
+      <th style="width:22px"></th>
+      <th style="width:22px"></th>
+      <th style="width:22px"></th>
+      <th style="width:22px"></th>
+      <th style="width:22px"></th>
+      <th style="width:22px"></th>
+      <th style="width:22px"></th>
+      <th style="width:22px"></th>
+      <th style="width:32px">OK</th>
     </tr>
   </thead>
   <tbody>
