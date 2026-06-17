@@ -2307,48 +2307,91 @@ function generarMotorAsignacion(){
     return a.frente.localeCompare(b.frente) || a.modulo-b.modulo;
   });
 
-  // PASO 3c — Asignar artículos a posiciones
+  // PASO 3c — Asignar: cada posición se llena al máximo antes de abrir la siguiente
   var asign = {};
   var posIdx = 0;
 
+  // Mapa de stock restante por artículo
+  var stockMap = {};
   candidatos.forEach(function(art){
-    if(posIdx >= posiciones.length) return;
-
-    var maxPos = art.max_pos || 32;
-    var stockRestante = art.stock||0;
-    if(stockRestante <= 0) return;
-
-    var diseno = (art.diseno||'').toUpperCase().trim();
-    var med = (art.med||'').trim();
-
-    // Asignar en tantas posiciones como sea necesario
-    while(stockRestante > 0 && posIdx < posiciones.length){
-      var unidadesEstaPos = Math.min(stockRestante, maxPos);
-
-      // Avanzar al próximo slot libre
-      while(posIdx < posiciones.length && posiciones[posIdx].ocupado){
-        posIdx++;
-      }
-      if(posIdx >= posiciones.length) break;
-
-      var posAsignada = posiciones[posIdx];
-      posAsignada.maxPos = maxPos;
-      posAsignada.arts.push(art);
-      posAsignada.unidades += unidadesEstaPos;
-      if(posAsignada.unidades >= posAsignada.maxPos) posAsignada.ocupado = true;
-      posIdx++;
-
-      if(!asign[posAsignada.id]){
-        asign[posAsignada.id] = {art: art.art, unidades: unidadesEstaPos, min_u: Math.ceil(unidadesEstaPos*0.25), compartidos: []};
-      } else {
-        asign[posAsignada.id].compartidos = asign[posAsignada.id].compartidos || [];
-        asign[posAsignada.id].compartidos.push({art: art.art, unidades: unidadesEstaPos});
-        asign[posAsignada.id].unidades += unidadesEstaPos;
-      }
-
-      stockRestante -= unidadesEstaPos;
-    }
+    if((art.stock||0) > 0) stockMap[art.art] = art.stock;
   });
+
+  // Índice de candidatos para recorrer en orden
+  var candIdx = 0;
+
+  while(posIdx < posiciones.length && candIdx < candidatos.length){
+    // Buscar siguiente artículo con stock restante
+    while(candIdx < candidatos.length && !(stockMap[candidatos[candIdx].art] > 0)){
+      candIdx++;
+    }
+    if(candIdx >= candidatos.length) break;
+
+    var pos = posiciones[posIdx];
+    var maxPos = 0;
+    var espacioLibre = 0;
+    var primerArt = null;
+
+    // Llenar la posición
+    var intentos = candidatos.length;
+    var ci = candIdx;
+
+    while(ci < candidatos.length && intentos-- > 0){
+      var art = candidatos[ci];
+      if(!(stockMap[art.art] > 0)){ ci++; continue; }
+
+      var mp = art.max_pos || 32;
+
+      // Primera asignación en esta posición
+      if(!asign[pos.id]){
+        maxPos = mp;
+        espacioLibre = maxPos;
+        primerArt = art;
+        var u = Math.min(stockMap[art.art], espacioLibre);
+        asign[pos.id] = {art: art.art, unidades: u, min_u: Math.ceil(u*0.25), compartidos: []};
+        stockMap[art.art] -= u;
+        espacioLibre -= u;
+        if(ci === candIdx && stockMap[art.art] <= 0) candIdx++;
+        ci++;
+      } else {
+        // Posición ya tiene algo — buscar artículo que comparta (mismo diseño o medida)
+        var mismaM = (art.med||'').trim() === (primerArt.med||'').trim();
+        var mismoD = (art.diseno||'').toUpperCase() === (primerArt.diseno||'').toUpperCase();
+        if(mismaM || mismoD){
+          var u2 = Math.min(stockMap[art.art], espacioLibre);
+          if(u2 > 0){
+            asign[pos.id].compartidos.push({art: art.art, unidades: u2});
+            asign[pos.id].unidades += u2;
+            stockMap[art.art] -= u2;
+            espacioLibre -= u2;
+            if(stockMap[art.art] <= 0 && ci === candIdx) candIdx++;
+          }
+          ci++;
+        } else {
+          ci++;
+        }
+      }
+
+      // Si la posición está llena, pasar a la siguiente
+      if(espacioLibre <= 0) break;
+    }
+
+    // Si quedó espacio y no hay candidatos compatibles, completar con cualquiera
+    if(asign[pos.id] && espacioLibre > 0){
+      for(var ci2 = candIdx; ci2 < candidatos.length && espacioLibre > 0; ci2++){
+        var art2 = candidatos[ci2];
+        if(!(stockMap[art2.art] > 0)) continue;
+        var u3 = Math.min(stockMap[art2.art], espacioLibre);
+        asign[pos.id].compartidos.push({art: art2.art, unidades: u3});
+        asign[pos.id].unidades += u3;
+        stockMap[art2.art] -= u3;
+        espacioLibre -= u3;
+        if(stockMap[art2.art] <= 0 && ci2 === candIdx) candIdx++;
+      }
+    }
+
+    posIdx++;
+  }
 
   return asign;
 }
