@@ -2240,8 +2240,8 @@ function generarMotorAsignacion(){
     // Excluir Speedway y agrícola
     if(EXCLUIR_PROV.indexOf(r.prov)>=0) return false;
     if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false;
-    // Excluir sin stock físico real
-    if((r.stock||0) <= 0) return false;
+    // Solo stocks bajos: máximo 6 pallets
+    if((r.pall||0) > 6) return false;
     return true;
   });
 
