@@ -2240,8 +2240,8 @@ function generarMotorAsignacion(){
     // Excluir Speedway y agrícola
     if(EXCLUIR_PROV.indexOf(r.prov)>=0) return false;
     if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false;
-    // Excluir sin stock y sin rotación proyectada
-    if(r.stock<=0 && r.pallx2<=0) return false;
+    // Excluir sin stock físico real
+    if((r.stock||0) <= 0) return false;
     return true;
   });
 
@@ -2311,8 +2311,7 @@ function generarMotorAsignacion(){
 
     var maxPos = art.max_pos || 32;
     var unidades = Math.min(art.stock||0, maxPos);
-    if(unidades<=0 && (art.pall||0)<=0 && (art.pallx2||0)<=0) return; // sin nada que poner
-    if(unidades<=0) unidades = Math.min(art.pallx2||maxPos, maxPos); // usar proyectado si no hay stock
+    if(unidades<=0) return; // sin stock, no va al rack
 
     var diseno = (art.diseno||'').toUpperCase().trim();
     var med = (art.med||'').trim();
