@@ -3002,12 +3002,34 @@ function confirmarDespacho(){
   const destino = document.getElementById('ped-destino').value||'Sin destino';
   const fecha = new Date().toLocaleDateString('es-AR');
   const hora = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  const repoSugerido = [];
 
   _confirmItems.forEach(item=>{
     // Descontar del mapa si tiene posición en rack
     if(item.posRack && item.posRack !== 'BUSCAR EN RACK' && ASIGN[item.posRack]){
       const pos = ASIGN[item.posRack];
       pos.unidades = Math.max(0, (pos.unidades||0) - item.cantReal);
+    }
+
+    // NUEVO: Descontar de DATA (stock real)
+    const dataArt = DATA.find(r=>r.art===item.art);
+    if(dataArt){
+      dataArt.stock = Math.max(0, (dataArt.stock||0) - item.cantReal);
+      dataArt.pall = Math.floor(dataArt.stock / (dataArt.max_pos||32));
+
+      // TRIGGER REPOSICIÓN: si el stock bajó a menos de 1 pallet → sugerir reponer
+      const minStock = dataArt.max_pos || 32;
+      if(dataArt.stock < minStock && dataArt.bloque){
+        repoSugerido.push({
+          art: dataArt.art,
+          med: dataArt.med,
+          diseno: dataArt.diseno,
+          prov: dataArt.prov,
+          bloque: dataArt.bloque,
+          stockActual: dataArt.stock,
+          posRack: item.posRack||'',
+        });
+      }
     }
 
     // Registrar diferencia si hay
@@ -3031,16 +3053,29 @@ function confirmarDespacho(){
   // Guardar diferencias
   if(diferencias.length){
     const histDif = JSON.parse(localStorage.getItem('wms_dif')||'[]');
-    histDif.unshift({
-      fecha, hora, destino,
-      items: diferencias,
-    });
+    histDif.unshift({ fecha, hora, destino, items: diferencias });
     localStorage.setItem('wms_dif', JSON.stringify(histDif.slice(0,50)));
+  }
+
+  // Guardar sugerencias de reposición
+  if(repoSugerido.length){
+    const histRepo = JSON.parse(localStorage.getItem('wms_repo_pendiente')||'[]');
+    repoSugerido.forEach(r=>{
+      // Evitar duplicados por art
+      if(!histRepo.find(x=>x.art===r.art)){
+        histRepo.unshift({...r, fecha, hora, estado:'pendiente'});
+      }
+    });
+    localStorage.setItem('wms_repo_pendiente', JSON.stringify(histRepo.slice(0,200)));
   }
 
   closeModalDirect();
   limpiarPedido();
-  showToast(`✅ Despacho confirmado${diferencias.length?' · '+diferencias.length+' diferencias registradas':''}`);
+
+  let msg = '✅ Despacho confirmado';
+  if(diferencias.length) msg += ' · '+diferencias.length+' diferencias';
+  if(repoSugerido.length) msg += ' · ⚠️ '+repoSugerido.length+' arts. para reponer';
+  showToast(msg);
 
   // Si hay diferencias abrir pestaña
   if(diferencias.length){
@@ -3629,6 +3664,43 @@ function renderReposicion(){
 
   // Store for export
   window._repoAlertas = alertas;
+
+  // PENDIENTES DEL MOTOR — generados al confirmar despachos
+  var repoPend = JSON.parse(localStorage.getItem('wms_repo_pendiente')||'[]');
+  if(repoPend.length){
+    var pendHTML = '<div style="margin-top:14px"><div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#86868b;margin-bottom:8px">⚡ Reposición sugerida por despachos recientes</div>';
+    repoPend.forEach(function(r,i){
+      var cls = r.estado==='hecho'?'#34c759':'#ff9500';
+      pendHTML += '<div style="background:#fff;border-radius:10px;border:.5px solid #e5e5ea;padding:12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">'
+        +'<div><div style="font-size:13px;font-weight:700">'+r.med+' — '+r.diseno+'</div>'
+        +'<div style="font-size:11px;color:#86868b">'+r.prov+' · bloque: '+(r.bloque||'—')+'</div>'
+        +'<div style="font-size:11px;color:#86868b">Pos rack: '+(r.posRack||'—')+' · Stock actual: '+r.stockActual+' un.</div>'
+        +'<div style="font-size:10px;color:#86868b">'+r.fecha+' '+r.hora+'</div></div>'
+        +'<div style="display:flex;gap:6px;flex-direction:column;align-items:flex-end">'
+        +'<span style="padding:3px 10px;border-radius:8px;font-size:10px;font-weight:700;background:'+(r.estado==='hecho'?'#d4edda':'#fff3cd')+';color:'+(r.estado==='hecho'?'#1c7c2c':'#856404')+'">'+(r.estado==='hecho'?'✅ Hecho':'⚠️ Pendiente')+'</span>'
+        +(r.estado!=='hecho'?'<button onclick="marcarRepoHecho('+i+')" style="padding:5px 10px;background:#34c759;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">✓ Marcar hecho</button>':'')
+        +'<button onclick="borrarRepoPend('+i+')" style="padding:5px 10px;background:#ffd6d9;color:#d70015;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">🗑️</button>'
+        +'</div></div>';
+    });
+    pendHTML += '</div>';
+    el.innerHTML += pendHTML;
+  }
+}
+
+function marcarRepoHecho(i){
+  var repo = JSON.parse(localStorage.getItem('wms_repo_pendiente')||'[]');
+  if(repo[i]) repo[i].estado = 'hecho';
+  localStorage.setItem('wms_repo_pendiente', JSON.stringify(repo));
+  renderReposicion();
+  showToast('✅ Reposición marcada como hecha');
+}
+
+function borrarRepoPend(i){
+  var repo = JSON.parse(localStorage.getItem('wms_repo_pendiente')||'[]');
+  repo.splice(i,1);
+  localStorage.setItem('wms_repo_pendiente', JSON.stringify(repo));
+  renderReposicion();
+  showToast('🗑️ Eliminado');
 }
 
 function exportarReposicion(){
