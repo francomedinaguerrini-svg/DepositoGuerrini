@@ -2308,63 +2308,45 @@ function generarMotorAsignacion(){
   });
 
   // PASO 3c — Asignar artículos a posiciones
-  // Primero asignar por diseño al mismo frente, compartiendo posición si misma medida o mismo diseño y caben
   var asign = {};
-  var posIdx = 0; // índice actual en posiciones disponibles
-
-  // Mapa de posición actual por frente para agrupar mismo diseño
-  var frenteActivo = {}; // {frente: {posId, espacioLibre}}
+  var posIdx = 0;
 
   candidatos.forEach(function(art){
-    if(posIdx >= posiciones.length) return; // rack lleno
+    if(posIdx >= posiciones.length) return;
 
     var maxPos = art.max_pos || 32;
-    var unidades = Math.min(art.stock||0, maxPos);
-    if(unidades<=0) return; // sin stock, no va al rack
+    var stockRestante = art.stock||0;
+    if(stockRestante <= 0) return;
 
     var diseno = (art.diseno||'').toUpperCase().trim();
     var med = (art.med||'').trim();
 
-    // Buscar posición existente del mismo diseño con espacio
-    var posAsignada = null;
-    for(var i=0;i<posiciones.length;i++){
-      var pos = posiciones[i];
-      if(pos.ocupado) continue;
-      if(pos.arts.length>0){
-        // Ya tiene artículos: ver si comparte
-        var primerArt = pos.arts[0];
-        var mismaM = (primerArt.med||'').trim()===med;
-        var mismoD = (primerArt.diseno||'').toUpperCase().trim()===diseno;
-        if((mismaM||mismoD) && (pos.unidades+unidades)<=pos.maxPos){
-          posAsignada = pos;
-          break;
-        }
-      }
-    }
+    // Asignar en tantas posiciones como sea necesario
+    while(stockRestante > 0 && posIdx < posiciones.length){
+      var unidadesEstaPos = Math.min(stockRestante, maxPos);
 
-    // Si no hay posición compartible, tomar la siguiente libre
-    if(!posAsignada){
-      while(posIdx<posiciones.length && posiciones[posIdx].arts.length>0 && posiciones[posIdx].ocupado){
+      // Avanzar al próximo slot libre
+      while(posIdx < posiciones.length && posiciones[posIdx].ocupado){
         posIdx++;
       }
-      if(posIdx>=posiciones.length) return;
-      posAsignada = posiciones[posIdx];
+      if(posIdx >= posiciones.length) break;
+
+      var posAsignada = posiciones[posIdx];
       posAsignada.maxPos = maxPos;
-    }
+      posAsignada.arts.push(art);
+      posAsignada.unidades += unidadesEstaPos;
+      if(posAsignada.unidades >= posAsignada.maxPos) posAsignada.ocupado = true;
+      posIdx++;
 
-    // Asignar
-    posAsignada.arts.push(art);
-    posAsignada.unidades += unidades;
-    if(posAsignada.unidades >= posAsignada.maxPos) posAsignada.ocupado = true;
+      if(!asign[posAsignada.id]){
+        asign[posAsignada.id] = {art: art.art, unidades: unidadesEstaPos, min_u: Math.ceil(unidadesEstaPos*0.25), compartidos: []};
+      } else {
+        asign[posAsignada.id].compartidos = asign[posAsignada.id].compartidos || [];
+        asign[posAsignada.id].compartidos.push({art: art.art, unidades: unidadesEstaPos});
+        asign[posAsignada.id].unidades += unidadesEstaPos;
+      }
 
-    // Asignar — guardar artículo principal + compartidos
-    if(!asign[posAsignada.id]){
-      asign[posAsignada.id] = {art: art.art, unidades: unidades, min_u: Math.ceil(unidades*0.25), compartidos: []};
-    } else {
-      // posición compartida — agregar a la lista
-      asign[posAsignada.id].compartidos = asign[posAsignada.id].compartidos || [];
-      asign[posAsignada.id].compartidos.push({art: art.art, unidades: unidades});
-      asign[posAsignada.id].unidades += unidades;
+      stockRestante -= unidadesEstaPos;
     }
   });
 
