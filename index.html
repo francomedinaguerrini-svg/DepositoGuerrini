@@ -2059,7 +2059,16 @@ function renderMapa(){
 
 function renderCobertura(){
   function getLlanta(med){ try{return parseFloat(med.trim().split(' ').pop())}catch{return 0} }
-  const universo = DATA.filter(r => getLlanta(r.med) < 22.5 && r.prov !== 'SPEEDWAY' && r.wms !== '#DIV/0!' && r.wms !== '' && r.rot > 0);
+  const universo = DATA.filter(r => {
+    var med = r.med||'';
+    if(/\d+\.5/.test(med)) return false;
+    if(r.prov === 'SPEEDWAY') return false;
+    var uso = (r.uso||'').trim();
+    if(['TT','TL','TLSB'].indexOf(uso)>=0) return false;
+    if(r.wms === '#DIV/0!' || r.wms === '') return false;
+    if((r.rot||0) <= 0) return false;
+    return true;
+  });
   const rotTotal = universo.reduce((s,r)=>s+(r.rot||0),0);
   if(!rotTotal){ return; }
 
@@ -2148,6 +2157,7 @@ function showModalOcupada(posId,art){
       <div class="unid-max">Máximo: ${currentMax} unidades por pallet</div>
       <div class="barra-pos"><div class="barra-pos-fill" id="barra-fill" style="width:${pct}%;background:${barColor}"></div></div>
     </div>
+    ${(()=>{const comp=(ASIGN[posId]||{}).compartidos||[];if(!comp.length)return '';return '<div style="background:#f5f5f7;border-radius:10px;padding:10px 12px;margin-top:8px"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#86868b;margin-bottom:6px">Comparte posición con:</div>'+comp.map(c=>{const ca=DATA.find(r=>r.art==c.art);if(!ca)return '';return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:.5px solid #e5e5ea"><div><div style="font-size:12px;font-weight:600">'+ca.med+' — '+ca.diseno+'</div><div style="font-size:10px;color:#86868b">'+ca.prov+'</div></div><span style="font-size:12px;font-weight:700;color:#0071e3">'+c.unidades+' un.</span></div>';}).join('')+'</div>';})()}
     <div class="btn-row">
       <button class="btn-primary" onclick="guardarUnidades()">💾 Guardar</button>
       <button class="btn-danger" onclick="vaciarPosicion()">🗑️ Vaciar</button>
@@ -2230,13 +2240,12 @@ function closeModalDirect(){document.getElementById('modal-bg').classList.remove
 // ======= MOTOR VIVO DE ASIGNACIÓN =======
 function generarMotorAsignacion(){
   // PASO 1 — Exclusiones duras
-  var EXCLUIR_MED = ['22.5','19.5'];
   var EXCLUIR_PROV = ['SPEEDWAY'];
   var EXCLUIR_USO = ['TT','TL','TLSB','TT ','TL '];
 
   var candidatos = DATA.filter(function(r){
-    // Excluir por medida
-    if(EXCLUIR_MED.some(function(m){return (r.med||'').indexOf(m)>=0;})) return false;
+    // Excluir cualquier medida que termine en .5 (22.5, 19.5, 17.5, etc.)
+    if(/\d+\.5/.test(r.med||'')) return false;
     // Excluir Speedway y agrícola
     if(EXCLUIR_PROV.indexOf(r.prov)>=0) return false;
     if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false;
@@ -2348,7 +2357,15 @@ function generarMotorAsignacion(){
     posAsignada.unidades += unidades;
     if(posAsignada.unidades >= posAsignada.maxPos) posAsignada.ocupado = true;
 
-    asign[posAsignada.id] = {art: art.art, unidades: unidades, min_u: Math.ceil(unidades*0.25)};
+    // Asignar — guardar artículo principal + compartidos
+    if(!asign[posAsignada.id]){
+      asign[posAsignada.id] = {art: art.art, unidades: unidades, min_u: Math.ceil(unidades*0.25), compartidos: []};
+    } else {
+      // posición compartida — agregar a la lista
+      asign[posAsignada.id].compartidos = asign[posAsignada.id].compartidos || [];
+      asign[posAsignada.id].compartidos.push({art: art.art, unidades: unidades});
+      asign[posAsignada.id].unidades += unidades;
+    }
   });
 
   return asign;
@@ -2387,6 +2404,9 @@ function aplicarSugerencia(){
     setTimeout(function(){
       ASIGN = generarMotorAsignacion();
       saveAsign();
+      var ts = new Date().toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      localStorage.setItem('wms_last_update', ts);
+      actualizarUltimaFecha();
       renderMapa();
       var n = Object.keys(ASIGN).length;
       showToast('✅ Stock Bajo aplicado — '+n+' posiciones asignadas en tiempo real');
