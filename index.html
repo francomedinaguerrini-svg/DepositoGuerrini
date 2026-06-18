@@ -522,6 +522,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
     <span class="tag" id="fechahoy" onclick="toggleUpdate()"></span>
     <span id="ultima-actualizacion" style="font-size:9px;color:#a0a0a5;cursor:pointer" onclick="toggleUpdate()"></span>
+    <button onclick="resetDataStock()" title="Resetear stock al Excel base" style="background:none;border:none;color:#a0a0a5;font-size:11px;cursor:pointer;padding:2px 4px" title="Reset stock">↺</button>
   </div>
   <span style="font-size:20px;cursor:pointer" onclick="toggleUpdate()">⬆️</span>
 </header>
@@ -550,66 +551,61 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     <div class="home-date" id="home-date"></div>
   </div>
 
-  <div class="home-section-title" style="margin-top:12px">Operaciones</div>
-  <div class="home-grid">
+  <div class="home-section-title" style="margin-top:12px">Operaciones diarias</div>
+  <div class="home-grid" style="grid-template-columns:repeat(5,1fr)">
     <button class="home-btn accent-blue" onclick="goHome('stock')">
       <div class="home-btn-icon">📦</div>
       <div class="home-btn-label">Stock</div>
-      <div class="home-btn-sub">Consulta y búsqueda</div>
+      <div class="home-btn-sub">Consulta</div>
     </button>
     <button class="home-btn accent-blue" onclick="goHome('pedidos')">
       <div class="home-btn-icon">📋</div>
       <div class="home-btn-label">Pedidos</div>
-      <div class="home-btn-sub">Preparación y despacho</div>
+      <div class="home-btn-sub">Despacho</div>
+    </button>
+    <button class="home-btn accent-blue" onclick="goHome('cydesc')">
+      <div class="home-btn-icon">🚚</div>
+      <div class="home-btn-label">Carga/Desc.</div>
+      <div class="home-btn-sub">Movimientos</div>
     </button>
     <button class="home-btn accent-orange" onclick="goHome('mapa')" style="position:relative">
       <div class="home-btn-icon">🗺️</div>
       <div class="home-btn-label">Mapa Racks</div>
-      <div class="home-btn-sub">462 posiciones</div>
-    </button>
-    <button class="home-btn accent-orange" onclick="goHome('repo')">
-      <div class="home-btn-icon">🔄</div>
-      <div class="home-btn-label">Reposición</div>
-      <div class="home-btn-sub">Alertas diarias</div>
+      <div class="home-btn-sub">448 posiciones</div>
     </button>
     <button class="home-btn accent-gray" onclick="goHome('nave')" style="position:relative">
       <div class="home-btn-icon">🏭</div>
       <div class="home-btn-label">Nave</div>
       <div class="home-btn-sub">10 bloques</div>
     </button>
-    <button class="home-btn accent-teal" onclick="goHome('dot')">
-      <div class="home-btn-icon">📅</div>
-      <div class="home-btn-label">DOTs</div>
-      <div class="home-btn-sub">Fechas elaboración</div>
-    </button>
-    <button class="home-btn accent-blue" onclick="goHome('cydesc')">
-      <div class="home-btn-icon">🚚</div>
-      <div class="home-btn-label">Carga / Descarga</div>
-      <div class="home-btn-sub">Control de movimientos</div>
-    </button>
   </div>
 
-  <div class="home-section-title">Control & Análisis</div>
-  <div class="home-grid">
+  <div class="home-section-title" style="margin-top:8px">Control & Análisis</div>
+  <div class="home-grid" style="grid-template-columns:repeat(5,1fr)">
+    <button class="home-btn accent-orange" onclick="goHome('repo')">
+      <div class="home-btn-icon">🔄</div>
+      <div class="home-btn-label">Reposición</div>
+      <div class="home-btn-sub">Alertas</div>
+    </button>
     <button class="home-btn accent-green" onclick="goHome('dash')">
       <div class="home-btn-icon">📊</div>
       <div class="home-btn-label">Dashboard</div>
-      <div class="home-btn-sub">Resumen general</div>
+      <div class="home-btn-sub">Resumen</div>
     </button>
     <button class="home-btn accent-yellow" onclick="goHome('inv')">
       <div class="home-btn-icon">🔢</div>
       <div class="home-btn-label">Inventario</div>
-      <div class="home-btn-sub">Conteo por diseño</div>
+      <div class="home-btn-sub">Conteo</div>
     </button>
     <button class="home-btn accent-red" onclick="goHome('dif')">
       <div class="home-btn-icon">⚠️</div>
       <div class="home-btn-label">Diferencias</div>
-      <div class="home-btn-sub">Control despachos</div>
+      <div class="home-btn-sub">Despachos</div>
     </button>
-    <button class="home-btn accent-blue" onclick="goHome('rot')">
-      <div class="home-btn-icon">🔥</div>
-      <div class="home-btn-label">Rotación Real</div>
-      <div class="home-btn-sub">6m y 12m reales</div>
+    <button class="home-btn accent-teal" onclick="goHome('dot')">
+      <div class="home-btn-icon">📅</div>
+      <div class="home-btn-label">DOTs</div>
+      <div class="home-btn-sub">Elaboración</div>
     </button>
   </div>
 
@@ -737,55 +733,12 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
         </div>
       </div>
     </div>
-    <!-- Selector de sugerencias -->
-    <div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:12px;margin-bottom:10px">
-      <div style="font-size:11px;font-weight:600;color:#86868b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">🤖 Sugerencia automática</div>
-      <div style="display:flex;gap:6px;margin-bottom:10px">
-        <button id="sug-btn-chasis" onclick="setSugerencia('chasis',this)" style="flex:1;padding:8px;border-radius:8px;border:2px solid #d2d2d7;background:#fff;color:#86868b;font-size:12px;font-weight:600;cursor:pointer">🚗 Chasis</button>
-        <button id="sug-btn-stock_bajo" onclick="setSugerencia('stock_bajo',this)" style="flex:1;padding:8px;border-radius:8px;border:2px solid #ff9500;background:#ff9500;color:#fff;font-size:12px;font-weight:600;cursor:pointer">⚠️ Stock Bajo</button>
-        <button id="sug-btn-eficiencia" onclick="setSugerencia('eficiencia',this)" style="flex:1;padding:8px;border-radius:8px;border:2px solid #d2d2d7;background:#fff;color:#86868b;font-size:12px;font-weight:600;cursor:pointer">⚡ Eficiencia</button>
-      </div>
-      <!-- Comparativa -->
-      <div style="background:#f5f5f7;border-radius:8px;padding:10px;margin-bottom:10px;font-size:11px">
-        <div style="display:grid;grid-template-columns:1fr repeat(3,52px);gap:4px;align-items:center">
-          <div></div>
-          <div style="text-align:center;font-weight:700;color:#0071e3">🚗</div>
-          <div style="text-align:center;font-weight:700;color:#ff9500">⚠️</div>
-          <div style="text-align:center;font-weight:700;color:#34c759">⚡</div>
-
-          <div style="color:#86868b">% Stock en rack</div>
-          <div style="text-align:center;font-weight:700;color:#0071e3">66%</div>
-          <div style="text-align:center;font-weight:700;color:#ff9500">51%</div>
-          <div style="text-align:center;font-weight:700;color:#34c759">63%</div>
-
-          <div style="color:#86868b">% Pedidos rack</div>
-          <div style="text-align:center;font-weight:700;color:#0071e3">72%</div>
-          <div style="text-align:center;font-weight:700;color:#ff9500">71%</div>
-          <div style="text-align:center;font-weight:700;color:#34c759">72%</div>
-
-          <div style="color:#86868b">% Bajo stock rack</div>
-          <div style="text-align:center;font-weight:700;color:#0071e3">91%</div>
-          <div style="text-align:center;font-weight:700;color:#ff9500">91%</div>
-          <div style="text-align:center;font-weight:700;color:#34c759">91%</div>
-
-          <div style="color:#86868b">Dist. prom. (mts)</div>
-          <div style="text-align:center;font-weight:700;color:#34c759">64m</div>
-          <div style="text-align:center;font-weight:700;color:#d70015">71m</div>
-          <div style="text-align:center;font-weight:700;color:#0071e3">65m</div>
-
-          <div style="color:#86868b">% Rot. en N1</div>
-          <div style="text-align:center;font-weight:700;color:#34c759">63%</div>
-          <div style="text-align:center;font-weight:700;color:#d70015">16%</div>
-          <div style="text-align:center;font-weight:700;color:#0071e3">55%</div>
-        </div>
-        <div style="margin-top:8px;font-size:10px;color:#86868b;border-top:1px solid #e5e5ea;padding-top:6px">
-          🟢 mejor · 🔴 peor en cada fila
-        </div>
-      </div>
+    <!-- Aplicar Stock Bajo -->
+    <div style="margin-bottom:10px">
       <div style="display:flex;gap:8px">
-        <button onclick="aplicarSugerencia()" style="flex:1;padding:9px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer" id="btn-aplicar" style="background:#ff9500">✅ Aplicar Stock Bajo</button>
-        <button onclick="imprimirMapa()" style="padding:9px 12px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:13px;cursor:pointer" title="Exportar mapa">📥</button>
-        <button onclick="limpiarMapa()" style="padding:9px 12px;background:#ffd6d9;color:#d70015;border:none;border-radius:10px;font-size:13px;cursor:pointer">🗑️</button>
+        <button onclick="aplicarSugerencia()" style="flex:1;padding:11px;background:#ff9500;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">⚠️ Aplicar Stock Bajo</button>
+        <button onclick="imprimirMapa()" style="padding:11px 14px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:13px;cursor:pointer" title="Exportar mapa">📥</button>
+        <button onclick="limpiarMapa()" style="padding:11px 14px;background:#ffd6d9;color:#d70015;border:none;border-radius:10px;font-size:13px;cursor:pointer">🗑️</button>
       </div>
     </div>
     <div id="alertas-box"></div>
@@ -1291,7 +1244,6 @@ const FRENTES = [
   {id:"B3S",label:"3 Sur",  modulos:14,niveles:[1,2,3,4]},
   {id:"B4N",label:"4 Norte",modulos:14,niveles:[1,2,3,4]},
   {id:"B4S",label:"4 Sur",  modulos:14,niveles:[1,2,3,4]},
-  {id:"B5N",label:"5 Norte",modulos:14,niveles:[4]},
   {id:"B5S",label:"5 Sur",  modulos:14,niveles:[1,2,3,4]},
 ];
 
@@ -1698,6 +1650,34 @@ function searchFromHistory(q){
 }
 
 // Hook search history to buscar input
+// ======= PERSISTENCIA DE DATA =======
+(function(){
+  var saved = localStorage.getItem('wms_data_stock');
+  if(saved){
+    try{
+      var stockMap = JSON.parse(saved);
+      DATA.forEach(function(r){
+        if(stockMap[r.art] !== undefined){
+          r.stock = stockMap[r.art].stock;
+          r.pall = stockMap[r.art].pall;
+        }
+      });
+    } catch(e){ console.warn('Error cargando stock guardado:', e); }
+  }
+})();
+
+function saveDataStock(){
+  var stockMap = {};
+  DATA.forEach(function(r){ stockMap[r.art] = {stock: r.stock, pall: r.pall}; });
+  localStorage.setItem('wms_data_stock', JSON.stringify(stockMap));
+}
+
+function resetDataStock(){
+  if(!confirm('¿Resetear el stock al del Excel base? Se perderán todos los movimientos registrados en el WMS.')) return;
+  localStorage.removeItem('wms_data_stock');
+  location.reload();
+}
+
 document.addEventListener('DOMContentLoaded', ()=>{
   renderHistory();
   const buscarEl = document.getElementById('buscar');
@@ -3023,6 +3003,7 @@ function confirmarDespacho(){
     if(dataArt){
       dataArt.stock = Math.max(0, (dataArt.stock||0) - item.cantReal);
       dataArt.pall = Math.floor(dataArt.stock / (dataArt.max_pos||32));
+      saveDataStock();
 
       // TRIGGER REPOSICIÓN: si el stock bajó a menos de 1 pallet → sugerir reponer
       const minStock = dataArt.max_pos || 32;
@@ -3669,8 +3650,48 @@ function renderReposicion(){
       </div>`).join('')}
   `;
 
-  // Store for export
-  window._repoAlertas = alertas;
+  // INGRESOS — ubicación inteligente rack vs bloque
+  var repoIng = JSON.parse(localStorage.getItem('wms_repo_ingresos')||'[]');
+  if(repoIng.length){
+    var ingHTML = '<div style="margin-top:14px"><div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#86868b;margin-bottom:8px">📥 Ingresos — dónde ubicar</div>';
+    repoIng.forEach(function(r,i){
+      var pctRack = r.cant>0?Math.round((r.unidRack/r.cant)*100):0;
+      ingHTML += '<div style="background:#fff;border-radius:10px;border:.5px solid #e5e5ea;padding:12px;margin-bottom:6px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
+        +'<div><div style="font-size:13px;font-weight:700">'+r.med+' — '+r.diseno+'</div>'
+        +'<div style="font-size:11px;color:#86868b">'+r.prov+' · '+r.cant+' un. ingresadas · rot. '+r.rotSem+'/sem</div>'
+        +'<div style="font-size:10px;color:#86868b">'+r.fecha+'</div></div>'
+        +'<span style="padding:3px 10px;border-radius:8px;font-size:10px;font-weight:700;background:'+(r.estado==='hecho'?'#d4edda':'#e6f1fb')+';color:'+(r.estado==='hecho'?'#1c7c2c':'#185fa5')+'">'+(r.estado==='hecho'?'✅ Hecho':'📋 Pendiente')+'</span>'
+        +'</div>'
+        // Rack
+        +'<div style="display:flex;gap:8px;margin-bottom:6px">'
+        +(r.unidRack>0
+          ? '<div style="flex:1;background:#e6f1fb;border-radius:8px;padding:8px 10px">'
+            +'<div style="font-size:11px;font-weight:700;color:#185fa5">📍 RACK — '+r.unidRack+' un. ('+r.nPos+' pos.)</div>'
+            +'<div style="font-size:10px;color:#185fa5;margin-top:2px">1 semana de rotación · max '+r.maxPos+' un./pos</div>'
+            +(r.posActuales&&r.posActuales.length?'<div style="font-size:10px;color:#185fa5;margin-top:2px">Posiciones actuales: '+r.posActuales.slice(0,3).join(', ')+(r.posActuales.length>3?' +'+( r.posActuales.length-3)+' más':'')+' → completar/reubicar</div>':'<div style="font-size:10px;color:#d70015;margin-top:2px">Sin posición en rack — aplicar Stock Bajo</div>')
+            +'</div>'
+          : '<div style="flex:1;background:#f5f5f7;border-radius:8px;padding:8px 10px"><div style="font-size:11px;color:#86868b">Sin rotación — no va al rack</div></div>'
+        )
+        // Bloque
+        +(r.unidBloque>0
+          ? '<div style="flex:1;background:#fff3cd;border-radius:8px;padding:8px 10px">'
+            +'<div style="font-size:11px;font-weight:700;color:#856404">📦 BLOQUE '+r.bloque+' — '+r.unidBloque+' un.</div>'
+            +'<div style="font-size:10px;color:#856404;margin-top:2px">Stock de reserva</div>'
+            +'</div>'
+          : ''
+        )
+        +'</div>'
+        +(r.estado!=='hecho'
+          ? '<div style="display:flex;gap:6px"><button onclick="marcarIngresoHecho('+i+')" style="flex:1;padding:6px;background:#34c759;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">✓ Ubicado</button>'
+            +'<button onclick="borrarIngreso('+i+')" style="padding:6px 10px;background:#ffd6d9;color:#d70015;border:none;border-radius:8px;font-size:11px;cursor:pointer">🗑️</button></div>'
+          : '<button onclick="borrarIngreso('+i+')" style="padding:4px 10px;background:#ffd6d9;color:#d70015;border:none;border-radius:8px;font-size:11px;cursor:pointer">🗑️</button>'
+        )
+        +'</div>';
+    });
+    ingHTML += '</div>';
+    el.innerHTML += ingHTML;
+  }
 
   // PENDIENTES DEL MOTOR — generados al confirmar despachos
   var repoPend = JSON.parse(localStorage.getItem('wms_repo_pendiente')||'[]');
@@ -3692,6 +3713,22 @@ function renderReposicion(){
     pendHTML += '</div>';
     el.innerHTML += pendHTML;
   }
+}
+
+function marcarIngresoHecho(i){
+  var ing=JSON.parse(localStorage.getItem('wms_repo_ingresos')||'[]');
+  if(ing[i]) ing[i].estado='hecho';
+  localStorage.setItem('wms_repo_ingresos',JSON.stringify(ing));
+  renderReposicion();
+  showToast('✅ Ingreso ubicado');
+}
+
+function borrarIngreso(i){
+  var ing=JSON.parse(localStorage.getItem('wms_repo_ingresos')||'[]');
+  ing.splice(i,1);
+  localStorage.setItem('wms_repo_ingresos',JSON.stringify(ing));
+  renderReposicion();
+  showToast('🗑️ Eliminado');
 }
 
 function marcarRepoHecho(i){
@@ -6307,6 +6344,7 @@ if('serviceWorker' in navigator){
   <div style="display:flex;gap:6px">
     <button onclick="cydNuevo('carga')" style="padding:8px 14px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">+ Nueva carga</button>
     <button onclick="cydNuevo('descarga')" style="padding:8px 14px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">+ Nueva descarga</button>
+    <button onclick="cydAbrirPegarRemito()" style="padding:8px 14px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">📋 Pegar remito</button>
   </div>
 </div>
 
@@ -6766,6 +6804,187 @@ function cydExportarInforme(){
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(wsDesc),'Descargas');
   XLSX.writeFile(wb,'Informe_CyD_'+new Date().toLocaleDateString('es-AR').replace(/\//g,'-')+'.xlsx');
   showToast('✅ Informe exportado');
+}
+</script>
+
+<!-- MODAL PEGAR REMITO -->
+<div id="cyd-remito-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;overflow-y:auto">
+<div style="background:#fff;border-radius:16px;max-width:700px;margin:30px auto;padding:20px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <div style="font-size:16px;font-weight:700">📋 Pegar remito de ingreso</div>
+    <button onclick="document.getElementById('cyd-remito-modal').style.display='none'" style="background:#f5f5f7;border:none;border-radius:8px;width:32px;height:32px;font-size:18px;cursor:pointer;color:#86868b">×</button>
+  </div>
+  <div style="font-size:12px;color:#86868b;margin-bottom:8px">Pegá el contenido del remito (acepta formato Halpern/Enisa o Kumho/Firemax). Detecta el formato automáticamente.</div>
+  <textarea id="cyd-remito-paste" rows="10" placeholder="Pegá acá el contenido copiado del remito..." style="width:100%;padding:10px;border:.5px solid #d2d2d7;border-radius:10px;font-size:12px;font-family:monospace;resize:vertical;outline:none;background:#fff;color:#1d1d1f;line-height:1.5"></textarea>
+  <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+    <input id="cyd-remito-nro" placeholder="N° Remito / Despacho" style="flex:1;padding:9px 12px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;background:#fff">
+    <input id="cyd-remito-origen" placeholder="Origen / Proveedor" style="flex:1;padding:9px 12px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;background:#fff">
+  </div>
+  <div id="cyd-remito-preview" style="margin-top:10px"></div>
+  <div style="display:flex;gap:8px;margin-top:12px">
+    <button onclick="cydProcesarRemito()" style="flex:1;padding:10px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">🔍 Procesar y previsualizar</button>
+    <button id="cyd-remito-confirmar" onclick="cydConfirmarRemito()" style="display:none;flex:1;padding:10px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">✅ Confirmar ingreso</button>
+  </div>
+</div>
+</div>
+
+<script>
+var _cydRemitoItems=[];
+function cydAbrirPegarRemito(){document.getElementById('cyd-remito-modal').style.display='block';document.getElementById('cyd-remito-paste').value='';document.getElementById('cyd-remito-preview').innerHTML='';document.getElementById('cyd-remito-confirmar').style.display='none';_cydRemitoItems=[];}
+function cydProcesarRemito(){
+  var texto=document.getElementById('cyd-remito-paste').value.trim();
+  if(!texto){showToast('❌ Pegá el contenido del remito primero');return;}
+  var lineas=texto.split('\n').map(function(l){return l.trim();}).filter(function(l){return l;});
+  _cydRemitoItems=[];var errores=[];
+  lineas.forEach(function(linea,idx){
+    if(linea.match(/^ART\t|^Proveedor\t/i)) return;
+    var cols=linea.split('\t');
+    var art=null,cant=0,detalle='',prov='',nroDoc='';
+    // Formato 1 Halpern: ART DETALLE Q DESPA DESPACHO...
+    if(!isNaN(cols[0])&&cols.length>=3&&!isNaN(cols[2])){
+      art=parseInt(cols[0]);detalle=cols[1]||'';cant=parseInt(cols[2])||0;nroDoc=cols[4]||'';prov=cols[8]||'';
+    }
+    // Formato 2 Kumho/Firemax: PROV ART DETALLE FACTURA CONTENEDOR Q
+    else if(isNaN(cols[0])&&!isNaN(cols[1])&&cols.length>=6){
+      prov=cols[0]||'';art=parseInt(cols[1]);detalle=cols[2]||'';nroDoc=cols[3]||'';cant=parseInt(cols[5])||0;
+    } else {if(linea.length>3)errores.push('Línea '+(idx+1)+': no reconocida');return;}
+    if(!art||cant<=0)return;
+    var dataArt=DATA.find(function(r){return r.art===art;});
+    _cydRemitoItems.push({art:art,detalle:detalle,prov:prov||(dataArt?dataArt.prov:''),cant:cant,nroDoc:nroDoc,enData:!!dataArt,med:dataArt?dataArt.med:'',diseno:dataArt?dataArt.diseno:'',stockActual:dataArt?dataArt.stock:0,bloque:dataArt?dataArt.bloque:''});
+  });
+  if(!_cydRemitoItems.length){document.getElementById('cyd-remito-preview').innerHTML='<div style="color:#d70015;font-size:13px;padding:10px">No se encontraron artículos válidos.</div>';return;}
+  var totalU=_cydRemitoItems.reduce(function(s,r){return s+r.cant;},0);
+  var noEnData=_cydRemitoItems.filter(function(r){return !r.enData;}).length;
+  var html='<div style="background:#f5f5f7;border-radius:10px;padding:10px;margin-bottom:8px"><div style="display:flex;gap:16px;margin-bottom:8px"><div><div style="font-size:10px;color:#86868b">Artículos</div><div style="font-size:18px;font-weight:700">'+_cydRemitoItems.length+'</div></div><div><div style="font-size:10px;color:#86868b">Unidades</div><div style="font-size:18px;font-weight:700">'+totalU+'</div></div>'+(noEnData?'<div><div style="font-size:10px;color:#86868b">No en DATA</div><div style="font-size:18px;font-weight:700;color:#d70015">'+noEnData+'</div></div>':'')+'</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1d1d1f;color:#fff"><th style="padding:5px 8px;text-align:left">Art.</th><th style="padding:5px 8px;text-align:left">Descripción</th><th style="padding:5px 8px;text-align:center">Cant.</th><th style="padding:5px 8px;text-align:center">Stock actual</th><th style="padding:5px 8px;text-align:center">Stock nuevo</th><th style="padding:5px 8px;text-align:left">Bloque</th></tr></thead><tbody>';
+  _cydRemitoItems.forEach(function(r,i){var bg=i%2?'background:#fafafa':'';var noD=!r.enData?'color:#d70015;font-weight:700':'';html+='<tr style="'+bg+'"><td style="padding:5px 8px;'+noD+'">'+r.art+(!r.enData?'⚠️':'')+'</td><td style="padding:5px 8px;font-size:10px">'+(r.med?r.med+' '+r.diseno:r.detalle.substring(0,30))+'</td><td style="padding:5px 8px;text-align:center;font-weight:700">+'+r.cant+'</td><td style="padding:5px 8px;text-align:center;color:#86868b">'+r.stockActual+'</td><td style="padding:5px 8px;text-align:center;font-weight:700;color:#34c759">'+(r.stockActual+r.cant)+'</td><td style="padding:5px 8px;font-size:10px">'+(r.bloque||'—')+'</td></tr>';});
+  html+='</tbody></table></div></div>'+(errores.length?'<div style="font-size:11px;color:#d70015;margin-top:4px">'+errores.join('<br>')+'</div>':'');
+  document.getElementById('cyd-remito-preview').innerHTML=html;
+  document.getElementById('cyd-remito-confirmar').style.display='block';
+}
+function cydConfirmarRemito(){
+  if(!_cydRemitoItems.length){showToast('❌ Procesá el remito primero');return;}
+  var nro=document.getElementById('cyd-remito-nro').value||'';
+  var origen=document.getElementById('cyd-remito-origen').value||'';
+  var fecha=new Date().toLocaleDateString('es-AR');
+  var fechaISO=new Date().toISOString().split('T')[0];
+  var actualizados=0;
+
+  // Actualizar stock en DATA
+  _cydRemitoItems.forEach(function(r){
+    var dataArt=DATA.find(function(d){return d.art===r.art;});
+    if(dataArt){dataArt.stock=(dataArt.stock||0)+r.cant;dataArt.pall=Math.floor(dataArt.stock/(dataArt.max_pos||32));actualizados++;saveDataStock();}
+  });
+
+  // Calcular ubicación inteligente — rack cubre 1 semana de rotación
+  var ingresosUbic=[];
+  _cydRemitoItems.forEach(function(r){
+    var da=DATA.find(function(d){return d.art===r.art;});
+    if(!da) return;
+    var rotSem=da.rot_sem||0;
+    var mp=(typeof PALL_BASE!=='undefined'&&PALL_BASE[String(r.art)]?PALL_BASE[String(r.art)].p_rack:0)||da.max_pos||32;
+    if(mp<=0) mp=32;
+    var unidRack,nPos,unidBloque;
+    if(rotSem<=0){unidRack=0;nPos=0;unidBloque=r.cant;}
+    else if(rotSem>=r.cant){unidRack=r.cant;nPos=Math.ceil(r.cant/mp);unidBloque=0;}
+    else{unidRack=Math.min(Math.ceil(rotSem),r.cant);nPos=Math.ceil(unidRack/mp);unidBloque=r.cant-unidRack;}
+    var posAct=Object.entries(ASIGN).filter(function(e){return e[1]&&e[1].art==r.art;}).map(function(e){return e[0];});
+    ingresosUbic.push({art:r.art,med:da.med,diseno:da.diseno,prov:da.prov,cant:r.cant,rotSem:rotSem,maxPos:mp,unidRack:unidRack,nPos:nPos,unidBloque:unidBloque,bloque:da.bloque||'',posActuales:posAct,fecha:fecha,fechaISO:fechaISO,estado:'pendiente'});
+  });
+  if(ingresosUbic.length){
+    var histIng=JSON.parse(localStorage.getItem('wms_repo_ingresos')||'[]');
+    ingresosUbic.forEach(function(r){histIng.unshift(r);});
+    localStorage.setItem('wms_repo_ingresos',JSON.stringify(histIng.slice(0,500)));
+  }
+
+  // Guardar planilla de descarga
+  var reg={tipo:'descarga',remito:nro||('REM-'+Date.now()),origen:origen,tte:'',fecha:fecha,fechaISO:fechaISO,ts:Date.now(),items:_cydRemitoItems.map(function(r){return{art:r.art,desc:(r.med+' '+r.diseno).trim()||r.detalle,prov:r.prov,cant:r.cant,llego:true,bloque:r.bloque,dot:'',lote:''};})};
+  var hist=JSON.parse(localStorage.getItem('wms_descarga_hist')||'[]');
+  hist.unshift(reg);
+  localStorage.setItem('wms_descarga_hist',JSON.stringify(hist.slice(0,500)));
+
+  // Generar planilla de recepción imprimible
+  cydImprimirRecepcion(_cydRemitoItems, nro, origen, fecha);
+
+  document.getElementById('cyd-remito-modal').style.display='none';
+  _cydRemitoItems=[];
+  cydSetTab('descargas');
+  showToast('✅ Ingreso confirmado — '+actualizados+' artículos actualizados en stock');
+  setTimeout(function(){showToast('💡 Recordá aplicar Stock Bajo para recalcular los racks');},2500);
+}
+
+function cydImprimirRecepcion(items, nro, origen, fecha){
+  var filas='';
+  items.forEach(function(r){
+    // Buscar posiciones en rack para este artículo
+    var posRack=[];
+    Object.entries(ASIGN).forEach(function(entry){
+      var pos=entry[0],v=entry[1];
+      if(v&&v.art==r.art) posRack.push({pos:pos,unidades:v.unidades});
+      // También verificar compartidos
+      if(v&&v.compartidos){
+        v.compartidos.forEach(function(c){
+          if(c.art==r.art) posRack.push({pos:pos,unidades:c.unidades,compartido:true});
+        });
+      }
+    });
+    posRack.sort(function(a,b){return a.pos.localeCompare(b.pos);});
+
+    var ubic='';
+    if(posRack.length){
+      ubic+=posRack.map(function(p){
+        return '<span style="display:inline-block;background:#e6f1fb;color:#185fa5;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;margin:2px">📍 '+p.pos+' — '+p.unidades+' un.'+(p.compartido?' (comp.)':'')+'</span>';
+      }).join('');
+    }
+    if(r.bloque){
+      ubic+='<span style="display:inline-block;background:#fff3cd;color:#856404;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;margin:2px">📦 Bloque '+r.bloque+'</span>';
+    }
+    if(!posRack.length&&!r.bloque){
+      ubic='<span style="color:#d70015;font-size:11px">⚠️ Sin ubicación asignada</span>';
+    }
+
+    filas+='<tr style="border-bottom:1px solid #e5e5ea">'
+      +'<td style="padding:8px;font-weight:700;font-size:13px">'+r.art+'</td>'
+      +'<td style="padding:8px;font-size:12px">'+(r.med?r.med+' '+r.diseno:r.detalle)+'</td>'
+      +'<td style="padding:8px;font-size:12px">'+r.prov+'</td>'
+      +'<td style="padding:8px;text-align:center;font-size:16px;font-weight:700;color:#0071e3">'+r.cant+'</td>'
+      +'<td style="padding:8px">'+ubic+'</td>'
+      +'<td style="padding:8px;width:80px;border:1px solid #d2d2d7;border-radius:4px">&nbsp;</td>'
+      +'</tr>';
+  });
+
+  var totalU=items.reduce(function(s,r){return s+r.cant;},0);
+
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Recepción '+nro+'</title>'
+    +'<style>*{font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin:0;padding:0;box-sizing:border-box}'
+    +'body{padding:20px;color:#1d1d1f}'
+    +'@media print{body{padding:10px}.no-print{display:none}}'
+    +'table{width:100%;border-collapse:collapse}'
+    +'th{background:#1d1d1f;color:#fff;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px}'
+    +'tr:nth-child(even){background:#fafafa}'
+    +'</style></head><body>'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">'
+    +'<div><div style="font-size:22px;font-weight:700">📥 Planilla de Recepción</div>'
+    +'<div style="font-size:14px;color:#86868b;margin-top:4px">'+(nro||'Sin N° remito')+' · '+(origen||'Sin origen')+' · '+fecha+'</div></div>'
+    +'<div style="text-align:right">'
+    +'<div style="font-size:28px;font-weight:700;color:#0071e3">'+items.length+' arts.</div>'
+    +'<div style="font-size:14px;color:#86868b">'+totalU+' unidades</div>'
+    +'<button class="no-print" onclick="window.print()" style="margin-top:8px;padding:8px 16px;background:#1d1d1f;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">🖨️ Imprimir</button>'
+    +'</div></div>'
+    +'<table><thead><tr>'
+    +'<th style="width:70px">Art.</th>'
+    +'<th>Descripción</th>'
+    +'<th style="width:90px">Proveedor</th>'
+    +'<th style="width:60px;text-align:center">Cant.</th>'
+    +'<th>Ubicación sugerida</th>'
+    +'<th style="width:80px">✓ Hecho</th>'
+    +'</tr></thead><tbody>'+filas+'</tbody></table>'
+    +'<div style="margin-top:16px;font-size:11px;color:#86868b;border-top:1px solid #e5e5ea;padding-top:8px">'
+    +'WMS Casero · Halpern Neumáticos · Generado: '+new Date().toLocaleString('es-AR')+'</div>'
+    +'</body></html>';
+
+  var win=window.open('','_blank');
+  if(win){win.document.write(html);win.document.close();}
+  else showToast('⚠️ Habilitá las ventanas emergentes para imprimir');
 }
 </script>
 
