@@ -2092,11 +2092,16 @@ function renderCobertura(){
   if(enEl) enEl.textContent = rotRack.toLocaleString('es-AR')+' rot. cubierta en rack';
   if(fEl) fEl.textContent = rotFuera.toLocaleString('es-AR')+' rot. fuera de rack';
 
-  // Stock coverage
-  const stockTotal = universo.reduce((s,r)=>s+(r.stock||0),0);
-  const stockRack = universo.filter(r=>artsEnRack.has(r.art)).reduce((s,r)=>s+(r.stock||0),0);
-  const stockFuera = stockTotal - stockRack;
-  const pctStock = stockTotal>0?Math.round((stockRack/stockTotal)*100):0;
+  // Stock coverage — usar unidades reales asignadas al rack, no el stock total del artículo
+  // Stock total = todo el DATA (incluyendo excluidos del rack)
+  const stockTotal = DATA.reduce((s,r)=>s+(r.stock||0),0);
+  // Sumar unidades efectivamente asignadas al rack
+  var stockEnRack = 0;
+  Object.values(ASIGN).forEach(function(v){
+    if(v) stockEnRack += (v.unidades||0);
+  });
+  const stockFuera = stockTotal - stockEnRack;
+  const pctStock = stockTotal>0?Math.round((stockEnRack/stockTotal)*100):0;
 
   const spctEl = document.getElementById('cob-stock-pct');
   const sfillEl = document.getElementById('cob-stock-fill');
@@ -2105,7 +2110,7 @@ function renderCobertura(){
   if(spctEl) spctEl.textContent = pctStock+'%';
   if(spctEl) spctEl.style.color = pctStock>=80?'#34c759':pctStock>=60?'#ff9500':'#d70015';
   if(sfillEl) sfillEl.style.width = pctStock+'%';
-  if(senEl) senEl.textContent = stockRack.toLocaleString('es-AR')+' unidades en rack';
+  if(senEl) senEl.textContent = stockEnRack.toLocaleString('es-AR')+' unidades en rack';
   if(sfEl) sfEl.textContent = stockFuera.toLocaleString('es-AR')+' unidades fuera de rack';
 }
 
@@ -2130,8 +2135,11 @@ function clickCelda(posId){
 
 function showModalOcupada(posId,art){
   currentUnidades=ASIGN[posId]?ASIGN[posId].unidades:0;
-  currentMax=art.max_pos||0;
-  const pct=currentMax?Math.round((currentUnidades/currentMax)*100):0;
+  currentMax=(PALL_BASE&&PALL_BASE[String(art.art)]?PALL_BASE[String(art.art)].p_rack:0)||art.max_pos||0;
+  const comp=(ASIGN[posId]||{}).compartidos||[];
+  // Si comparte, el máximo por artículo es la mitad del pallet
+  const maxEfectivo = comp.length>0 ? Math.floor(currentMax/2) : currentMax;
+  const pct=maxEfectivo?Math.round((currentUnidades/maxEfectivo)*100):0;
   const barColor=pct>=66?'#34c759':pct>=33?'#ff9500':'#d70015';
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-pos">📍 ${posId}</div>
@@ -2154,7 +2162,7 @@ function showModalOcupada(posId,art){
         <div class="unid-num" id="unid-num">${currentUnidades}</div>
         <button class="unid-btn mas" onclick="cambiarUnidades(1)">+</button>
       </div>
-      <div class="unid-max">Máximo: ${currentMax} unidades por pallet</div>
+      <div class="unid-max">Máximo: ${maxEfectivo} unidades${comp.length>0?' (mitad del pallet)':' por pallet'}</div>
       <div class="barra-pos"><div class="barra-pos-fill" id="barra-fill" style="width:${pct}%;background:${barColor}"></div></div>
     </div>
     ${(()=>{const comp=(ASIGN[posId]||{}).compartidos||[];if(!comp.length)return '';return '<div style="background:#f5f5f7;border-radius:10px;padding:10px 12px;margin-top:8px"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#86868b;margin-bottom:6px">Comparte posición con:</div>'+comp.map(c=>{const ca=DATA.find(r=>r.art==c.art);if(!ca)return '';return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:.5px solid #e5e5ea"><div><div style="font-size:12px;font-weight:600">'+ca.med+' — '+ca.diseno+'</div><div style="font-size:10px;color:#86868b">'+ca.prov+'</div></div><span style="font-size:12px;font-weight:700;color:#0071e3">'+c.unidades+' un.</span></div>';}).join('')+'</div>';})()}
@@ -2249,27 +2257,19 @@ function generarMotorAsignacion(){
     // Excluir Speedway y agrícola
     if(EXCLUIR_PROV.indexOf(r.prov)>=0) return false;
     if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false;
-    // Solo stocks bajos: máximo 6 pallets
-    if((r.pall||0) > 6) return false;
+    // Solo stocks bajos: calcular pallets reales desde stock/max_pos
+    var mpFilt = (typeof PALL_BASE!=='undefined' && PALL_BASE[String(r.art)] ? PALL_BASE[String(r.art)].p_rack : 0) || r.max_pos || 32;
+    if(mpFilt <= 0) mpFilt = 32;
+    var pallReal = Math.ceil((r.stock||0) / mpFilt);
+    if(pallReal > 6) return false;  // más de 6 pallets → bloque
+    if((r.stock||0) <= 0) return false;  // sin stock → no va
+    if((r.rot||0) <= 0) return false;    // sin rotación → no va
     return true;
   });
 
-  // PASO 2 — Ordenar candidatos: primero sueltos/picking, después por pallets asc, dentro de cada grupo por rotación desc
-  function grupoPall(r){
-    var p = r.pall||0;
-    if(p<=0) return 0;  // sueltos/picking
-    if(p===1) return 1;
-    if(p===2) return 2;
-    if(p<=4) return 3;
-    if(p<=6) return 4;
-    if(p<=9) return 5;
-    return 6;
-  }
-
+  // PASO 2 — Ordenar por rotación descendente. Simple. El más pedido va primero → N1.
   candidatos.sort(function(a,b){
-    var ga = grupoPall(a), gb = grupoPall(b);
-    if(ga!==gb) return ga-gb;
-    return (b.rot||0)-(a.rot||0); // más rotación primero dentro del grupo
+    return (b.rot||0) - (a.rot||0);
   });
 
   // PASO 3 — Agrupar por diseño para asignar frentes
@@ -2321,73 +2321,76 @@ function generarMotorAsignacion(){
   var candIdx = 0;
 
   while(posIdx < posiciones.length && candIdx < candidatos.length){
-    // Buscar siguiente artículo con stock restante
     while(candIdx < candidatos.length && !(stockMap[candidatos[candIdx].art] > 0)){
       candIdx++;
     }
     if(candIdx >= candidatos.length) break;
 
     var pos = posiciones[posIdx];
-    var maxPos = 0;
-    var espacioLibre = 0;
-    var primerArt = null;
+    var primerArt = candidatos[candIdx];
+    var mp = (typeof PALL_BASE!=='undefined' && PALL_BASE[String(primerArt.art)] ? PALL_BASE[String(primerArt.art)].p_rack : 0) || primerArt.max_pos || 32;
+    if(mp <= 0) mp = 32;
 
-    // Llenar la posición
-    var intentos = candidatos.length;
-    var ci = candIdx;
+    var stockPrimero = stockMap[primerArt.art];
+    var u1 = Math.min(stockPrimero, mp);
+    var mitad = Math.floor(mp / 2);
 
-    while(ci < candidatos.length && intentos-- > 0){
-      var art = candidatos[ci];
-      if(!(stockMap[art.art] > 0)){ ci++; continue; }
+    // Si llena el pallet O tiene más de la mitad → posición exclusiva
+    if(u1 >= mitad){
+      asign[pos.id] = {art: primerArt.art, unidades: u1, min_u: Math.ceil(u1*0.25), compartidos: []};
+      stockMap[primerArt.art] -= u1;
+      if(stockMap[primerArt.art] <= 0) candIdx++;
+    } else {
+      // Remanente: u1 < mp → busca con quién compartir la posición
+      var mitad = Math.floor(mp / 2);
+      // Limitar el primero a su mitad para dejar espacio al comparte
+      u1 = Math.min(stockPrimero, mitad);
+      var espacioLibre = mp - u1;
 
-      var mp = art.max_pos || 32;
+      // Buscar comparte: primero misma medida+tipo, después cualquiera
+      var compart = null;
+      var mpComp = 0;
 
-      // Primera asignación en esta posición
-      if(!asign[pos.id]){
-        maxPos = mp;
-        espacioLibre = maxPos;
-        primerArt = art;
-        var u = Math.min(stockMap[art.art], espacioLibre);
-        asign[pos.id] = {art: art.art, unidades: u, min_u: Math.ceil(u*0.25), compartidos: []};
-        stockMap[art.art] -= u;
-        espacioLibre -= u;
-        if(ci === candIdx && stockMap[art.art] <= 0) candIdx++;
-        ci++;
-      } else {
-        // Posición ya tiene algo — buscar artículo que comparta (mismo diseño o medida)
-        var mismaM = (art.med||'').trim() === (primerArt.med||'').trim();
-        var mismoD = (art.diseno||'').toUpperCase() === (primerArt.diseno||'').toUpperCase();
-        if(mismaM || mismoD){
-          var u2 = Math.min(stockMap[art.art], espacioLibre);
-          if(u2 > 0){
-            asign[pos.id].compartidos.push({art: art.art, unidades: u2});
-            asign[pos.id].unidades += u2;
-            stockMap[art.art] -= u2;
-            espacioLibre -= u2;
-            if(stockMap[art.art] <= 0 && ci === candIdx) candIdx++;
-          }
-          ci++;
-        } else {
-          ci++;
+      // 1er intento: misma medida + mismo tipo
+      for(var ci = candIdx+1; ci < candidatos.length; ci++){
+        var cand = candidatos[ci];
+        if(!(stockMap[cand.art] > 0)) continue;
+        if((cand.med||'').trim() === (primerArt.med||'').trim() &&
+           (cand.tipo||'').trim() === (primerArt.tipo||'').trim()){
+          compart = cand; break;
         }
       }
 
-      // Si la posición está llena, pasar a la siguiente
-      if(espacioLibre <= 0) break;
-    }
-
-    // Si quedó espacio y no hay candidatos compatibles, completar con cualquiera
-    if(asign[pos.id] && espacioLibre > 0){
-      for(var ci2 = candIdx; ci2 < candidatos.length && espacioLibre > 0; ci2++){
-        var art2 = candidatos[ci2];
-        if(!(stockMap[art2.art] > 0)) continue;
-        var u3 = Math.min(stockMap[art2.art], espacioLibre);
-        asign[pos.id].compartidos.push({art: art2.art, unidades: u3});
-        asign[pos.id].unidades += u3;
-        stockMap[art2.art] -= u3;
-        espacioLibre -= u3;
-        if(stockMap[art2.art] <= 0 && ci2 === candIdx) candIdx++;
+      // 2do intento: cualquier remanente que quepa
+      if(!compart){
+        for(var ci2 = candIdx+1; ci2 < candidatos.length; ci2++){
+          var cand2 = candidatos[ci2];
+          if(!(stockMap[cand2.art] > 0)) continue;
+          var mpC2 = (typeof PALL_BASE!=='undefined' && PALL_BASE[String(cand2.art)] ? PALL_BASE[String(cand2.art)].p_rack : 0) || cand2.max_pos || 32;
+          if(mpC2 <= 0) mpC2 = 32;
+          var stockC2 = stockMap[cand2.art];
+          // Solo comparte si también es un remanente (stock < mp completo)
+          if(stockC2 < mpC2 && Math.min(stockC2, espacioLibre) > 0){
+            compart = cand2; break;
+          }
+        }
       }
+
+      if(compart){
+        var u2 = Math.min(stockMap[compart.art], espacioLibre);
+        asign[pos.id] = {
+          art: primerArt.art, unidades: u1,
+          min_u: Math.ceil(u1*0.25),
+          compartidos: [{art: compart.art, unidades: u2}]
+        };
+        stockMap[primerArt.art] -= u1;
+        stockMap[compart.art] -= u2;      } else {
+        // Sin comparte: ocupa lo que tiene sin forzar mitad
+        asign[pos.id] = {art: primerArt.art, unidades: u1, min_u: Math.ceil(u1*0.25), compartidos: []};
+        stockMap[primerArt.art] -= u1;
+      }
+
+      if(stockMap[primerArt.art] <= 0) candIdx++;
     }
 
     posIdx++;
