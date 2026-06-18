@@ -868,10 +868,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
         <input type="text" id="ped-preparador" placeholder="Preparador" autocomplete="off" style="flex:1">
       </div>
       <div style="display:flex;gap:8px;margin-top:4px">
-        <button id="btn-chasis" onclick="setModo('chasis')" style="flex:1;padding:10px;border-radius:10px;border:2px solid #3a3a3c;background:#3a3a3c;color:#fff;font-size:13px;font-weight:600;cursor:pointer">🚗 Chasis</button>
-        <button id="btn-flete" onclick="setModo('flete')" style="flex:1;padding:10px;border-radius:10px;border:2px solid #3a3a3c;background:#3a3a3c;color:#86868b;font-size:13px;font-weight:600;cursor:pointer">🚛 Flete Origen</button>
       </div>
-      <div id="modo-label" style="font-size:11px;color:#a0a0a5;margin-top:4px;text-align:center">Seleccioná el modo de preparación</div>
       <div style="display:none">
       </div>
     </div>
@@ -2562,29 +2559,14 @@ function procesarPaste(){
   showToast('✅ '+pedido.length+' artículos procesados');
 }
 
-let _modoPedido = 'chasis';
-
-function setModo(modo){
-  _modoPedido = modo;
-  document.getElementById('btn-chasis').style.background = modo==='chasis'?'#0071e3':'#3a3a3c';
-  document.getElementById('btn-chasis').style.borderColor = modo==='chasis'?'#0071e3':'#3a3a3c';
-  document.getElementById('btn-chasis').style.color = '#fff';
-  document.getElementById('btn-flete').style.background = modo==='flete'?'#ff9500':'#3a3a3c';
-  document.getElementById('btn-flete').style.borderColor = modo==='flete'?'#ff9500':'#3a3a3c';
-  document.getElementById('btn-flete').style.color = modo==='flete'?'#fff':'#86868b';
-  const labels = {chasis:'🚗 Modo Chasis — prepara desde racks', flete:'🚛 Modo Flete Origen — prepara desde bloques'};
-  document.getElementById('modo-label').textContent = labels[modo];
-}
+let _modoPedido = 'pedidos';
 
 function esCamion(item){
-  // 22.5 o mayor, o Speedway
   try{ return parseFloat(String(item.llan).replace(',','.')) >= 22.5 || item.prov.toUpperCase().includes('SPEEDWAY'); }
   catch{ return false; }
 }
 
 function procesarPedido(pedido){
-  if(!_modoPedido){ showToast('❌ Seleccioná Chasis o Flete Origen primero'); return; }
-
   const conRack = [];
   const conBloque = [];
   const sinUbic = [];
@@ -2595,7 +2577,7 @@ function procesarPedido(pedido){
     item.med = dataArt?dataArt.med:`${item.diam} ${item.secc} ${item.llan}`;
     item.cond = dataArt?dataArt.cond:'';
 
-    // Buscar posición en rack — cualquier nivel (N1 primero, luego N2, N3, N4)
+    // Buscar posición en rack — N1 primero, luego N2, N3, N4
     const posRackN1 = Object.entries(ASIGN).find(([pos,v])=>pos.includes('-N1-')&&v&&v.art==item.art);
     const posRackN2 = Object.entries(ASIGN).find(([pos,v])=>pos.includes('-N2-')&&v&&v.art==item.art);
     const posRackN3 = Object.entries(ASIGN).find(([pos,v])=>pos.includes('-N3-')&&v&&v.art==item.art);
@@ -2603,36 +2585,13 @@ function procesarPedido(pedido){
     const posRack = posRackN1||posRackN2||posRackN3||posRackN4;
     item.posRack = posRack?posRack[0]:'';
 
-    const esCam = esCamion(item);
-
-    if(_modoPedido === 'chasis'){
-      // Chasis: TODO va a rack excepto 22.5 y Speedway
-      if(esCam){
-        // camión siempre a bloque
-        item.posRack = '';
-        if(item.bloque) conBloque.push(item);
-        else sinUbic.push(item);
-      } else {
-        // Tiene posición en rack → rack
-        if(item.posRack){
-          conRack.push(item);
-        } else if(item.bloque){
-          // No tiene posición asignada → bloque (los 111 que no entraron)
-          conBloque.push(item);
-        } else {
-          sinUbic.push(item);
-        }
-      }
+    // Lógica simple: si está en rack → rack, si no → bloque
+    if(item.posRack){
+      conRack.push(item);
+    } else if(item.bloque){
+      conBloque.push(item);
     } else {
-      // Flete Origen: bloques primero, rack solo si no hay bloque
-      if(item.bloque){
-        item.posRack = '';
-        conBloque.push(item);
-      } else if(item.posRack){
-        conRack.push(item);
-      } else {
-        sinUbic.push(item);
-      }
+      sinUbic.push(item);
     }
   });
 
@@ -3402,10 +3361,10 @@ function exportarNivelActivo(){
     const wsData = [
       ['CONTENIDO '+niv+' — '+fecha+' · '+sugNombre],
       [],
-      ['POSICIÓN','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','UNIDADES','MÁX.PALLET','% LLENO','MÍN.SEMANAL','ESTADO','CONDICIÓN'],
+      ['POSICIÓN','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','UNIDADES EN RACK','STOCK FP TOTAL','MÁX.PALLET','% LLENO','MÍN.SEMANAL','ESTADO','CONDICIÓN'],
       ...items.map(i=>[
         i.pos, i.art.art, i.art.med, i.art.diseno, i.art.prov,
-        i.unidades, i.art.max_pos||0, i.pctOcup+'%', i.min_u,
+        i.unidades, i.art.stock||0, i.art.max_pos||0, i.pctOcup+'%', i.min_u,
         i.estado, i.art.cond||''
       ])
     ];
@@ -3413,7 +3372,7 @@ function exportarNivelActivo(){
     wsData.push(['TOTAL',items.length+' pos','','','',items.reduce((s,i)=>s+i.unidades,0)+' un.','','','','','']);
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
-    ws['!cols'] = [{wch:18},{wch:8},{wch:14},{wch:10},{wch:12},{wch:10},{wch:8},{wch:8},{wch:10},{wch:8},{wch:12}];
+    ws['!cols'] = [{wch:18},{wch:8},{wch:14},{wch:10},{wch:12},{wch:14},{wch:12},{wch:8},{wch:8},{wch:10},{wch:8},{wch:12}];
     ws['!pageSetup'] = {orientation:'landscape'};
     XLSX.utils.book_append_sheet(wb, ws, niv);
   });
