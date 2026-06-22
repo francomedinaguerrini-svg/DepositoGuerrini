@@ -6250,6 +6250,7 @@ function renderNave(){
     { label: '3',  norte: null,   sur: '3S' },
     { label: '2/3 Norte', compartido: true, key: '2N/3N' },
     { label: '2 Sur/Norte', compartido: true, key: '2S/2N' },
+    { label: '1',  norte: 'RACKS', sur: null },
   ];
 
   // Total stats
@@ -6284,7 +6285,22 @@ function renderNave(){
     html2 += `<div class="nave-side-label">S</div>`;
     html2 += fila.sur ? mkBloque(fila.sur, `Bloque ${fila.label} Sur`) : `<div class="bloque-card vacio"><div class="bloque-name">—</div></div>`;
     html2 += `<div class="nave-side-label">N</div>`;
-    html2 += fila.norte ? mkBloque(fila.norte, `Bloque ${fila.label} Norte`) : `<div class="bloque-card vacio"><div class="bloque-name">—</div></div>`;
+    if(fila.norte === 'RACKS'){
+      const asign = Object.values(ASIGN);
+      const posOcupadas = asign.length;
+      const artUnicos = new Set(asign.map(a=>a.art)).size;
+      const totalUnid = asign.reduce((s,a)=>s+(a.unidades||0),0);
+      const pctOcup = Math.round((posOcupadas/448)*100);
+      html2 += `<div class="bloque-card" style="border:2px solid #0071e3;background:linear-gradient(135deg,#f0f6ff 0%,#e8f0fe 100%);cursor:pointer" onclick="switchTab('mapa',document.querySelectorAll('.tab')[2])">
+        <div class="bloque-name" style="color:#0071e3">🗄️ Racks — Pasillos 4 al 7</div>
+        <div class="bloque-pall" style="color:#0071e3">${posOcupadas} <span style="font-size:10px;font-weight:400;color:#86868b">pos. ocupadas de 448</span></div>
+        <div class="bloque-arts">${artUnicos} arts · ${totalUnid.toLocaleString('es-AR')} un.</div>
+        <div style="font-size:11px;color:#0071e3;font-weight:500;margin-top:4px">→ Ir al Mapa de Racks</div>
+        <div class="bloque-bar"><div class="bloque-bar-fill" style="width:${pctOcup}%;background:#0071e3"></div></div>
+      </div>`;
+    } else {
+      html2 += fila.norte ? mkBloque(fila.norte, `Bloque ${fila.label} Norte`) : `<div class="bloque-card vacio"><div class="bloque-name">—</div></div>`;
+    }
     html2 += '</div>';
   });
 
