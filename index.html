@@ -2241,35 +2241,36 @@ function generarMotorAsignacion(){
   var EXCLUIR_PROV = ['SPEEDWAY'];
   var EXCLUIR_USO = ['TT','TL','TLSB','TT ','TL '];
 
-  // UMBRALES rot_sem: entre 0.25 y 8 unidades/semana → van al rack
-  // < 0.25/sem = artículo muerto → bloque esquinado nave
-  // > 8/sem    = alta rotación → bloque propio en nave
-  var ROT_SEM_MIN = 0.5;   // mínimo: 0.5 unidades/semana
-  var ROT_SEM_MAX = 5;     // máximo: 5 unidades por semana → más de 5 va a bloque nave
+  // CRITERIO BAJA ROTACIÓN:
+  // rot_sem < 0.5  → artículo lento, ocupa lugar en bloque sin moverse
+  // pall entre 1 y 4 → no tiene tanto stock como para dejarlo en bloque
+  // Objetivo: sacar la baja rotación de los bloques y ordenarlos
+  var ROT_SEM_MAX = 0.5;   // máximo: menos de 0.5/semana
+  var PALL_MAX = 4;        // máximo 4 pallets de stock
 
   var candidatos = DATA.filter(function(r){
-    // Excluir medidas x.5 (camión: 22.5, 19.5, 17.5...)
+    // Excluir camión (medidas x.5: 22.5, 19.5, 17.5...)
     if(/\d+\.5/.test(r.med||'')) return false;
     // Excluir Speedway y agrícola
     if(EXCLUIR_PROV.indexOf(r.prov)>=0) return false;
     if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false;
     // Sin stock → no va al rack
     if((r.stock||0) <= 0) return false;
-    // Sin rotación semanal → no va
-    if(!(r.rot_sem > 0)) return false;
-    // Zona rack: rotación media-baja semanal
-    if(r.rot_sem < ROT_SEM_MIN) return false;  // muerto → nave
-    if(r.rot_sem > ROT_SEM_MAX) return false;  // alta rot → bloque nave
+    // Alta rotación → se queda en bloque donde es fácil acceder con autoelevador
+    if((r.rot_sem||0) >= ROT_SEM_MAX) return false;
+    // Demasiado stock → no tiene sentido traerlo al rack
+    if((r.pall||0) > PALL_MAX) return false;
+    // Al menos 1 pallet
+    if((r.pall||0) < 1) return false;
     return true;
   });
 
-  // PASO 2 — Ordenar por rot_sem DESCENDENTE dentro del rango
-  // N1 → los más ágiles del rango (cerca de 8/sem)
-  // N4 → los más lentos del rango (cerca de 0.25/sem)
+  // PASO 2 — Ordenar: más pallets primero (los de más stock al nivel más accesible)
+  // N1 → pall 3-4, N2 → pall 1-2
   candidatos.sort(function(a,b){
-    var rotA = a.rot_sem||0, rotB = b.rot_sem||0;
-    if(rotA !== rotB) return rotB - rotA;
-    return (b.stock||0) - (a.stock||0);
+    var pallA = a.pall||0, pallB = b.pall||0;
+    if(pallA !== pallB) return pallB - pallA;
+    return (a.rot_sem||0) - (b.rot_sem||0); // empate: el más lento primero
   });
 
   // PASO 3 — Agrupar por diseño para asignar frentes
@@ -2303,7 +2304,8 @@ function generarMotorAsignacion(){
 
   // Ordenar posiciones: N1 primero, dentro de N1 por frente en orden, etc.
   posiciones.sort(function(a,b){
-    if(a.nivel!==b.nivel) return a.nivel-b.nivel;
+    // Baja rotación: N4 primero (los más lentos arriba), N1 último (más accesible)
+    if(a.nivel!==b.nivel) return b.nivel-a.nivel;
     return a.frente.localeCompare(b.frente) || a.modulo-b.modulo;
   });
 
@@ -2337,9 +2339,8 @@ function generarMotorAsignacion(){
 
     // Si llena el pallet O tiene más de la mitad → posición exclusiva
     if(u1 >= mitad){
-      var _rotSem1 = primerArt.rot_sem||0;
-      var _minU1 = _rotSem1>0 ? Math.ceil(_rotSem1*2) : Math.ceil(u1*0.25);
-      asign[pos.id] = {art: primerArt.art, unidades: u1, min_u: _minU1, compartidos: []};
+      // Baja rotación: alerta cuando llega a 0 (se vendió todo del rack)
+      asign[pos.id] = {art: primerArt.art, unidades: u1, min_u: 1, compartidos: []};
       stockMap[primerArt.art] -= u1;
       if(stockMap[primerArt.art] <= 0) candIdx++;
     } else {
@@ -2380,19 +2381,16 @@ function generarMotorAsignacion(){
 
       if(compart){
         var u2 = Math.min(stockMap[compart.art], espacioLibre);
-        var _rotSem2 = primerArt.rot_sem||0;
-        var _minU2 = _rotSem2>0 ? Math.ceil(_rotSem2*2) : Math.ceil(u1*0.25);
         asign[pos.id] = {
           art: primerArt.art, unidades: u1,
-          min_u: _minU2,
+          min_u: 1,
           compartidos: [{art: compart.art, unidades: u2}]
         };
         stockMap[primerArt.art] -= u1;
         stockMap[compart.art] -= u2;      } else {
         // Sin comparte: ocupa lo que tiene sin forzar mitad
-        var _rotSem3 = primerArt.rot_sem||0;
-        var _minU3 = _rotSem3>0 ? Math.ceil(_rotSem3*2) : Math.ceil(u1*0.25);
-        asign[pos.id] = {art: primerArt.art, unidades: u1, min_u: _minU3, compartidos: []};
+        // Baja rotación: alerta cuando llega a 0
+        asign[pos.id] = {art: primerArt.art, unidades: u1, min_u: 1, compartidos: []};
         stockMap[primerArt.art] -= u1;
       }
 
@@ -2471,63 +2469,64 @@ function renderAlertas(){
   const box = document.getElementById('alertas-box');
   if(!box) return;
 
-  // CRITERIO: alerta cuando unidades en rack < rot_sem × 2 (menos de 2 semanas de cobertura)
-  // REPONER: hasta rot_sem × 4 (1 mes de cobertura)
+  // CRITERIO BAJA ROTACIÓN:
+  // Alerta cuando el artículo se agotó en rack (unidades = 0)
+  // y sigue teniendo stock en bloque → proponer reposición
+  // Reposición: mismo criterio de selección (todo el stock, si sigue siendo < 0.5/sem y 1-4 pallets)
   const alertas = [];
   Object.entries(ASIGN).forEach(([pos, v]) => {
     if(!v || !v.art) return;
     const art = DATA.find(r => r.art == v.art);
     if(!art) return;
+    // Solo alerta si se agotó en rack
+    if((v.unidades || 0) > 0) return;
+    // Verificar si sigue cumpliendo criterio de baja rotación
     const rotSem = art.rot_sem || 0;
-    if(rotSem <= 0) return; // sin rotación → no hay criterio
-    const umbralAlerta = rotSem * 2;   // < 2 semanas → alerta
-    const objetivoRepo  = rotSem * 4;  // reponer hasta 1 mes
-    const traer = Math.max(0, Math.ceil(objetivoRepo - v.unidades));
-    if(v.unidades < umbralAlerta && traer > 0){
-      // Buscar de dónde traer: bloque asignado primero, luego cualquier bloque con stock
-      const bloquePref = art.bloque || '';
-      const stockDisp = (art.stock || 0) - v.unidades; // stock fuera del rack
-      alertas.push({
-        pos, art, unidades: v.unidades,
-        umbral: Math.ceil(umbralAlerta),
-        traer: Math.min(traer, stockDisp > 0 ? stockDisp : traer),
-        bloque: bloquePref,
-        stockDisp,
-        semanas: rotSem > 0 ? (v.unidades / rotSem).toFixed(1) : '—'
-      });
-    }
+    const pall = art.pall || 0;
+    const stock = art.stock || 0;
+    if(stock <= 0) return; // sin stock en nave tampoco
+    const bloquePref = art.bloque || '';
+    alertas.push({
+      pos, art, unidades: 0,
+      traer: Math.min(stock, art.max_pos || 32),
+      bloque: bloquePref,
+      stockDisp: stock,
+      rotSem,
+      pall,
+      sigueCalificando: rotSem < 0.5 && pall >= 1 && pall <= 4
+    });
   });
 
-  alertas.sort((a,b) => (a.unidades/(a.art.rot_sem||1)) - (b.unidades/(b.art.rot_sem||1)));
+  alertas.sort((a,b) => (b.stockDisp - a.stockDisp));
 
   if(!alertas.length){ box.innerHTML=''; return; }
 
   const filas = alertas.map(a => {
-    const sinStock = a.stockDisp <= 0;
-    const color = sinStock ? '#d70015' : '#856404';
-    const bg    = sinStock ? '#ffd6d9' : '#fff3cd';
+    const color = a.sigueCalificando ? '#856404' : '#86868b';
+    const bg    = a.sigueCalificando ? '#fff3cd' : '#f5f5f7';
+    const label = a.sigueCalificando ? 'Reponer' : 'Ya no califica';
     return `<div style="background:${bg};border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;gap:8px;align-items:center">
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:700;color:${color}">${a.pos}</div>
         <div style="font-size:11px;color:#1d1d1f">${a.art.med} ${a.art.diseno} <span style="color:#86868b">${a.art.prov}</span></div>
         <div style="font-size:10px;color:#86868b;margin-top:2px">
-          ${a.unidades} un. en rack · ${a.semanas} sem. cobertura · rot: ${(a.art.rot_sem||0).toFixed(2)}/sem
+          Rack vacío · ${a.stockDisp} un. en bloque ${a.bloque} · rot: ${(a.rotSem||0).toFixed(2)}/sem · ${a.pall} pall.
         </div>
       </div>
       <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:14px;font-weight:700;color:${color}">Traer ${a.traer} un.</div>
-        <div style="font-size:10px;color:#86868b">${sinStock ? '⚠️ Sin stock en nave' : (a.bloque ? 'de bloque ' + a.bloque : 'buscar en nave')}</div>
+        <div style="font-size:14px;font-weight:700;color:${color}">${a.sigueCalificando ? 'Traer '+a.traer+' un.' : '🔄 Liberar'}</div>
+        <div style="font-size:10px;color:#86868b">${a.sigueCalificando ? 'de bloque ' + a.bloque : 'Barrer con datos nuevos'}</div>
       </div>
     </div>`;
   }).join('');
 
   box.innerHTML = `<div style="background:#fff3cd;border:1px solid #ff9500;border-radius:10px;padding:10px;margin-bottom:10px">
     <div style="font-size:13px;font-weight:700;color:#856404;margin-bottom:8px">
-      ⚠️ ${alertas.length} posición${alertas.length>1?'es':''} para reponer — menos de 2 semanas de cobertura
+      📦 ${alertas.length} posición${alertas.length>1?'es':''} vacías en rack
     </div>
     ${filas}
     <div style="font-size:10px;color:#86868b;margin-top:6px;border-top:1px solid #ffe082;padding-top:6px">
-      Criterio: alerta &lt; 2 sem. · objetivo: 1 mes (rot_sem × 4)
+      Criterio: artículo agotado en rack · reponer si sigue siendo baja rot. (&lt;0.5/sem, 1-4 pall.) · liberar si ya no califica
     </div>
   </div>`;
 }
