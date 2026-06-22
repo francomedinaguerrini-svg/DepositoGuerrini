@@ -736,7 +736,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     <!-- Aplicar Stock Bajo -->
     <div style="margin-bottom:10px">
       <div style="display:flex;gap:8px">
-        <button onclick="aplicarSugerencia()" style="flex:1;padding:11px;background:#ff9500;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">⚠️ Aplicar Stock Bajo</button>
+        <button onclick="aplicarSugerencia()" style="flex:1;padding:11px;background:#ff9500;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">📉 Aplicar Rotación Baja</button>
         <button onclick="imprimirMapa()" style="padding:11px 14px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:13px;cursor:pointer" title="Exportar mapa">📥</button>
         <button onclick="limpiarMapa()" style="padding:11px 14px;background:#ffd6d9;color:#d70015;border:none;border-radius:10px;font-size:13px;cursor:pointer">🗑️</button>
       </div>
@@ -1210,7 +1210,13 @@ const ROT_REAL_BASE = {"303116":{"r12":0.2,"r6":0.2},"32800":{"r12":23.1,"r6":25
 
 // Apply saved stock immediately
 loadSavedData();
-let ASIGN = JSON.parse(localStorage.getItem('wms_asign2') || 'null') || JSON.parse(JSON.stringify(SUGERENCIA));
+// v2: frentes actualizados a B4N-B7S — limpiar asignaciones viejas si son de la versión anterior
+var _asignGuardado = JSON.parse(localStorage.getItem('wms_asign2') || 'null');
+if(_asignGuardado && Object.keys(_asignGuardado).some(function(k){return k.startsWith('B');})){
+  _asignGuardado = null; // descarta asignaciones de frentes viejos
+  localStorage.removeItem('wms_asign2');
+}
+let ASIGN = _asignGuardado || JSON.parse(JSON.stringify(SUGERENCIA));
 
 // Aplicar rotación real al arrancar
 (function(){
@@ -1237,14 +1243,14 @@ let ASIGN = JSON.parse(localStorage.getItem('wms_asign2') || 'null') || JSON.par
 })();
 
 const FRENTES = [
-  {id:"B1N",label:"1 Norte",modulos:14,niveles:[1,2,3,4]},
-  {id:"B2N",label:"2 Norte",modulos:14,niveles:[1,2,3,4]},
-  {id:"B2S",label:"2 Sur",  modulos:14,niveles:[1,2,3,4]},
-  {id:"B3N",label:"3 Norte",modulos:14,niveles:[1,2,3,4]},
-  {id:"B3S",label:"3 Sur",  modulos:14,niveles:[1,2,3,4]},
-  {id:"B4N",label:"4 Norte",modulos:14,niveles:[1,2,3,4]},
-  {id:"B4S",label:"4 Sur",  modulos:14,niveles:[1,2,3,4]},
-  {id:"B5S",label:"5 Sur",  modulos:14,niveles:[1,2,3,4]},
+  {id:"4N",label:"4 Norte",modulos:14,niveles:[1,2,3,4]},
+  {id:"4S",label:"4 Sur",  modulos:14,niveles:[1,2,3,4]},
+  {id:"5N",label:"5 Norte",modulos:14,niveles:[1,2,3,4]},
+  {id:"5S",label:"5 Sur",  modulos:14,niveles:[1,2,3,4]},
+  {id:"6N",label:"6 Norte",modulos:14,niveles:[1,2,3,4]},
+  {id:"6S",label:"6 Sur",  modulos:14,niveles:[1,2,3,4]},
+  {id:"7N",label:"7 Norte",modulos:14,niveles:[1,2,3,4]},
+  {id:"7S",label:"7 Sur",  modulos:14,niveles:[1,2,3,4]},
 ];
 
 let sortKey='rot', sortDir=-1;
@@ -1913,7 +1919,7 @@ function init(){
   // Set initial badge
   const badge = document.getElementById('sug-activa-badge');
   if(badge){
-    const noms={chasis:'🚗 Chasis',stock_bajo:'⚠️ Stock Bajo',eficiencia:'⚡ Eficiencia'};
+    const noms={chasis:'🚗 Chasis',stock_bajo:'📉 Rotación Baja',eficiencia:'⚡ Eficiencia'};
     const cols={chasis:'#0071e3',stock_bajo:'#ff9500',eficiencia:'#34c759'};
     badge.textContent = noms[_sugActiva]||'🚗 Chasis';
     badge.style.background = cols[_sugActiva]||'#0071e3';
@@ -2235,25 +2241,35 @@ function generarMotorAsignacion(){
   var EXCLUIR_PROV = ['SPEEDWAY'];
   var EXCLUIR_USO = ['TT','TL','TLSB','TT ','TL '];
 
+  // UMBRALES rot_sem: entre 0.25 y 8 unidades/semana → van al rack
+  // < 0.25/sem = artículo muerto → bloque esquinado nave
+  // > 8/sem    = alta rotación → bloque propio en nave
+  var ROT_SEM_MIN = 0.5;   // mínimo: 0.5 unidades/semana
+  var ROT_SEM_MAX = 5;     // máximo: 5 unidades por semana → más de 5 va a bloque nave
+
   var candidatos = DATA.filter(function(r){
-    // Excluir cualquier medida que termine en .5 (22.5, 19.5, 17.5, etc.)
+    // Excluir medidas x.5 (camión: 22.5, 19.5, 17.5...)
     if(/\d+\.5/.test(r.med||'')) return false;
     // Excluir Speedway y agrícola
     if(EXCLUIR_PROV.indexOf(r.prov)>=0) return false;
     if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false;
-    // Solo stocks bajos: calcular pallets reales desde stock/max_pos
-    var mpFilt = (typeof PALL_BASE!=='undefined' && PALL_BASE[String(r.art)] ? PALL_BASE[String(r.art)].p_rack : 0) || r.max_pos || 32;
-    if(mpFilt <= 0) mpFilt = 32;
-    var pallReal = Math.ceil((r.stock||0) / mpFilt);
-    if(pallReal > 6) return false;  // más de 6 pallets → bloque
-    if((r.stock||0) <= 0) return false;  // sin stock → no va
-    if((r.rot||0) <= 0) return false;    // sin rotación → no va
+    // Sin stock → no va al rack
+    if((r.stock||0) <= 0) return false;
+    // Sin rotación semanal → no va
+    if(!(r.rot_sem > 0)) return false;
+    // Zona rack: rotación media-baja semanal
+    if(r.rot_sem < ROT_SEM_MIN) return false;  // muerto → nave
+    if(r.rot_sem > ROT_SEM_MAX) return false;  // alta rot → bloque nave
     return true;
   });
 
-  // PASO 2 — Ordenar por rotación descendente. Simple. El más pedido va primero → N1.
+  // PASO 2 — Ordenar por rot_sem DESCENDENTE dentro del rango
+  // N1 → los más ágiles del rango (cerca de 8/sem)
+  // N4 → los más lentos del rango (cerca de 0.25/sem)
   candidatos.sort(function(a,b){
-    return (b.rot||0) - (a.rot||0);
+    var rotA = a.rot_sem||0, rotB = b.rot_sem||0;
+    if(rotA !== rotB) return rotB - rotA;
+    return (b.stock||0) - (a.stock||0);
   });
 
   // PASO 3 — Agrupar por diseño para asignar frentes
@@ -2321,7 +2337,9 @@ function generarMotorAsignacion(){
 
     // Si llena el pallet O tiene más de la mitad → posición exclusiva
     if(u1 >= mitad){
-      asign[pos.id] = {art: primerArt.art, unidades: u1, min_u: Math.ceil(u1*0.25), compartidos: []};
+      var _rotSem1 = primerArt.rot_sem||0;
+      var _minU1 = _rotSem1>0 ? Math.ceil(_rotSem1*2) : Math.ceil(u1*0.25);
+      asign[pos.id] = {art: primerArt.art, unidades: u1, min_u: _minU1, compartidos: []};
       stockMap[primerArt.art] -= u1;
       if(stockMap[primerArt.art] <= 0) candIdx++;
     } else {
@@ -2362,15 +2380,19 @@ function generarMotorAsignacion(){
 
       if(compart){
         var u2 = Math.min(stockMap[compart.art], espacioLibre);
+        var _rotSem2 = primerArt.rot_sem||0;
+        var _minU2 = _rotSem2>0 ? Math.ceil(_rotSem2*2) : Math.ceil(u1*0.25);
         asign[pos.id] = {
           art: primerArt.art, unidades: u1,
-          min_u: Math.ceil(u1*0.25),
+          min_u: _minU2,
           compartidos: [{art: compart.art, unidades: u2}]
         };
         stockMap[primerArt.art] -= u1;
         stockMap[compart.art] -= u2;      } else {
         // Sin comparte: ocupa lo que tiene sin forzar mitad
-        asign[pos.id] = {art: primerArt.art, unidades: u1, min_u: Math.ceil(u1*0.25), compartidos: []};
+        var _rotSem3 = primerArt.rot_sem||0;
+        var _minU3 = _rotSem3>0 ? Math.ceil(_rotSem3*2) : Math.ceil(u1*0.25);
+        asign[pos.id] = {art: primerArt.art, unidades: u1, min_u: _minU3, compartidos: []};
         stockMap[primerArt.art] -= u1;
       }
 
@@ -2414,15 +2436,20 @@ function aplicarSugerencia(){
   if(_sugActiva==='stock_bajo'){
     showToast('⚠️ Calculando Stock Bajo...');
     setTimeout(function(){
-      ASIGN = generarMotorAsignacion();
-      saveAsign();
-      var ts = new Date().toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-      localStorage.setItem('wms_last_update', ts);
-      actualizarUltimaFecha();
-      renderMapa();
-      var n = Object.keys(ASIGN).length;
-      showToast('✅ Stock Bajo aplicado — '+n+' posiciones asignadas en tiempo real');
-    },50);
+      try {
+        ASIGN = generarMotorAsignacion();
+        saveAsign();
+        var ts = new Date().toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+        localStorage.setItem('wms_last_update', ts);
+        actualizarUltimaFecha();
+        renderMapa();
+        var n = Object.keys(ASIGN).length;
+        showToast('✅ Rotación Baja aplicada — '+n+' arts en rack');
+      } catch(e) {
+        console.error('Error en Stock Bajo:', e);
+        alert('Error al calcular Stock Bajo: ' + e.message);
+      }
+    },100);
   } else {
     ASIGN = JSON.parse(JSON.stringify(SUGERENCIAS[_sugActiva]||SUGERENCIAS.chasis));
     saveAsign();
@@ -2443,21 +2470,65 @@ function limpiarMapa(){
 function renderAlertas(){
   const box = document.getElementById('alertas-box');
   if(!box) return;
+
+  // CRITERIO: alerta cuando unidades en rack < rot_sem × 2 (menos de 2 semanas de cobertura)
+  // REPONER: hasta rot_sem × 4 (1 mes de cobertura)
   const alertas = [];
   Object.entries(ASIGN).forEach(([pos, v]) => {
-    if(!pos.includes('-N1-')) return;
+    if(!v || !v.art) return;
     const art = DATA.find(r => r.art == v.art);
     if(!art) return;
-    const minU = v.min_u || 0;
-    if(minU > 0 && v.unidades < minU){
-      alertas.push({pos, art, unidades: v.unidades, min_u: minU});
+    const rotSem = art.rot_sem || 0;
+    if(rotSem <= 0) return; // sin rotación → no hay criterio
+    const umbralAlerta = rotSem * 2;   // < 2 semanas → alerta
+    const objetivoRepo  = rotSem * 4;  // reponer hasta 1 mes
+    const traer = Math.max(0, Math.ceil(objetivoRepo - v.unidades));
+    if(v.unidades < umbralAlerta && traer > 0){
+      // Buscar de dónde traer: bloque asignado primero, luego cualquier bloque con stock
+      const bloquePref = art.bloque || '';
+      const stockDisp = (art.stock || 0) - v.unidades; // stock fuera del rack
+      alertas.push({
+        pos, art, unidades: v.unidades,
+        umbral: Math.ceil(umbralAlerta),
+        traer: Math.min(traer, stockDisp > 0 ? stockDisp : traer),
+        bloque: bloquePref,
+        stockDisp,
+        semanas: rotSem > 0 ? (v.unidades / rotSem).toFixed(1) : '—'
+      });
     }
   });
+
+  alertas.sort((a,b) => (a.unidades/(a.art.rot_sem||1)) - (b.unidades/(b.art.rot_sem||1)));
+
   if(!alertas.length){ box.innerHTML=''; return; }
+
+  const filas = alertas.map(a => {
+    const sinStock = a.stockDisp <= 0;
+    const color = sinStock ? '#d70015' : '#856404';
+    const bg    = sinStock ? '#ffd6d9' : '#fff3cd';
+    return `<div style="background:${bg};border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;gap:8px;align-items:center">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:700;color:${color}">${a.pos}</div>
+        <div style="font-size:11px;color:#1d1d1f">${a.art.med} ${a.art.diseno} <span style="color:#86868b">${a.art.prov}</span></div>
+        <div style="font-size:10px;color:#86868b;margin-top:2px">
+          ${a.unidades} un. en rack · ${a.semanas} sem. cobertura · rot: ${(a.art.rot_sem||0).toFixed(2)}/sem
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:14px;font-weight:700;color:${color}">Traer ${a.traer} un.</div>
+        <div style="font-size:10px;color:#86868b">${sinStock ? '⚠️ Sin stock en nave' : (a.bloque ? 'de bloque ' + a.bloque : 'buscar en nave')}</div>
+      </div>
+    </div>`;
+  }).join('');
+
   box.innerHTML = `<div style="background:#fff3cd;border:1px solid #ff9500;border-radius:10px;padding:10px;margin-bottom:10px">
-    <div style="font-size:12px;font-weight:600;color:#856404;margin-bottom:6px">⚠️ ${alertas.length} posiciones para reponer en Nivel 1</div>
-    ${alertas.slice(0,5).map(a=>`<div style="font-size:12px;color:#856404;padding:2px 0">${a.pos} · ${a.art.med} ${a.art.diseno} — ${a.unidades}/${a.min_u} un.</div>`).join('')}
-    ${alertas.length>5?`<div style="font-size:11px;color:#856404;margin-top:4px">...y ${alertas.length-5} más</div>`:''}
+    <div style="font-size:13px;font-weight:700;color:#856404;margin-bottom:8px">
+      ⚠️ ${alertas.length} posición${alertas.length>1?'es':''} para reponer — menos de 2 semanas de cobertura
+    </div>
+    ${filas}
+    <div style="font-size:10px;color:#86868b;margin-top:6px;border-top:1px solid #ffe082;padding-top:6px">
+      Criterio: alerta &lt; 2 sem. · objetivo: 1 mes (rot_sem × 4)
+    </div>
   </div>`;
 }
 
@@ -2481,7 +2552,7 @@ function procesarPaste(){
     const cols = linea.split('\t');
     if(cols.length < 5) return;
 
-    const art = parseInt(cols[0]);
+    const art = parseInt(String(cols[0]).replace(/,/g,''));
     if(!art) return;
 
     // Detectar formato automáticamente
@@ -5237,11 +5308,11 @@ function closeSubMenu(){
   document.getElementById('ng-'+group)?.classList.add('active');
 }
 
-// === CONTRASEÑA ===
-const LIBRE = ['mapa','nave'];
+// === CONTRASEÑA (desactivada) ===
+const LIBRE = ['mapa','nave','stock','pedidos','repo','dot','dash','inv','dif','grupos','prod','cydesc'];
 const PWD = 'deposito';
 let _pendingView = null;
-let _pwaUnlocked = false;
+let _pwaUnlocked = true;
 
 function showPwd(view){
   const nombres = {
@@ -5294,7 +5365,7 @@ function goHome(view){
 }
 
 function showHome(){
-  _pwaUnlocked = false;
+  // _pwaUnlocked no se resetea (contraseñas desactivadas)
   document.getElementById('home-screen').classList.add('show');
   document.getElementById('back-home-btn').style.display='none';
   const _hd=document.getElementById('home-date'); if(_hd) _hd.textContent = new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
@@ -6892,7 +6963,13 @@ function cydConfirmarRemito(){
     if(dataArt){dataArt.stock=(dataArt.stock||0)+r.cant;dataArt.pall=Math.floor(dataArt.stock/(dataArt.max_pos||32));actualizados++;saveDataStock();}
   });
 
-  // Calcular ubicación inteligente — rack cubre 1 semana de rotación
+  // ── SUGERENCIA DE UBICACIÓN POR ROTACIÓN SEMANAL ──────────────────
+  // Pallets al rack según rot_sem (1 semana de cobertura máximo):
+  //   rot_sem 6-8  → 2 pallets al rack
+  //   rot_sem 3-6  → 1 pallet al rack
+  //   rot_sem 1-3  → medio pallet (redondeado arriba)
+  //   rot_sem 0.25-1 → pocas unidades (ceil de rot_sem)
+  //   fuera de rango → todo al bloque
   var ingresosUbic=[];
   _cydRemitoItems.forEach(function(r){
     var da=DATA.find(function(d){return d.art===r.art;});
@@ -6900,12 +6977,34 @@ function cydConfirmarRemito(){
     var rotSem=da.rot_sem||0;
     var mp=(typeof PALL_BASE!=='undefined'&&PALL_BASE[String(r.art)]?PALL_BASE[String(r.art)].p_rack:0)||da.max_pos||32;
     if(mp<=0) mp=32;
-    var unidRack,nPos,unidBloque;
-    if(rotSem<=0){unidRack=0;nPos=0;unidBloque=r.cant;}
-    else if(rotSem>=r.cant){unidRack=r.cant;nPos=Math.ceil(r.cant/mp);unidBloque=0;}
-    else{unidRack=Math.min(Math.ceil(rotSem),r.cant);nPos=Math.ceil(unidRack/mp);unidBloque=r.cant-unidRack;}
-    var posAct=Object.entries(ASIGN).filter(function(e){return e[1]&&e[1].art==r.art;}).map(function(e){return e[0];});
-    ingresosUbic.push({art:r.art,med:da.med,diseno:da.diseno,prov:da.prov,cant:r.cant,rotSem:rotSem,maxPos:mp,unidRack:unidRack,nPos:nPos,unidBloque:unidBloque,bloque:da.bloque||'',posActuales:posAct,fecha:fecha,fechaISO:fechaISO,estado:'pendiente'});
+
+    // Buscar si tiene posición en rack asignada
+    var posRack=Object.entries(ASIGN).filter(function(e){
+      var v=e[1];
+      if(!v) return false;
+      if(v.art==r.art) return true;
+      if(v.compartidos&&v.compartidos.some(function(c){return c.art==r.art;})) return true;
+      return false;
+    }).map(function(e){return e[0];});
+    var tieneRack = posRack.length > 0;
+
+    // Calcular cuánto va al rack según rot_sem
+    var unidRack=0;
+    if(tieneRack && rotSem>=0.25 && rotSem<=8){
+      if(rotSem>6)      unidRack = Math.min(mp*2, r.cant);   // 2 pallets
+      else if(rotSem>3) unidRack = Math.min(mp,   r.cant);   // 1 pallet
+      else if(rotSem>1) unidRack = Math.min(Math.ceil(mp/2), r.cant); // medio pallet
+      else              unidRack = Math.min(Math.ceil(rotSem*4), r.cant); // ~4 sem cobertura
+    }
+    var unidBloque = r.cant - unidRack;
+
+    ingresosUbic.push({
+      art:r.art, med:da.med, diseno:da.diseno, prov:da.prov,
+      cant:r.cant, rotSem:rotSem, maxPos:mp,
+      unidRack:unidRack, unidBloque:unidBloque,
+      bloque:da.bloque||'', posRack:posRack,
+      fecha:fecha, fechaISO:fechaISO, estado:'pendiente'
+    });
   });
   if(ingresosUbic.length){
     var histIng=JSON.parse(localStorage.getItem('wms_repo_ingresos')||'[]');
@@ -6926,7 +7025,7 @@ function cydConfirmarRemito(){
   _cydRemitoItems=[];
   cydSetTab('descargas');
   showToast('✅ Ingreso confirmado — '+actualizados+' artículos actualizados en stock');
-  setTimeout(function(){showToast('💡 Recordá aplicar Stock Bajo para recalcular los racks');},2500);
+  setTimeout(function(){showToast('💡 Revisá el Mapa de Racks y aplicá Rotación Baja si cambió mucho el stock');},2500);
 }
 
 /* ── HELPER DE IMPRESIÓN ─────────────────────────────────────────
@@ -6974,39 +7073,60 @@ function _wmsPrint(html){
 function cydImprimirRecepcion(items, nro, origen, fecha){
   var filas='';
   items.forEach(function(r){
-    // Buscar posiciones en rack para este artículo
+    var da=DATA.find(function(d){return d.art===r.art;});
+    var rotSem=da?da.rot_sem||0:0;
+    var mp=(da&&typeof PALL_BASE!=='undefined'&&PALL_BASE[String(r.art)]?PALL_BASE[String(r.art)].p_rack:0)||(da?da.max_pos:0)||32;
+
+    // Buscar posiciones rack asignadas
     var posRack=[];
     Object.entries(ASIGN).forEach(function(entry){
       var pos=entry[0],v=entry[1];
-      if(v&&v.art==r.art) posRack.push({pos:pos,unidades:v.unidades});
-      // También verificar compartidos
-      if(v&&v.compartidos){
-        v.compartidos.forEach(function(c){
-          if(c.art==r.art) posRack.push({pos:pos,unidades:c.unidades,compartido:true});
-        });
-      }
+      if(v&&v.art==r.art) posRack.push(pos);
+      if(v&&v.compartidos) v.compartidos.forEach(function(c){if(c.art==r.art) posRack.push(pos);});
     });
-    posRack.sort(function(a,b){return a.pos.localeCompare(b.pos);});
+    posRack.sort(function(a,b){return a.localeCompare(b);});
+    var tieneRack=posRack.length>0;
 
-    var ubic='';
-    if(posRack.length){
-      ubic+=posRack.map(function(p){
-        return '<span style="display:inline-block;background:#e6f1fb;color:#185fa5;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;margin:2px">📍 '+p.pos+' — '+p.unidades+' un.'+(p.compartido?' (comp.)':'')+'</span>';
-      }).join('');
+    // Calcular split rack/bloque según rot_sem
+    var unidRack=0;
+    if(tieneRack && rotSem>=0.25 && rotSem<=8){
+      if(rotSem>6)      unidRack=Math.min(mp*2,r.cant);
+      else if(rotSem>3) unidRack=Math.min(mp,r.cant);
+      else if(rotSem>1) unidRack=Math.min(Math.ceil(mp/2),r.cant);
+      else              unidRack=Math.min(Math.ceil(rotSem*4),r.cant);
     }
-    if(r.bloque){
-      ubic+='<span style="display:inline-block;background:#fff3cd;color:#856404;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;margin:2px">📦 Bloque '+r.bloque+'</span>';
+    var unidBloque=r.cant-unidRack;
+
+    // Celda de ubicación: dos líneas — rack y bloque
+    var celdaRack='';
+    if(unidRack>0 && posRack.length){
+      celdaRack='<div style="margin-bottom:4px">'
+        +'<span style="background:#e6f1fb;color:#185fa5;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:700">🔵 RACK</span>'
+        +' <span style="font-size:13px;font-weight:700;color:#0071e3">'+unidRack+' un.</span>'
+        +' → <span style="font-size:11px;color:#185fa5">'+posRack.slice(0,3).join(', ')+(posRack.length>3?' +'+( posRack.length-3)+' más':'')+'</span>'
+        +'</div>';
     }
-    if(!posRack.length&&!r.bloque){
-      ubic='<span style="color:#d70015;font-size:11px">⚠️ Sin ubicación asignada</span>';
+    var celdaBloque='';
+    if(unidBloque>0){
+      var bloq=da?da.bloque||'':'';
+      celdaBloque='<div>'
+        +'<span style="background:#fff3cd;color:#856404;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:700">🟡 BLOQUE</span>'
+        +' <span style="font-size:13px;font-weight:700;color:#856404">'+unidBloque+' un.</span>'
+        +(bloq?' → <span style="font-size:11px;color:#856404">'+bloq+'</span>':'')
+        +'</div>';
     }
+    if(!celdaRack&&!celdaBloque){
+      celdaBloque='<span style="color:#d70015;font-size:11px">⚠️ Sin ubicación — definir bloque</span>';
+    }
+
+    var rotLabel=rotSem>0?'<span style="font-size:10px;color:#86868b">'+rotSem.toFixed(1)+'/sem</span>':'';
 
     filas+='<tr style="border-bottom:1px solid #e5e5ea">'
       +'<td style="padding:8px;font-weight:700;font-size:13px">'+r.art+'</td>'
-      +'<td style="padding:8px;font-size:12px">'+(r.med?r.med+' '+r.diseno:r.detalle)+'</td>'
+      +'<td style="padding:8px;font-size:12px">'+(r.med?r.med+' '+r.diseno:r.detalle)+'<br>'+rotLabel+'</td>'
       +'<td style="padding:8px;font-size:12px">'+r.prov+'</td>'
       +'<td style="padding:8px;text-align:center;font-size:16px;font-weight:700;color:#0071e3">'+r.cant+'</td>'
-      +'<td style="padding:8px">'+ubic+'</td>'
+      +'<td style="padding:8px">'+celdaRack+celdaBloque+'</td>'
       +'<td style="padding:8px;width:80px;border:1px solid #d2d2d7;border-radius:4px">&nbsp;</td>'
       +'</tr>';
   });
@@ -7034,7 +7154,7 @@ function cydImprimirRecepcion(items, nro, origen, fecha){
     +'<th>Descripción</th>'
     +'<th style="width:90px">Proveedor</th>'
     +'<th style="width:60px;text-align:center">Cant.</th>'
-    +'<th>Ubicación sugerida</th>'
+    +'<th>Dónde va</th>'
     +'<th style="width:80px">✓ Hecho</th>'
     +'</tr></thead><tbody>'+filas+'</tbody></table>'
     +'<div style="margin-top:16px;font-size:11px;color:#86868b;border-top:1px solid #e5e5ea;padding-top:8px">'
@@ -7045,19 +7165,6 @@ function cydImprimirRecepcion(items, nro, origen, fecha){
   _wmsPrint(html);
 }
 </script>
-
-<!-- PASSWORD OVERLAY -->
-<div class="pwd-overlay" id="pwd-overlay">
-  <div class="pwd-box">
-    <div style="font-size:40px;margin-bottom:8px">🔒</div>
-    <div class="pwd-title" id="pwd-module-name">Módulo protegido</div>
-    <div class="pwd-sub">Ingresá la contraseña para continuar</div>
-    <input type="password" class="pwd-input" id="pwd-input" placeholder="••••••••" 
-      onkeydown="if(event.key==='Enter')checkPwd()">
-    <button class="pwd-btn" onclick="checkPwd()">Ingresar</button>
-    <button class="pwd-cancel" onclick="closePwd()">Cancelar</button>
-  </div>
-</div>
 
 
 
