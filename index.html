@@ -2265,140 +2265,155 @@ function generarMotorAsignacion(){
     return true;
   });
 
-  // PASO 2 — Ordenar: más pallets primero (los de más stock al nivel más accesible)
-  // N1 → pall 3-4, N2 → pall 1-2
+  // PASO 2 — Ordenar: más pallets primero, empate por rot_sem menor
   candidatos.sort(function(a,b){
     var pallA = a.pall||0, pallB = b.pall||0;
     if(pallA !== pallB) return pallB - pallA;
-    return (a.rot_sem||0) - (b.rot_sem||0); // empate: el más lento primero
+    return (a.rot_sem||0) - (b.rot_sem||0);
   });
 
-  // PASO 3 — Agrupar por diseño para asignar frentes
-  var disenoGroups = {};
-  candidatos.forEach(function(r){
-    var d = (r.diseno||'SIN_DISENO').toUpperCase().trim();
-    if(!disenoGroups[d]) disenoGroups[d]=[];
-    disenoGroups[d].push(r);
+  // PASO 3 — Separar candidatos en dos grupos:
+  //   A) Ya tienen posición válida en ASIGN actual → mantener (evitar movimiento innecesario)
+  //   B) Sin posición → necesitan asignación nueva
+  var asign = {};
+  var posOcupadasIds = new Set();
+  var artsYaAsignados = new Set();
+
+  // Revisar ASIGN actual: mantener si el artículo sigue calificando
+  Object.entries(ASIGN).forEach(function(entry){
+    var posId = entry[0], v = entry[1];
+    if(!v || !v.art) return;
+    var artId = v.art;
+    // ¿Sigue siendo candidato?
+    var sigueCalificando = candidatos.some(function(c){ return c.art == artId; });
+    if(!sigueCalificando) return; // ya no califica → posición libre
+    // ¿Ya asignamos este artículo? (puede tener múltiples posiciones)
+    // Mantener todas sus posiciones
+    asign[posId] = {art: v.art, unidades: v.unidades, min_u: 1, compartidos: v.compartidos||[]};
+    posOcupadasIds.add(posId);
+    artsYaAsignados.add(String(artId));
+    // Manejar compartidos también
+    (v.compartidos||[]).forEach(function(c){
+      if(c && c.art) artsYaAsignados.add(String(c.art));
+    });
   });
 
-  // Ordenar grupos de diseño por rotación total desc (los más pedidos al frente)
-  var gruposOrdenados = Object.keys(disenoGroups).map(function(d){
-    var arts = disenoGroups[d];
-    var rotTotal = arts.reduce(function(s,r){return s+(r.rot||0);},0);
-    var pallTotal = arts.reduce(function(s,r){return s+(r.pall||0);},0);
-    return {diseno:d, arts:arts, rotTotal:rotTotal, pallTotal:pallTotal};
-  }).sort(function(a,b){ return b.rotTotal-a.rotTotal; });
+  // Candidatos que NO tienen posición → necesitan asignación nueva
+  var sinAsignar = candidatos.filter(function(c){
+    return !artsYaAsignados.has(String(c.art));
+  });
 
-  // PASO 3b — Asignar frentes a grupos de diseño
-  // Generar todas las posiciones disponibles: frente × nivel × modulo
+  // PASO 4 — Asignar nivel por cuartil de rot_sem
+  // Los datos solo tienen valores discretos (0.25, 0) así que dividimos
+  // los candidatos en 4 grupos proporcionales: más rápidos → N1, más lentos → N4
+  sinAsignar.sort(function(a,b){ return (b.rot_sem||0)-(a.rot_sem||0); });
+  var total = sinAsignar.length;
+  var nivelMap = {};
+  sinAsignar.forEach(function(art, idx){
+    var cuartil = Math.floor(idx / total * 4); // 0,1,2,3
+    nivelMap[art.art] = cuartil + 1;           // N1,N2,N3,N4
+  });
+
+  function nivelParaArt(artId){
+    return nivelMap[artId] || 1;
+  }
+
+  // PASO 5 — Generar posiciones disponibles (las que no están ya ocupadas)
   var posiciones = [];
   FRENTES.forEach(function(f){
     [1,2,3,4].forEach(function(nv){
       if(f.niveles.indexOf(nv)<0) return;
       for(var m=1;m<=f.modulos;m++){
         var pid = f.id+'-N'+nv+'-P'+(m<10?'0'+m:''+m);
-        posiciones.push({id:pid, frente:f.id, nivel:nv, modulo:m, ocupado:false, arts:[], unidades:0, maxPos:0});
+        if(!posOcupadasIds.has(pid)){
+          posiciones.push({id:pid, frente:f.id, nivel:nv, modulo:m});
+        }
       }
     });
   });
 
-  // Ordenar posiciones: N1 primero, dentro de N1 por frente en orden, etc.
-  posiciones.sort(function(a,b){
-    // Baja rotación: N4 primero (los más lentos arriba), N1 último (más accesible)
-    if(a.nivel!==b.nivel) return b.nivel-a.nivel;
-    return a.frente.localeCompare(b.frente) || a.modulo-b.modulo;
-  });
-
-  // PASO 3c — Asignar: cada posición se llena al máximo antes de abrir la siguiente
-  var asign = {};
-  var posIdx = 0;
-
-  // Mapa de stock restante por artículo
+  // PASO 6 — Para cada candidato sin asignar, buscar posición del nivel correcto
   var stockMap = {};
-  candidatos.forEach(function(art){
+  sinAsignar.forEach(function(art){
     if((art.stock||0) > 0) stockMap[art.art] = art.stock;
   });
 
-  // Índice de candidatos para recorrer en orden
-  var candIdx = 0;
+  // Índice de posiciones libres por nivel
+  var posPorNivel = {1:[], 2:[], 3:[], 4:[]};
+  posiciones.forEach(function(p){ posPorNivel[p.nivel].push(p); });
 
-  while(posIdx < posiciones.length && candIdx < candidatos.length){
-    while(candIdx < candidatos.length && !(stockMap[candidatos[candIdx].art] > 0)){
-      candIdx++;
+  function tomarPosicion(nivelIdeal){
+    // Solo tomar del nivel ideal. Si está lleno, buscar el más cercano hacia N4 primero
+    // Para baja rotación preferimos subir (N4) antes que bajar (N1)
+    var orden;
+    if(nivelIdeal === 1)      orden = [1, 2, 3, 4];
+    else if(nivelIdeal === 2) orden = [2, 3, 4, 1];
+    else if(nivelIdeal === 3) orden = [3, 4, 2, 1];
+    else                      orden = [4, 3, 2, 1];
+    for(var i=0; i<orden.length; i++){
+      var n = orden[i];
+      if(posPorNivel[n] && posPorNivel[n].length > 0) return posPorNivel[n].shift();
     }
-    if(candIdx >= candidatos.length) break;
+    return null;
+  }
 
-    var pos = posiciones[posIdx];
-    var primerArt = candidatos[candIdx];
-    var mp = (typeof PALL_BASE!=='undefined' && PALL_BASE[String(primerArt.art)] ? PALL_BASE[String(primerArt.art)].p_rack : 0) || primerArt.max_pos || 32;
+  sinAsignar.forEach(function(art){
+    if(!(stockMap[art.art] > 0)) return;
+    var nivelIdeal = nivelParaArt(art.art);
+    var mp = (typeof PALL_BASE!=='undefined' && PALL_BASE[String(art.art)] ? PALL_BASE[String(art.art)].p_rack : 0) || art.max_pos || 32;
     if(mp <= 0) mp = 32;
 
-    var stockPrimero = stockMap[primerArt.art];
-    var u1 = Math.min(stockPrimero, mp);
-    var mitad = Math.floor(mp / 2);
+    while(stockMap[art.art] > 0){
+      var pos = tomarPosicion(nivelIdeal);
+      if(!pos) break; // rack lleno
 
-    // Si llena el pallet O tiene más de la mitad → posición exclusiva
-    if(u1 >= mitad){
-      // Baja rotación: alerta cuando llega a 0 (se vendió todo del rack)
-      asign[pos.id] = {art: primerArt.art, unidades: u1, min_u: 1, compartidos: []};
-      stockMap[primerArt.art] -= u1;
-      if(stockMap[primerArt.art] <= 0) candIdx++;
-    } else {
-      // Remanente: u1 < mp → busca con quién compartir la posición
-      var mitad = Math.floor(mp / 2);
-      // Limitar el primero a su mitad para dejar espacio al comparte
-      u1 = Math.min(stockPrimero, mitad);
-      var espacioLibre = mp - u1;
+      var u = Math.min(stockMap[art.art], mp);
+      var mitad = Math.floor(mp/2);
 
-      // Buscar comparte: primero misma medida+tipo, después cualquiera
-      var compart = null;
-      var mpComp = 0;
-
-      // 1er intento: misma medida + mismo tipo
-      for(var ci = candIdx+1; ci < candidatos.length; ci++){
-        var cand = candidatos[ci];
-        if(!(stockMap[cand.art] > 0)) continue;
-        if((cand.med||'').trim() === (primerArt.med||'').trim() &&
-           (cand.tipo||'').trim() === (primerArt.tipo||'').trim()){
-          compart = cand; break;
-        }
-      }
-
-      // 2do intento: cualquier remanente que quepa
-      if(!compart){
-        for(var ci2 = candIdx+1; ci2 < candidatos.length; ci2++){
-          var cand2 = candidatos[ci2];
-          if(!(stockMap[cand2.art] > 0)) continue;
-          var mpC2 = (typeof PALL_BASE!=='undefined' && PALL_BASE[String(cand2.art)] ? PALL_BASE[String(cand2.art)].p_rack : 0) || cand2.max_pos || 32;
-          if(mpC2 <= 0) mpC2 = 32;
-          var stockC2 = stockMap[cand2.art];
-          // Solo comparte si también es un remanente (stock < mp completo)
-          if(stockC2 < mpC2 && Math.min(stockC2, espacioLibre) > 0){
-            compart = cand2; break;
+      if(u >= mitad){
+        // Posición exclusiva
+        asign[pos.id] = {art: art.art, unidades: u, min_u: 1, compartidos: []};
+        stockMap[art.art] -= u;
+      } else {
+        // Remanente → buscar comparte del mismo nivel
+        var compart = null;
+        for(var ci=0; ci<sinAsignar.length; ci++){
+          var c = sinAsignar[ci];
+          if(c.art == art.art) continue;
+          if(!(stockMap[c.art] > 0)) continue;
+          var mpC = (typeof PALL_BASE!=='undefined' && PALL_BASE[String(c.art)] ? PALL_BASE[String(c.art)].p_rack : 0) || c.max_pos || 32;
+          if(mpC <= 0) mpC = 32;
+          // Preferir misma medida, sino cualquier remanente
+          if(stockMap[c.art] < mpC){
+            compart = c; break;
           }
         }
+        if(compart){
+          var u2 = Math.min(stockMap[compart.art], mp - u);
+          asign[pos.id] = {art: art.art, unidades: u, min_u: 1, compartidos: [{art: compart.art, unidades: u2}]};
+          stockMap[art.art] -= u;
+          stockMap[compart.art] -= u2;
+        } else {
+          asign[pos.id] = {art: art.art, unidades: u, min_u: 1, compartidos: []};
+          stockMap[art.art] -= u;
+        }
       }
-
-      if(compart){
-        var u2 = Math.min(stockMap[compart.art], espacioLibre);
-        asign[pos.id] = {
-          art: primerArt.art, unidades: u1,
-          min_u: 1,
-          compartidos: [{art: compart.art, unidades: u2}]
-        };
-        stockMap[primerArt.art] -= u1;
-        stockMap[compart.art] -= u2;      } else {
-        // Sin comparte: ocupa lo que tiene sin forzar mitad
-        // Baja rotación: alerta cuando llega a 0
-        asign[pos.id] = {art: primerArt.art, unidades: u1, min_u: 1, compartidos: []};
-        stockMap[primerArt.art] -= u1;
-      }
-
-      if(stockMap[primerArt.art] <= 0) candIdx++;
     }
+  });
 
-    posIdx++;
-  }
+  // PASO 7 — Generar resumen de alertas post-asignación
+  var sinUbicacion = sinAsignar.filter(function(a){ return stockMap[a.art] > 0; });
+  var posLibres = posiciones.reduce(function(s,p){ return s + (posPorNivel[p.nivel]?1:0); }, 0);
+  var compartidas = Object.values(asign).filter(function(v){ return v.compartidos && v.compartidos.length>0; }).length;
+
+  // Guardar resumen para renderAlertas
+  window._motorResumen = {
+    sinUbicacion: sinUbicacion.length,
+    posLibres: Object.values(posPorNivel).reduce(function(s,arr){return s+arr.length;},0),
+    compartidas: compartidas,
+    mantenidas: artsYaAsignados.size,
+    nuevas: sinAsignar.length - sinUbicacion.length
+  };
 
   return asign;
 }
@@ -2442,7 +2457,13 @@ function aplicarSugerencia(){
         actualizarUltimaFecha();
         renderMapa();
         var n = Object.keys(ASIGN).length;
-        showToast('✅ Rotación Baja aplicada — '+n+' arts en rack');
+        var res = window._motorResumen || {};
+        var msg = '✅ Rotación Baja aplicada — ' + n + ' posiciones';
+        if(res.mantenidas) msg += ' · ' + res.mantenidas + ' mantenidas';
+        if(res.nuevas)     msg += ' · ' + res.nuevas + ' nuevas';
+        if(res.posLibres)  msg += ' · ' + res.posLibres + ' libres';
+        if(res.sinUbicacion) msg += ' · ⚠️ ' + res.sinUbicacion + ' sin lugar';
+        showToast(msg);
       } catch(e) {
         console.error('Error en Stock Bajo:', e);
         alert('Error al calcular Stock Bajo: ' + e.message);
