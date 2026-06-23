@@ -533,6 +533,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
   <div class="tab" onclick="switchTab('mapa',this)">🗺️ Mapa Racks</div>
   <div class="tab" onclick="switchTab('repo',this)">🔄 Reposición</div>
   <div class="tab" onclick="switchTab('nave',this)">🏭 Nave</div>
+  <div class="tab" onclick="switchTab('termometro',this)">🌡️ Termómetro</div>
   <div class="tab" onclick="switchTab('dash',this)">📊 Dashboard</div>
   <div class="tab" onclick="switchTab('inv',this)">🔢 Inventario</div>
   <div class="tab" onclick="switchTab('dif',this)">📊 Diferencias</div>
@@ -801,6 +802,32 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
   </div>
 </div>
 
+
+<!-- TERMÓMETRO -->
+<div class="view" id="view-termometro">
+  <div style="padding:16px;max-width:900px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+      <span style="font-size:18px;font-weight:700;color:#1d1d1f">🌡ufe0f Termómetro de Nave</span>
+      <div id="termo-capas" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="termoCapa('rot')" id="tcap-rot" style="padding:7px 14px;border-radius:20px;border:none;background:#0071e3;color:#fff;font-size:12px;font-weight:700;cursor:pointer">🔄 Rotación</button>
+        <button onclick="termoCapa('stock')" id="tcap-stock" style="padding:7px 14px;border-radius:20px;border:2px solid #ddd;background:#fff;color:#555;font-size:12px;font-weight:600;cursor:pointer">📦 Stock</button>
+        <button onclick="termoCapa('efic')" id="tcap-efic" style="padding:7px 14px;border-radius:20px;border:2px solid #ddd;background:#fff;color:#555;font-size:12px;font-weight:600;cursor:pointer">⚡ Eficiencia</button>
+        <button onclick="termoCapa('bajo')" id="tcap-bajo" style="padding:7px 14px;border-radius:20px;border:2px solid #ddd;background:#fff;color:#555;font-size:12px;font-weight:600;cursor:pointer">⚠ufe0f Bajo Stock</button>
+      </div>
+    </div>
+    <div id="termo-leyenda" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;color:#86868b;margin-right:4px">Zonas:</span>
+      <span style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600"><span style="width:14px;height:14px;border-radius:3px;background:#0071e3;display:inline-block"></span>Rack</span>
+      <span style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600"><span style="width:14px;height:14px;border-radius:3px;background:#d70015;display:inline-block"></span>A — Caliente (3-4-5)</span>
+      <span style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600"><span style="width:14px;height:14px;border-radius:3px;background:#ff9500;display:inline-block"></span>B — Media (6-7-8)</span>
+      <span style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600"><span style="width:14px;height:14px;border-radius:3px;background:#34c759;display:inline-block"></span>C — Fría (9-10)</span>
+    </div>
+    <div id="termo-mapa" style="display:flex;flex-direction:column;gap:10px"></div>
+    <div id="termo-detalle" style="margin-top:20px;display:none;background:#fff;border-radius:16px;padding:16px;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
+      <div id="termo-detalle-contenido"></div>
+    </div>
+  </div>
+</div>
 <!-- PEDIDOS -->
 <div class="view" id="view-pedidos">
   <div class="ped-wrap">
@@ -1489,6 +1516,7 @@ function switchTab(name,btn){
   if(name==='mapa') renderMapa();
   if(name==='dash') renderDash();
   if(name==='nave') renderNave();
+  if(name==='termometro') renderTermometro();
   if(name==='dif') renderDiferencias();
   if(name==='grupos') { renderGrupos(); renderGruposHoy(); }
   if(name==='dot') renderDOTs();
@@ -2265,58 +2293,59 @@ function generarMotorAsignacion(){
     return true;
   });
 
-  // PASO 2 — Ordenar: más pallets primero, empate por rot_sem menor
+  // PASO 2 — Priorizar por zona ABC (sacar artículos lentos de zonas calientes)
+  // Zona A (bloques 3-5): urgente liberar → prioridad 0
+  // Zona B (bloques 6-8): prioridad 1
+  // Zona C (bloques 9-10): prioridad 2
+  // Sin bloque definido: prioridad 3
+  var ZONA_A = ['3S','4N','4S','4S PICKING','5N','5S'];
+  var ZONA_B = ['6N','6S','7N','7S','8S'];
+  var ZONA_C = ['9N','9S','10'];
+
+  function zonaABC(r){
+    if(!r.bloque) return 3;
+    var bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
+    var mejor = 3;
+    bs.forEach(function(b){
+      var bk = b.trim();
+      if(ZONA_A.indexOf(bk)>=0 && mejor>0) mejor=0;
+      else if(ZONA_B.indexOf(bk)>=0 && mejor>1) mejor=1;
+      else if(ZONA_C.indexOf(bk)>=0 && mejor>2) mejor=2;
+    });
+    return mejor;
+  }
+
   candidatos.sort(function(a,b){
-    var pallA = a.pall||0, pallB = b.pall||0;
-    if(pallA !== pallB) return pallB - pallA;
-    return (a.rot_sem||0) - (b.rot_sem||0);
+    var zA = zonaABC(a), zB = zonaABC(b);
+    if(zA !== zB) return zA - zB;           // zona A primero (urge liberarla)
+    return (a.rot_sem||0) - (b.rot_sem||0); // empate: más muerto primero → va a N4
   });
 
   // PASO 3 — Separar candidatos en dos grupos:
   //   A) Ya tienen posición válida en ASIGN actual → mantener (evitar movimiento innecesario)
   //   B) Sin posición → necesitan asignación nueva
+  // NOTA: Solo mantener si ASIGN fue generado con el mismo criterio (baja rotación)
+  // Si ASIGN tiene artículos de alta rotación (criterio viejo), ignorar todo y recalcular
   var asign = {};
   var posOcupadasIds = new Set();
   var artsYaAsignados = new Set();
 
-  // Revisar ASIGN actual: mantener si el artículo sigue calificando
-  Object.entries(ASIGN).forEach(function(entry){
-    var posId = entry[0], v = entry[1];
-    if(!v || !v.art) return;
-    var artId = v.art;
-    // ¿Sigue siendo candidato?
-    var sigueCalificando = candidatos.some(function(c){ return c.art == artId; });
-    if(!sigueCalificando) return; // ya no califica → posición libre
-    // ¿Ya asignamos este artículo? (puede tener múltiples posiciones)
-    // Mantener todas sus posiciones
-    asign[posId] = {art: v.art, unidades: v.unidades, min_u: 1, compartidos: v.compartidos||[]};
-    posOcupadasIds.add(posId);
-    artsYaAsignados.add(String(artId));
-    // Manejar compartidos también
-    (v.compartidos||[]).forEach(function(c){
-      if(c && c.art) artsYaAsignados.add(String(c.art));
-    });
-  });
+  // El motor siempre recalcula todo desde cero para garantizar
+  // que N1 no quede vacío por arrastres de runs anteriores.
+  // asign, posOcupadasIds y artsYaAsignados quedan vacíos → recálculo total.
 
   // Candidatos que NO tienen posición → necesitan asignación nueva
   var sinAsignar = candidatos.filter(function(c){
     return !artsYaAsignados.has(String(c.art));
   });
 
-  // PASO 4 — Asignar nivel por cuartil de rot_sem
-  // Los datos solo tienen valores discretos (0.25, 0) así que dividimos
-  // los candidatos en 4 grupos proporcionales: más rápidos → N1, más lentos → N4
+  // PASO 4 — Orden final dentro de sinAsignar para asignación de nivel:
+  // Los que algo rotan (rot_sem más alto) van a N1 (nivel bajo, accesible)
+  // Los más muertos (rot_sem=0) van a N4 (nivel alto, menos accesible)
+  // Ordenamos desc por rot_sem: el primero en la cola toma N1 primero
   sinAsignar.sort(function(a,b){ return (b.rot_sem||0)-(a.rot_sem||0); });
-  var total = sinAsignar.length;
-  var nivelMap = {};
-  sinAsignar.forEach(function(art, idx){
-    var cuartil = Math.floor(idx / total * 4); // 0,1,2,3
-    nivelMap[art.art] = cuartil + 1;           // N1,N2,N3,N4
-  });
 
-  function nivelParaArt(artId){
-    return nivelMap[artId] || 1;
-  }
+  function nivelParaArt(){ return 1; } // no se usa, tomarPosicion maneja el nivel
 
   // PASO 5 — Generar posiciones disponibles (las que no están ya ocupadas)
   var posiciones = [];
@@ -2335,21 +2364,17 @@ function generarMotorAsignacion(){
   // PASO 6 — Para cada candidato sin asignar, buscar posición del nivel correcto
   var stockMap = {};
   sinAsignar.forEach(function(art){
-    if((art.stock||0) > 0) stockMap[art.art] = art.stock;
+    if((art.stock||0) > 0) stockMap[String(art.art)] = art.stock;
   });
 
   // Índice de posiciones libres por nivel
   var posPorNivel = {1:[], 2:[], 3:[], 4:[]};
   posiciones.forEach(function(p){ posPorNivel[p.nivel].push(p); });
 
-  function tomarPosicion(nivelIdeal){
-    // Solo tomar del nivel ideal. Si está lleno, buscar el más cercano hacia N4 primero
-    // Para baja rotación preferimos subir (N4) antes que bajar (N1)
-    var orden;
-    if(nivelIdeal === 1)      orden = [1, 2, 3, 4];
-    else if(nivelIdeal === 2) orden = [2, 3, 4, 1];
-    else if(nivelIdeal === 3) orden = [3, 4, 2, 1];
-    else                      orden = [4, 3, 2, 1];
+  function tomarPosicion(){
+    // Llenar de N1 a N4: los menos lentos abajo (accesibles), los muertos arriba
+    // Si sobran posiciones quedan en N4, no en N1
+    var orden = [1, 2, 3, 4];
     for(var i=0; i<orden.length; i++){
       var n = orden[i];
       if(posPorNivel[n] && posPorNivel[n].length > 0) return posPorNivel[n].shift();
@@ -2357,47 +2382,39 @@ function generarMotorAsignacion(){
     return null;
   }
 
+  // PASO 6 — Asignación en dos pasadas:
+  // Pasada 1: 1 posición por artículo (distribuye todos los artículos primero)
+  // Pasada 2: remanente de stock que no entró en la primera posición
+  var remanentes = [];
+
   sinAsignar.forEach(function(art){
-    if(!(stockMap[art.art] > 0)) return;
-    var nivelIdeal = nivelParaArt(art.art);
-    var mp = (typeof PALL_BASE!=='undefined' && PALL_BASE[String(art.art)] ? PALL_BASE[String(art.art)].p_rack : 0) || art.max_pos || 32;
+    var artKey = String(art.art);
+    if(!(stockMap[artKey] > 0)) return;
+    var mp = (typeof PALL_BASE!=='undefined' && PALL_BASE[artKey] ? PALL_BASE[artKey].p_rack : 0) || art.max_pos || 32;
     if(mp <= 0) mp = 32;
 
-    while(stockMap[art.art] > 0){
-      var pos = tomarPosicion(nivelIdeal);
-      if(!pos) break; // rack lleno
+    var pos = tomarPosicion();
+    if(!pos) return;
 
-      var u = Math.min(stockMap[art.art], mp);
-      var mitad = Math.floor(mp/2);
+    var u = Math.min(stockMap[artKey], mp);
+    asign[pos.id] = {art: art.art, unidades: u, min_u: 1, compartidos: []};
+    stockMap[artKey] -= u;
 
-      if(u >= mitad){
-        // Posición exclusiva
-        asign[pos.id] = {art: art.art, unidades: u, min_u: 1, compartidos: []};
-        stockMap[art.art] -= u;
-      } else {
-        // Remanente → buscar comparte del mismo nivel
-        var compart = null;
-        for(var ci=0; ci<sinAsignar.length; ci++){
-          var c = sinAsignar[ci];
-          if(c.art == art.art) continue;
-          if(!(stockMap[c.art] > 0)) continue;
-          var mpC = (typeof PALL_BASE!=='undefined' && PALL_BASE[String(c.art)] ? PALL_BASE[String(c.art)].p_rack : 0) || c.max_pos || 32;
-          if(mpC <= 0) mpC = 32;
-          // Preferir misma medida, sino cualquier remanente
-          if(stockMap[c.art] < mpC){
-            compart = c; break;
-          }
-        }
-        if(compart){
-          var u2 = Math.min(stockMap[compart.art], mp - u);
-          asign[pos.id] = {art: art.art, unidades: u, min_u: 1, compartidos: [{art: compart.art, unidades: u2}]};
-          stockMap[art.art] -= u;
-          stockMap[compart.art] -= u2;
-        } else {
-          asign[pos.id] = {art: art.art, unidades: u, min_u: 1, compartidos: []};
-          stockMap[art.art] -= u;
-        }
-      }
+    if(stockMap[artKey] > 0) remanentes.push(art);
+  });
+
+  // Pasada 2: remanente
+  remanentes.forEach(function(art){
+    var artKey = String(art.art);
+    var mp = (typeof PALL_BASE!=='undefined' && PALL_BASE[artKey] ? PALL_BASE[artKey].p_rack : 0) || art.max_pos || 32;
+    if(mp <= 0) mp = 32;
+
+    while(stockMap[artKey] > 0){
+      var pos = tomarPosicion();
+      if(!pos) break;
+      var u = Math.min(stockMap[artKey], mp);
+      asign[pos.id] = {art: art.art, unidades: u, min_u: 1, compartidos: []};
+      stockMap[artKey] -= u;
     }
   });
 
@@ -5329,7 +5346,7 @@ function closeSubMenu(){
 }
 
 // === CONTRASEÑA (desactivada) ===
-const LIBRE = ['mapa','nave','stock','pedidos','repo','dot','dash','inv','dif','grupos','prod','cydesc'];
+const LIBRE = ['mapa','nave','stock','pedidos','repo','dot','dash','inv','dif','grupos','prod','cydesc','termometro','rot','pall'];
 const PWD = 'deposito';
 let _pendingView = null;
 let _pwaUnlocked = true;
@@ -5416,6 +5433,7 @@ function navTo(view){
   if(view==='mapa') renderMapa();
   if(view==='dash') renderDash();
   if(view==='nave') renderNave();
+  if(view==='termometro') renderTermometro();
   if(view==='repo') renderReposicion();
   if(view==='inv') renderInventario();
   if(view==='dif') renderDiferencias();
@@ -6210,6 +6228,364 @@ function exportarPalletizado(){
   XLSX.utils.book_append_sheet(wb, ws, 'Palletizado');
   XLSX.writeFile(wb, 'Palletizado_'+new Date().toLocaleDateString('es-AR').replace(/\//g,'-')+'.xlsx');
   showToast('✅ Palletizado exportado');
+}
+
+// ======= TERMÓMETRO DE NAVE =======
+let _termoCapa = 'rot';
+
+// Zonas ABC: A=caliente, B=media, C=fría, Rack=especial
+const ZONAS_TERMO = [
+  { id:'RACK', label:'Rack — Bloques 1 y 2',     bloques:['2N/3N','2S/2N'], zona:'RACK', especial:true },
+  { id:'ZA',   label:'Zona A — Bloques 3, 4 y 5', bloques:['3S','4N','4S','4S PICKING','5N','5S'], zona:'A' },
+  { id:'ZB',   label:'Zona B — Bloques 6, 7 y 8', bloques:['6N','6S','7N','7S','8S'], zona:'B' },
+  { id:'ZC',   label:'Zona C — Bloques 9 y 10',   bloques:['9N','9S','10'], zona:'C' },
+];
+
+// Colores por zona
+const ZONA_COLORS = { RACK:'#0071e3', A:'#d70015', B:'#ff9500', C:'#34c759' };
+const ZONA_LABELS = { RACK:'Rack', A:'Zona A 🔥', B:'Zona B', C:'Zona C' };
+
+function termoColorZona(zona){ return ZONA_COLORS[zona] || '#8e8e93'; }
+
+function termoLabel(pct, capa, zona){
+  if(zona === 'RACK') return 'Rack — baja rotación';
+  if(capa === 'bajo'){
+    if(pct === 0) return 'Sin alertas ✓';
+    if(pct < 20)  return 'Pocas alertas';
+    if(pct < 40)  return 'Varias alertas';
+    return '⚠️ Alta criticidad';
+  }
+  // Para las demás capas mostramos la zona ABC
+  return { A:'Zona A — Caliente 🔥', B:'Zona B — Media', C:'Zona C — Fría' }[zona] || '';
+}
+
+function termoStats(){
+  const stats = {};
+  const totRot   = DATA.reduce((s,r)=>s+(r.rot||0),0)||1;
+  const totStock = DATA.reduce((s,r)=>s+(r.stock||0),0)||1;
+
+  // Artículos que califican para el rack (misma lógica del motor)
+  const candidatosRack = new Set(DATA.filter(r=>{
+    if(/\d+\.5/.test(r.med||'')) return false;
+    if(r.prov==='SPEEDWAY') return false;
+    const uso = (r.uso||'').trim();
+    if(['TT','TL','TLSB','TT ','TL '].indexOf(uso)>=0) return false;
+    if((r.stock||0)<=0) return false;
+    if((r.rot_sem||0)>=0.5) return false;
+    if((r.pall||0)>4 || (r.pall||0)<1) return false;
+    return true;
+  }).map(r=>r.art));
+
+  // Bloque de cada artículo en el rack actual (ASIGN)
+  const ZONA_A_BLQ = ['3S','4N','4S','4S PICKING','5N','5S'];
+  const ZONA_B_BLQ = ['6N','6S','7N','7S','8S'];
+  const ZONA_C_BLQ = ['9N','9S','10'];
+  function zonaDeBloque(bloque){
+    if(!bloque) return null;
+    const bs = bloque.includes('/')?bloque.split('/'):[bloque];
+    for(const b of bs){
+      const bk=b.trim();
+      if(ZONA_A_BLQ.indexOf(bk)>=0) return 'A';
+      if(ZONA_B_BLQ.indexOf(bk)>=0) return 'B';
+      if(ZONA_C_BLQ.indexOf(bk)>=0) return 'C';
+    }
+    return null;
+  }
+
+  // Stats del rack: de dónde vienen los artículos asignados
+  const rackZonaCount = {A:0,B:0,C:0,sin:0};
+  const rackArts = new Set();
+  let rackRotActivos=0, rackMuertos=0;
+  Object.values(ASIGN).forEach(function(v){
+    if(!v||!v.art) return;
+    const art = DATA.find(r=>r.art==v.art);
+    if(!art) return;
+    if(rackArts.has(v.art)) return;
+    rackArts.add(v.art);
+    const zona = zonaDeBloque(art.bloque);
+    if(zona) rackZonaCount[zona]++;
+    else rackZonaCount.sin++;
+    if((art.rot_sem||0)>0) rackRotActivos++;
+    else rackMuertos++;
+  });
+  const rackTotal = rackArts.size||1;
+
+  // Rotación acumulada de los artículos en rack
+  let rackRot = 0;
+  rackArts.forEach(artId=>{
+    const art = DATA.find(r=>r.art==artId);
+    if(art) rackRot += art.rot||0;
+  });
+
+  // Rotación sin zona (excluidos)
+  let rotSinZona=0, artsSinZona=0;
+  const zonasBlqs = [...ZONA_A_BLQ,...ZONA_B_BLQ,...ZONA_C_BLQ,'2N/3N','2S/2N'];
+  DATA.forEach(r=>{
+    if(!r.bloque){ rotSinZona+=r.rot||0; artsSinZona++; return; }
+    const bs=r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
+    const enZona=bs.some(b=>zonasBlqs.indexOf(b.trim())>=0);
+    if(!enZona){ rotSinZona+=r.rot||0; artsSinZona++; }
+  });
+
+  ZONAS_TERMO.forEach(z=>{
+    if(z.zona==='RACK'){
+      stats[z.id]={
+        rot: rackRot, stock:0, arts: rackTotal, bajo:0, malUbicados:0,
+        rackZonaCount, rackRotActivos, rackMuertos, rackTotal,
+        eficProm:0,
+        pctRot: Math.round((rackRot/totRot)*100),
+        pctStock:0, pctBajo:0, pctEfic:0,
+        pctA: Math.round((rackZonaCount.A/rackTotal)*100),
+        pctB: Math.round((rackZonaCount.B/rackTotal)*100),
+        pctC: Math.round((rackZonaCount.C/rackTotal)*100),
+      };
+      return;
+    }
+    let rot=0, stock=0, arts=0, bajo=0, eficSum=0, eficN=0, malUbicados=0;
+    const artsVistos = new Set();
+    z.bloques.forEach(bk=>{
+      DATA.forEach(r=>{
+        if(!r.bloque) return;
+        const bs = r.bloque.includes('/')?r.bloque.split('/'):[ r.bloque ];
+        if(!bs.map(b=>b.trim()).includes(bk)) return;
+        if(artsVistos.has(r.art)) return;
+        artsVistos.add(r.art);
+        rot   += r.rot||0;
+        stock += r.stock||0;
+        arts++;
+        if(r.cond==='bajo stock') bajo++;
+        if(r.eficiencia!=null){ eficSum+=r.eficiencia; eficN++; }
+        if(z.zona==='A' && candidatosRack.has(r.art)) malUbicados++;
+      });
+    });
+    const eficProm = eficN>0 ? eficSum/eficN : 0;
+    stats[z.id] = {
+      rot, stock, arts, bajo, malUbicados,
+      eficProm,
+      pctRot:   Math.round((rot/totRot)*100),
+      pctStock: Math.round((stock/totStock)*100),
+      pctBajo:  arts>0 ? Math.round((bajo/arts)*100) : 0,
+      pctEfic:  Math.round(eficProm*100),
+    };
+  });
+
+  // Zona "sin clasificar" para mostrar el 100%
+  stats['SIN'] = {
+    rot: rotSinZona, arts: artsSinZona,
+    pctRot: Math.round((rotSinZona/totRot)*100),
+  };
+
+  return stats;
+}
+
+function renderTermometro(){
+  const stats = termoStats();
+  const capa  = _termoCapa;
+
+  // Actualizar botones
+  ['rot','stock','efic','bajo'].forEach(c=>{
+    const btn = document.getElementById('tcap-'+c);
+    if(!btn) return;
+    if(c===capa){
+      btn.style.background='#0071e3'; btn.style.color='#fff'; btn.style.border='none';
+    } else {
+      btn.style.background='#fff'; btn.style.color='#555'; btn.style.border='2px solid #ddd';
+    }
+  });
+
+  // Valor máximo para normalizar barras (excepto bajo)
+  const vals = ZONAS_TERMO.map(z=>{
+    const s = stats[z.id];
+    if(capa==='rot')   return s.pctRot;
+    if(capa==='stock') return s.pctStock;
+    if(capa==='efic')  return s.pctEfic;
+    if(capa==='bajo')  return s.pctBajo;
+    return 0;
+  });
+  const maxVal = Math.max(...vals, 1);
+
+  let html = '';
+  ZONAS_TERMO.forEach((z,zi)=>{
+    const s = stats[z.id];
+    let val, label2, unidad;
+    if(capa==='rot'){   val=s.pctRot;   label2=s.rot.toLocaleString('es-AR')+' rot/mes'; unidad='% del total'; }
+    if(capa==='stock'){ val=s.pctStock; label2=s.stock.toLocaleString('es-AR')+' unidades'; unidad='% del stock'; }
+    if(capa==='efic'){  val=s.pctEfic;  label2=(s.eficProm*100).toFixed(1)+'% eficiencia'; unidad='% efic.'; }
+    if(capa==='bajo'){  val=s.pctBajo;  label2=s.bajo+' arts. bajo stock de '+s.arts; unidad='% alertas'; }
+
+    const barW   = Math.round((val/maxVal)*100);
+    const color  = termoColorZona(z.zona);
+    const tempLbl= termoLabel(val, capa, z.zona);
+    const malUbic = s.malUbicados || 0;
+
+    // Card especial para Rack — muestra desglose A/B/C
+    if(z.zona === 'RACK'){
+      const pA = s.pctA||0, pB = s.pctB||0, pC = s.pctC||0, pSin = 100-pA-pB-pC;
+      const activos = s.rackRotActivos||0, muertos = s.rackMuertos||0;
+      html += `
+      <div onclick="termoClickZona('${z.id}')"
+           style="background:#f0f6ff;border-radius:14px;padding:14px 16px;cursor:pointer;
+                  box-shadow:0 1px 6px rgba(0,113,227,0.12);border:2px solid #0071e322;
+                  transition:box-shadow 0.15s"
+           onmouseover="this.style.boxShadow='0 3px 16px rgba(0,113,227,0.2)'"
+           onmouseout="this.style.boxShadow='0 1px 6px rgba(0,113,227,0.12)'">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="background:#0071e3;color:#fff;font-size:11px;font-weight:800;padding:2px 9px;border-radius:10px">RACK</span>
+              <span style="font-size:14px;font-weight:700;color:#1d1d1f">${z.label}</span>
+            </div>
+            <div style="font-size:11px;color:#86868b;margin-top:4px">${s.arts} arts. asignados · ${activos} rotan · ${muertos} muertos</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:22px;font-weight:800;color:#0071e3">${s.pctRot}%</div>
+            <div style="font-size:10px;color:#86868b">rot. total</div>
+          </div>
+        </div>
+        <!-- Barra desglose por zona origen -->
+        <div style="font-size:11px;color:#555;margin-bottom:5px;font-weight:600">Origen de los artículos en rack:</div>
+        <div style="height:14px;background:#e8f0fe;border-radius:7px;overflow:hidden;display:flex;margin-bottom:6px">
+          <div title="Zona A" style="height:100%;width:${pA}%;background:#d70015;transition:width 0.4s"></div>
+          <div title="Zona B" style="height:100%;width:${pB}%;background:#ff9500;transition:width 0.4s"></div>
+          <div title="Zona C" style="height:100%;width:${pC}%;background:#34c759;transition:width 0.4s"></div>
+          <div title="Sin zona" style="height:100%;width:${pSin>0?pSin:0}%;background:#c7c7cc;transition:width 0.4s"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:700;color:#d70015">A: ${pA}%</span>
+          <span style="font-size:11px;font-weight:700;color:#ff9500">B: ${pB}%</span>
+          <span style="font-size:11px;font-weight:700;color:#34c759">C: ${pC}%</span>
+          ${pSin>0?`<span style="font-size:11px;font-weight:700;color:#8e8e93">Sin zona: ${pSin}%</span>`:''}
+        </div>
+      </div>`;
+      return;
+    }
+
+    html += `
+    <div onclick="termoClickZona('${z.id}')"
+         style="background:#fff;border-radius:14px;padding:14px 16px;cursor:pointer;
+                box-shadow:0 1px 6px rgba(0,0,0,0.07);border:2px solid ${color}22;
+                transition:box-shadow 0.15s"
+         onmouseover="this.style.boxShadow='0 3px 16px rgba(0,0,0,0.13)'"
+         onmouseout="this.style.boxShadow='0 1px 6px rgba(0,0,0,0.07)'">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="background:${color};color:#fff;font-size:11px;font-weight:800;
+                         padding:2px 9px;border-radius:10px">${z.zona||'RACK'}</span>
+            <span style="font-size:14px;font-weight:700;color:#1d1d1f">${z.label}</span>
+          </div>
+          <div style="font-size:11px;color:#86868b;margin-top:4px">${z.bloques.join(' · ')}</div>
+          ${malUbic>0?`<div style="font-size:11px;color:#d70015;margin-top:3px;font-weight:600">⚠️ ${malUbic} arts. deberían estar en rack</div>`:''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:12px">
+          <div style="font-size:26px;font-weight:800;color:${color}">${val}<span style="font-size:12px;font-weight:500;color:#86868b">%</span></div>
+          <div style="font-size:10px;color:#86868b">${unidad}</div>
+        </div>
+      </div>
+      <div style="height:10px;background:#f0f0f5;border-radius:5px;overflow:hidden;margin-bottom:6px">
+        <div style="height:100%;width:${barW}%;background:${color};border-radius:5px;transition:width 0.4s"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:11px;color:${color};font-weight:700">${tempLbl}</span>
+        <span style="font-size:11px;color:#86868b">${label2}</span>
+      </div>
+    </div>`;
+  });
+
+  // Card "Sin clasificar" al final
+  const sinStats = stats['SIN']||{pctRot:0,arts:0};
+  if(sinStats.pctRot > 0 || sinStats.arts > 0){
+    html += `
+    <div style="background:#f5f5f7;border-radius:14px;padding:12px 16px;border:1px dashed #c7c7cc">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <span style="font-size:12px;font-weight:700;color:#8e8e93">Sin zona asignada</span>
+          <div style="font-size:11px;color:#c7c7cc;margin-top:2px">Speedway, camión, rot=0, sin bloque</div>
+        </div>
+        <span style="font-size:20px;font-weight:800;color:#8e8e93">${sinStats.pctRot}%</span>
+      </div>
+    </div>`;
+  }
+
+  const el = document.getElementById('termo-mapa');
+  if(el) el.innerHTML = html;
+  document.getElementById('termo-detalle').style.display = 'none';
+}
+
+function termoCapa(c){
+  _termoCapa = c;
+  renderTermometro();
+}
+
+function termoClickZona(zid){
+  const z = ZONAS_TERMO.find(x=>x.id===zid);
+  if(!z) return;
+  const stats = termoStats();
+  const s = stats[zid];
+
+  // Artículos de esta zona ordenados por la capa activa
+  const arts = [];
+  z.bloques.forEach(bk=>{
+    DATA.forEach(r=>{
+      if(!r.bloque) return;
+      const bs = r.bloque.includes('/')?r.bloque.split('/'):[ r.bloque ];
+      if(bs.map(b=>b.trim()).includes(bk) && !arts.find(a=>a.art===r.art)) arts.push(r);
+    });
+  });
+
+  const capa = _termoCapa;
+  arts.sort((a,b)=>{
+    if(capa==='rot')   return (b.rot||0)-(a.rot||0);
+    if(capa==='stock') return (b.stock||0)-(a.stock||0);
+    if(capa==='efic')  return (b.eficiencia||0)-(a.eficiencia||0);
+    if(capa==='bajo')  return (a.cond==='bajo stock'?0:1)-(b.cond==='bajo stock'?0:1);
+    return 0;
+  });
+
+  const top = arts.slice(0,15);
+  const capaLabel = {rot:'Rotación/mes',stock:'Stock',efic:'Eficiencia',bajo:'Condición'}[capa];
+
+  document.getElementById('termo-detalle-contenido').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:15px;font-weight:700;color:#1d1d1f">${z.label}</div>
+      <div style="font-size:12px;color:#86868b">${s.arts} artículos · ${s.rot.toLocaleString('es-AR')} rot/mes · ${s.bajo} bajo stock</div>
+    </div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:#f5f5f7">
+            <th style="padding:8px;text-align:left;border-radius:8px 0 0 8px">Artículo</th>
+            <th style="padding:8px;text-align:left">Medida · Diseño</th>
+            <th style="padding:8px;text-align:right">${capaLabel}</th>
+            <th style="padding:8px;text-align:right">Pallets</th>
+            <th style="padding:8px;text-align:left;border-radius:0 8px 8px 0">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${top.map((r,i)=>`
+          <tr style="border-bottom:1px solid #f0f0f0">
+            <td style="padding:7px 8px;font-weight:600;color:#1d1d1f">${r.art}</td>
+            <td style="padding:7px 8px;color:#555">${r.med} — ${r.diseno}</td>
+            <td style="padding:7px 8px;text-align:right;font-weight:700;color:#0071e3">
+              ${capa==='rot'?(r.rot||0):capa==='stock'?(r.stock||0):capa==='efic'?((r.eficiencia||0)*100).toFixed(0)+'%':r.cond}
+            </td>
+            <td style="padding:7px 8px;text-align:right">${r.pall||0}</td>
+            <td style="padding:7px 8px">
+              <span style="font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600;
+                background:${r.cond==='bajo stock'?'#ffd6d9':'#d1f2db'};
+                color:${r.cond==='bajo stock'?'#d70015':'#1a7a3a'}">
+                ${r.cond==='bajo stock'?'⚠️ bajo':'✓ ok'}
+              </span>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${arts.length>15?`<div style="font-size:11px;color:#86868b;margin-top:8px;text-align:center">Mostrando top 15 de ${arts.length} artículos</div>`:''}
+  `;
+  const det = document.getElementById('termo-detalle');
+  det.style.display = 'block';
+  det.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
 function renderNave(){
