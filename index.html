@@ -2267,180 +2267,354 @@ function closeModalDirect(){document.getElementById('modal-bg').classList.remove
 
 
 // ======= MOTOR VIVO DE ASIGNACIÓN =======
-function generarMotorAsignacion(){
-  // PASO 1 — Exclusiones duras
-  var EXCLUIR_PROV = ['SPEEDWAY'];
-  var EXCLUIR_USO = ['TT','TL','TLSB','TT ','TL '];
+// ═══════════════════════════════════════════════════════════════
+// MOTOR DE RACK — 3 PASOS
+// ═══════════════════════════════════════════════════════════════
+// Flujo completo:
+//   PASO 1 — BARRIDO: detecta candidatos (baja rot, bajo stock)
+//   PASO 2 — ASIGNACIÓN: asigna posiciones N4→N1 (rot=0 arriba,
+//             algo rota abajo). Permite compartir pallet si hay
+//             espacio libre en una posición ya ocupada.
+//   PASO 3 — REPOSICIÓN: al salir un pedido, posiciones que
+//             quedan libres re-ejecutan el barrido automáticamente.
+//             Las alertas de reposición se generan cuando
+//             rack_stock[pos] < min_u.
+// ───────────────────────────────────────────────────────────────
 
-  // CRITERIO BAJA ROTACIÓN:
-  // rot_sem < 0.5  → artículo lento, ocupa lugar en bloque sin moverse
-  // pall entre 1 y 4 → no tiene tanto stock como para dejarlo en bloque
-  // Objetivo: sacar la baja rotación de los bloques y ordenarlos
-  var ROT_SEM_MAX = 0.5;   // máximo: menos de 0.5/semana
-  var PALL_MAX = 4;        // máximo 4 pallets de stock
+// rack_stock: { "4N-N1-P03": { art, stock, min_u } }
+// Se guarda en localStorage bajo 'wms_rack_stock'
+function loadRackStock(){
+  try{ return JSON.parse(localStorage.getItem('wms_rack_stock')||'{}'); }catch(e){ return {}; }
+}
+function saveRackStock(rs){ localStorage.setItem('wms_rack_stock', JSON.stringify(rs)); }
+
+// ───────────────────────────────────────────────────────────────
+// PASO 1 — BARRIDO
+// Detecta artículos candidatos al rack:
+//   • Excluye: camión (.5), agrícola (TT/TL), Speedway
+//   • Filtra: rot_sem < 0.5 Y pall 1-4
+//   • Prioriza: zona más caliente primero (sacar lentos de B→C→D)
+//   • Dentro de zona: menor rot primero (los más muertos al rack)
+// ───────────────────────────────────────────────────────────────
+function barridoCandidatosRack(){
+  var EXCLUIR_PROV = ['SPEEDWAY'];
+  var EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
+  var ROT_MAX = 0.5, PALL_MAX = 4;
+
+  // Bloques 1 y 2 son la zona física del rack — no se mueven
+  var BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
 
   var candidatos = DATA.filter(function(r){
-    // Excluir camión (medidas x.5: 22.5, 19.5, 17.5...)
-    if(/\d+\.5/.test(r.med||'')) return false;
-    // Excluir Speedway y agrícola
-    if(EXCLUIR_PROV.indexOf(r.prov)>=0) return false;
-    if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false;
-    // Sin stock → no va al rack
-    if((r.stock||0) <= 0) return false;
-    // Alta rotación → se queda en bloque donde es fácil acceder con autoelevador
-    if((r.rot_sem||0) >= ROT_SEM_MAX) return false;
-    // Demasiado stock → no tiene sentido traerlo al rack
-    if((r.pall||0) > PALL_MAX) return false;
-    // Al menos 1 pallet
-    if((r.pall||0) < 1) return false;
+    if(/\d+\.5/.test(r.med||''))           return false; // camión
+    if(EXCLUIR_PROV.indexOf(r.prov)>=0)    return false; // Speedway
+    if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false; // agrícola
+    if((r.stock||0) <= 0)                  return false; // sin stock
+    if((r.rot_sem||0) >= ROT_MAX)          return false; // alta rot → bloque
+    if((r.pall||0) > PALL_MAX)             return false; // demasiado stock
+    if((r.pall||0) < 1)                    return false; // menos de 1 pallet
+    // Excluir bloques 1 y 2 — ya están en zona rack, no tiene sentido moverlos
+    if(r.bloque){
+      var bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
+      if(bs.some(function(b){ return BLOQUES_RACK.indexOf(b.trim())>=0; })) return false;
+    }
     return true;
   });
 
-  // PASO 2 — Priorizar por zona ABC (sacar artículos lentos de zonas calientes)
-  // Zona A (bloques 3-5): urgente liberar → prioridad 0
-  // Zona B (bloques 6-8): prioridad 1
-  // Zona C (bloques 9-10): prioridad 2
-  // Sin bloque definido: prioridad 3
-  // Zonas ABCD — prioridad para sacar del rack artículos que ocupan zona caliente
-  // Zona B (bloques 3-5) es la más urgente de liberar
-  // Zona A (bloques 1-2 + rack) no aplica porque ya son el destino
-  var ZONA_B_MOTOR = ['3S','4N','4S','4S PICKING','5N','5S'];
-  var ZONA_C_MOTOR = ['6N','6S','7N','7S','8S'];
-  var ZONA_D_MOTOR = ['9N','9S','10'];
-  var ZONA_A_MOTOR = ['2N/3N','2S/2N']; // piso zona A — también urgente liberar
+  // Prioridad de zona: B (3-5) > A piso (1-2) > C (6-8) > D (9-10) > sin zona
+  var ZB = ['3S','4N','4S','4S PICKING','5N','5S'];
+  var ZA = ['2N/3N','2S/2N'];
+  var ZC = ['6N','6S','7N','7S','8S'];
+  var ZD = ['9N','9S','10'];
 
-  function zonaMotor(r){
-    if(!r.bloque) return 4;
+  function zonaUrgencia(r){
+    if(!r.bloque) return 5;
     var bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
-    var mejor = 4;
+    var m = 5;
     bs.forEach(function(b){
-      var bk = b.trim();
-      if(ZONA_A_MOTOR.indexOf(bk)>=0 && mejor>0) mejor=0; // bloques 1-2 piso → urgente
-      else if(ZONA_B_MOTOR.indexOf(bk)>=0 && mejor>1) mejor=1; // B → muy urgente
-      else if(ZONA_C_MOTOR.indexOf(bk)>=0 && mejor>2) mejor=2; // C → urgente
-      else if(ZONA_D_MOTOR.indexOf(bk)>=0 && mejor>3) mejor=3; // D → menor urgencia
+      var bk=b.trim();
+      if(ZB.indexOf(bk)>=0 && m>0) m=0;
+      else if(ZA.indexOf(bk)>=0 && m>1) m=1;
+      else if(ZC.indexOf(bk)>=0 && m>2) m=2;
+      else if(ZD.indexOf(bk)>=0 && m>3) m=3;
     });
-    return mejor;
+    return m;
   }
 
   candidatos.sort(function(a,b){
-    var zA = zonaMotor(a), zB = zonaMotor(b);
-    if(zA !== zB) return zA - zB;           // zona más caliente primero
-    return (a.rot_sem||0) - (b.rot_sem||0); // empate: más muerto primero → va a N4
+    var zA=zonaUrgencia(a), zB=zonaUrgencia(b);
+    if(zA!==zB) return zA-zB;               // zona más urgente primero
+    return (a.rot_sem||0)-(b.rot_sem||0);   // empate: más muerto primero → N4
   });
 
-  // PASO 3 — Separar candidatos en dos grupos:
-  //   A) Ya tienen posición válida en ASIGN actual → mantener (evitar movimiento innecesario)
-  //   B) Sin posición → necesitan asignación nueva
-  // NOTA: Solo mantener si ASIGN fue generado con el mismo criterio (baja rotación)
-  // Si ASIGN tiene artículos de alta rotación (criterio viejo), ignorar todo y recalcular
-  var asign = {};
-  var posOcupadasIds = new Set();
-  var artsYaAsignados = new Set();
+  return candidatos;
+}
 
-  // El motor siempre recalcula todo desde cero para garantizar
-  // que N1 no quede vacío por arrastres de runs anteriores.
-  // asign, posOcupadasIds y artsYaAsignados quedan vacíos → recálculo total.
+// ───────────────────────────────────────────────────────────────
+// PASO 2 — ASIGNACIÓN
+// Asigna posiciones N4→N1 según rotación:
+//   rot=0      → N4 (muertos arriba, fuera del camino)
+//   rot 0-0.15 → N3
+//   rot 0.15-0.35 → N2
+//   rot 0.35-0.5  → N1 (algo rotan, más accesibles)
+//
+// Compartir pallet: si una posición tiene espacio libre
+//   (stock < max_pos) se completa con unidades sueltas de otro art.
+//   No importa medida ni diseño — se llena el pallet.
+//
+// Se alimenta del barrido (PASO 1) y del ASIGN existente.
+// Posiciones liberadas por pedidos también se re-asignan aquí.
+// ───────────────────────────────────────────────────────────────
+function nivelSegunRot(rotSem){
+  if(rotSem <= 0)    return 4; // muerto → N4
+  if(rotSem < 0.15)  return 4; // casi muerto → N4
+  if(rotSem < 0.35)  return 3; // lento → N3
+  if(rotSem < 0.5)   return 2; // algo lento → N2
+  return 1;                     // baja pero algo rota → N1
+}
 
-  // Candidatos que NO tienen posición → necesitan asignación nueva
-  var sinAsignar = candidatos.filter(function(c){
-    return !artsYaAsignados.has(String(c.art));
-  });
+function generarMotorAsignacion(){
+  var candidatos = barridoCandidatosRack();
 
-  // PASO 4 — Orden final dentro de sinAsignar para asignación de nivel:
-  // Los que algo rotan (rot_sem más alto) van a N1 (nivel bajo, accesible)
-  // Los más muertos (rot_sem=0) van a N4 (nivel alto, menos accesible)
-  // Ordenamos desc por rot_sem: el primero en la cola toma N1 primero
-  sinAsignar.sort(function(a,b){ return (b.rot_sem||0)-(a.rot_sem||0); });
-
-  function nivelParaArt(){ return 1; } // no se usa, tomarPosicion maneja el nivel
-
-  // PASO 5 — Generar posiciones disponibles (las que no están ya ocupadas)
-  var posiciones = [];
+  // Generar posiciones disponibles por nivel
+  var posPorNivel = {1:[], 2:[], 3:[], 4:[]};
   FRENTES.forEach(function(f){
-    [1,2,3,4].forEach(function(nv){
+    [4,3,2,1].forEach(function(nv){ // recorrer N4→N1
       if(f.niveles.indexOf(nv)<0) return;
       for(var m=1;m<=f.modulos;m++){
         var pid = f.id+'-N'+nv+'-P'+(m<10?'0'+m:''+m);
-        if(!posOcupadasIds.has(pid)){
-          posiciones.push({id:pid, frente:f.id, nivel:nv, modulo:m});
-        }
+        posPorNivel[nv].push({id:pid, frente:f.id, nivel:nv, modulo:m, libre:true, stockActual:0, maxPos:0});
       }
     });
   });
 
-  // PASO 6 — Para cada candidato sin asignar, buscar posición del nivel correcto
-  var stockMap = {};
-  sinAsignar.forEach(function(art){
-    if((art.stock||0) > 0) stockMap[String(art.art)] = art.stock;
-  });
+  // Cargar estado actual del rack_stock para saber qué posiciones
+  // tienen espacio libre para compartir pallet
+  var rackSt = loadRackStock();
+  var asign  = {};
 
-  // Índice de posiciones libres por nivel
-  var posPorNivel = {1:[], 2:[], 3:[], 4:[]};
-  posiciones.forEach(function(p){ posPorNivel[p.nivel].push(p); });
-
-  function tomarPosicion(){
-    // Llenar de N1 a N4: los menos lentos abajo (accesibles), los muertos arriba
-    // Si sobran posiciones quedan en N4, no en N1
-    var orden = [1, 2, 3, 4];
-    for(var i=0; i<orden.length; i++){
-      var n = orden[i];
-      if(posPorNivel[n] && posPorNivel[n].length > 0) return posPorNivel[n].shift();
-    }
-    return null;
-  }
-
-  // PASO 6 — Asignación en dos pasadas:
-  // Pasada 1: 1 posición por artículo (distribuye todos los artículos primero)
-  // Pasada 2: remanente de stock que no entró en la primera posición
-  var remanentes = [];
-
-  sinAsignar.forEach(function(art){
-    var artKey = String(art.art);
-    if(!(stockMap[artKey] > 0)) return;
-    var mp = (typeof PALL_BASE!=='undefined' && PALL_BASE[artKey] ? PALL_BASE[artKey].p_rack : 0) || art.max_pos || 32;
-    if(mp <= 0) mp = 32;
-
-    var pos = tomarPosicion();
-    if(!pos) return;
-
-    var u = Math.min(stockMap[artKey], mp);
-    asign[pos.id] = {art: art.art, unidades: u, min_u: 1, compartidos: []};
-    stockMap[artKey] -= u;
-
-    if(stockMap[artKey] > 0) remanentes.push(art);
-  });
-
-  // Pasada 2: remanente
-  remanentes.forEach(function(art){
-    var artKey = String(art.art);
-    var mp = (typeof PALL_BASE!=='undefined' && PALL_BASE[artKey] ? PALL_BASE[artKey].p_rack : 0) || art.max_pos || 32;
-    if(mp <= 0) mp = 32;
-
-    while(stockMap[artKey] > 0){
-      var pos = tomarPosicion();
-      if(!pos) break;
-      var u = Math.min(stockMap[artKey], mp);
-      asign[pos.id] = {art: art.art, unidades: u, min_u: 1, compartidos: []};
-      stockMap[artKey] -= u;
+  // Marcar posiciones con stock actual y espacio libre
+  Object.entries(rackSt).forEach(function(e){
+    var posId=e[0], rs=e[1];
+    if(!rs || !rs.art) return;
+    var da = DATA.find(function(r){return r.art==rs.art;});
+    var mp = da ? ((typeof PALL_BASE!=='undefined'&&PALL_BASE[String(rs.art)]?PALL_BASE[String(rs.art)].p_rack:0)||da.max_pos||32) : 32;
+    // Buscar en qué nivel está esta posición
+    var m = posId.match(/^(.+)-N(\d)-P/);
+    if(!m) return;
+    var nv = parseInt(m[2]);
+    var arr = posPorNivel[nv];
+    if(!arr) return;
+    var idx = arr.findIndex(function(p){return p.id===posId;});
+    if(idx<0) return;
+    arr[idx].libre       = (rs.stock||0) <= 0;
+    arr[idx].stockActual = rs.stock||0;
+    arr[idx].maxPos      = mp;
+    arr[idx].artActual   = rs.art;
+    // Mantener en ASIGN si sigue siendo candidato
+    if((rs.stock||0) > 0){
+      asign[posId] = {art:rs.art, unidades:rs.stock, min_u:rs.min_u||1, compartidos:rs.compartidos||[]};
     }
   });
 
-  // PASO 7 — Generar resumen de alertas post-asignación
-  var sinUbicacion = sinAsignar.filter(function(a){ return stockMap[a.art] > 0; });
-  var posLibres = posiciones.reduce(function(s,p){ return s + (posPorNivel[p.nivel]?1:0); }, 0);
-  var compartidas = Object.values(asign).filter(function(v){ return v.compartidos && v.compartidos.length>0; }).length;
+  // Stock disponible para cada candidato (pendiente de asignar)
+  var artsCandidatos = new Set(candidatos.map(function(c){return String(c.art);}));
+  var stockPend = {};
+  candidatos.forEach(function(c){
+    // Si ya tiene posición asignada con stock, no reasignar
+    var yaEnRack = Object.values(rackSt).some(function(rs){return rs && rs.art==c.art && (rs.stock||0)>0;});
+    if(!yaEnRack) stockPend[String(c.art)] = c.stock||0;
+  });
 
-  // Guardar resumen para renderAlertas
+  var sinUbicacion = [];
+
+  // ── ASIGNACIÓN ──
+  // Para cada candidato sin posición:
+  candidatos.forEach(function(art){
+    var artKey = String(art.art);
+    if(!(stockPend[artKey] > 0)) return; // ya tiene rack o sin stock
+
+    var nivelIdeal = nivelSegunRot(art.rot_sem||0);
+    var mp = (typeof PALL_BASE!=='undefined'&&PALL_BASE[artKey]?PALL_BASE[artKey].p_rack:0)||art.max_pos||32;
+    if(mp<=0) mp=32;
+
+    var unidPend = stockPend[artKey];
+
+    // 1) Buscar posición existente con espacio libre para COMPARTIR pallet
+    // Criterio físico: diagonal del pallet = 1.2m x 1.2m → diagonal ≈ 170cm
+    // ag_articuloA + ag_articuloB ≤ 170cm → entran juntos en el pallet
+    var DIAG_PALLET_CM = 170;
+    var agArt = (typeof PALL_BASE!=='undefined'&&PALL_BASE[artKey])?PALL_BASE[artKey].ag:0;
+
+    var compartida = null;
+    [nivelIdeal, nivelIdeal+1, nivelIdeal-1, 4, 3, 2, 1].forEach(function(nv){
+      if(compartida || nv<1 || nv>4) return;
+      var arr = posPorNivel[nv];
+      if(!arr) return;
+      arr.forEach(function(p){
+        if(compartida) return;
+        if(p.libre) return;
+        if(!p.artActual) return;
+        // Excluir .5 y Speedway como anfitrión — no comparten
+        var daExist = DATA.find(function(r){return r.art==p.artActual;});
+        if(daExist){
+          if(/\d+\.5/.test(daExist.med||'')) return;
+          if(daExist.prov==='SPEEDWAY') return;
+        }
+        // Verificar que entran físicamente en el pallet por diagonal
+        var agExist = (typeof PALL_BASE!=='undefined'&&PALL_BASE[String(p.artActual)])?PALL_BASE[String(p.artActual)].ag:0;
+        if(agArt > 0 && agExist > 0 && (agArt + agExist) > DIAG_PALLET_CM) return; // no entran
+        var espacio = (p.maxPos||32) - (p.stockActual||0);
+        if(espacio >= Math.min(unidPend, mp)) compartida = p;
+      });
+    });
+
+    if(compartida){
+      var esp = (compartida.maxPos||32) - (compartida.stockActual||0);
+      var uComp = Math.min(unidPend, esp, mp);
+      var posAct = asign[compartida.id] || {art:compartida.artActual, unidades:compartida.stockActual, min_u:1, compartidos:[]};
+      posAct.compartidos = posAct.compartidos||[];
+      posAct.compartidos.push({art:art.art, unidades:uComp});
+      asign[compartida.id] = posAct;
+      compartida.stockActual += uComp;
+      stockPend[artKey] -= uComp;
+      unidPend -= uComp;
+      if(unidPend <= 0) return;
+    }
+
+    // 2) Asignar posición libre en nivel ideal (o subir nivel si lleno)
+    var orden = [nivelIdeal];
+    [4,3,2,1].forEach(function(n){ if(n!==nivelIdeal) orden.push(n); });
+
+    while(unidPend > 0){
+      var posAsig = null;
+      orden.forEach(function(nv){
+        if(posAsig) return;
+        var arr = posPorNivel[nv];
+        if(!arr) return;
+        for(var i=0;i<arr.length;i++){
+          if(arr[i].libre){
+            posAsig = arr.splice(i,1)[0];
+            break;
+          }
+        }
+      });
+      if(!posAsig) break; // rack lleno
+
+      var u = Math.min(unidPend, mp);
+      posAsig.libre       = false;
+      posAsig.stockActual = u;
+      posAsig.maxPos      = mp;
+      posAsig.artActual   = art.art;
+      asign[posAsig.id]   = {art:art.art, unidades:u, min_u:Math.ceil(mp*0.25), compartidos:[]};
+      unidPend -= u;
+      stockPend[artKey] -= u;
+    }
+
+    if(stockPend[artKey] > 0) sinUbicacion.push(art);
+  });
+
+  // Actualizar rack_stock con el nuevo asign
+  var nuevoRackSt = {};
+  Object.entries(asign).forEach(function(e){
+    var posId=e[0], v=e[1];
+    nuevoRackSt[posId] = {
+      art:      v.art,
+      stock:    v.unidades,
+      min_u:    v.min_u||1,
+      compartidos: v.compartidos||[]
+    };
+  });
+  saveRackStock(nuevoRackSt);
+
+  // PASO 3 — Generar alertas de reposición
+  var alertasRepo = [];
+  Object.entries(nuevoRackSt).forEach(function(e){
+    var posId=e[0], rs=e[1];
+    if((rs.stock||0) < (rs.min_u||1)){
+      var da = DATA.find(function(r){return r.art==rs.art;});
+      alertasRepo.push({
+        pos:    posId,
+        art:    rs.art,
+        med:    da?da.med:'',
+        diseno: da?da.diseno:'',
+        bloque: da?da.bloque:'',
+        stock:  rs.stock||0,
+        min_u:  rs.min_u||1,
+        traer:  (rs.min_u||1) - (rs.stock||0)
+      });
+    }
+  });
+  localStorage.setItem('wms_repo_pendiente', JSON.stringify(alertasRepo));
+
   window._motorResumen = {
+    asignados:    Object.keys(asign).length,
     sinUbicacion: sinUbicacion.length,
-    posLibres: Object.values(posPorNivel).reduce(function(s,arr){return s+arr.length;},0),
-    compartidas: compartidas,
-    mantenidas: artsYaAsignados.size,
-    nuevas: sinAsignar.length - sinUbicacion.length
+    posLibres:    Object.values(posPorNivel).reduce(function(s,a){return s+a.filter(function(p){return p.libre;}).length;},0),
+    compartidas:  Object.values(asign).filter(function(v){return v.compartidos&&v.compartidos.length>0;}).length,
+    alertasRepo:  alertasRepo.length
   };
 
   return asign;
+}
+
+// ───────────────────────────────────────────────────────────────
+// PASO 3 — REPOSICIÓN
+// Se ejecuta automáticamente cuando un pedido descuenta stock del rack.
+// Si rack_stock[pos] < min_u → genera alerta de reposición.
+// El operario confirma la reposición → rack_stock[pos] += cant traídas.
+// Luego re-ejecuta el motor para re-asignar posiciones liberadas.
+// ───────────────────────────────────────────────────────────────
+function descontarRackPorPedido(art, cant){
+  var rackSt = loadRackStock();
+  var descontado = 0;
+
+  // Buscar posiciones del artículo (principal o compartido)
+  Object.entries(rackSt).forEach(function(e){
+    var posId=e[0], rs=e[1];
+    if(descontado >= cant) return;
+    if(!rs) return;
+
+    if(rs.art == art){
+      var desc = Math.min(cant - descontado, rs.stock||0);
+      rs.stock = Math.max(0, (rs.stock||0) - desc);
+      descontado += desc;
+      // Si quedó vacío → posición libre → re-barrido
+      if(rs.stock <= 0) delete rackSt[posId];
+    } else if(rs.compartidos){
+      rs.compartidos.forEach(function(c){
+        if(descontado >= cant) return;
+        if(c.art != art) return;
+        var desc = Math.min(cant - descontado, c.unidades||0);
+        c.unidades = Math.max(0, (c.unidades||0) - desc);
+        descontado += desc;
+      });
+      rs.compartidos = rs.compartidos.filter(function(c){return (c.unidades||0)>0;});
+    }
+  });
+
+  saveRackStock(rackSt);
+
+  // Re-ejecutar motor para re-asignar posiciones liberadas
+  if(descontado > 0){
+    var nuevoAsign = generarMotorAsignacion();
+    ASIGN = nuevoAsign;
+    saveAsign();
+  }
+
+  return descontado;
+}
+
+function confirmarReposicion(posId, cantTraida){
+  var rackSt = loadRackStock();
+  if(!rackSt[posId]) return;
+  rackSt[posId].stock = (rackSt[posId].stock||0) + cantTraida;
+  saveRackStock(rackSt);
+
+  // Actualizar ASIGN
+  if(ASIGN[posId]) ASIGN[posId].unidades = rackSt[posId].stock;
+  saveAsign();
+  showToast('✅ Reposición confirmada — '+posId);
+  renderMapa();
 }
 
 let _sugActiva = 'stock_bajo';
@@ -3129,11 +3303,8 @@ function confirmarDespacho(){
   const repoSugerido = [];
 
   _confirmItems.forEach(item=>{
-    // Descontar del mapa si tiene posición en rack
-    if(item.posRack && item.posRack !== 'BUSCAR EN RACK' && ASIGN[item.posRack]){
-      const pos = ASIGN[item.posRack];
-      pos.unidades = Math.max(0, (pos.unidades||0) - item.cantReal);
-    }
+    // Descontar del rack_stock y re-ejecutar motor si quedan posiciones libres
+    descontarRackPorPedido(item.art, item.cantReal);
 
     // NUEVO: Descontar de DATA (stock real)
     const dataArt = DATA.find(r=>r.art===item.art);
@@ -6354,7 +6525,9 @@ function termoStats(){
         arts++;
         if(r.cond==='bajo stock') bajo++;
         if(r.eficiencia!=null){ eficSum+=r.eficiencia; eficN++; }
-        if(z.zona==='A' && candidatosRack.has(r.art)) malUbicados++;
+        // Mal ubicados: candidatos al rack en zonas B/C/D (bloques 3-10)
+        // Zona A (bloques 1-2) excluida — ya son zona rack física
+        if(['B','C','D'].indexOf(z.zona)>=0 && candidatosRack.has(r.art)) malUbicados++;
       });
     });
     // Si es zona A (esRack), sumar también los artículos del rack
@@ -7394,6 +7567,58 @@ function cydConfirmarRemito(){
     var dataArt=DATA.find(function(d){return d.art===r.art;});
     if(dataArt){dataArt.stock=(dataArt.stock||0)+r.cant;dataArt.pall=Math.floor(dataArt.stock/(dataArt.max_pos||32));actualizados++;saveDataStock();}
   });
+
+  // Re-ejecutar motor de rack con el nuevo stock
+  // El motor hace el barrido, asigna posiciones y genera alertas de reposición
+  var nuevoAsign = generarMotorAsignacion();
+  ASIGN = nuevoAsign;
+  saveAsign();
+
+  // Mostrar resumen de asignación al operario
+  var res = window._motorResumen || {};
+  var rackSt = loadRackStock();
+  var itemsConRack = _cydRemitoItems.filter(function(r){
+    return Object.values(rackSt).some(function(rs){return rs && rs.art==r.art;});
+  });
+  var itemsSinRack = _cydRemitoItems.filter(function(r){
+    return !Object.values(rackSt).some(function(rs){return rs && rs.art==r.art;});
+  });
+
+  // Construir mensaje de ubicación por artículo
+  var htmlUbic = '<div style="background:#fff;border-radius:12px;padding:12px;margin-top:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08)">';
+  htmlUbic += '<div style="font-size:13px;font-weight:700;color:#1d1d1f;margin-bottom:8px">📍 Ubicación sugerida</div>';
+
+  _cydRemitoItems.forEach(function(r){
+    var posiciones = Object.entries(rackSt).filter(function(e){
+      var rs=e[1]; return rs && rs.art==r.art;
+    }).map(function(e){return e[0];});
+
+    if(posiciones.length > 0){
+      htmlUbic += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0">';
+      htmlUbic += '<span style="background:#0071e3;color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700">RACK</span>';
+      htmlUbic += '<span style="font-size:12px;font-weight:600">'+r.art+'</span>';
+      htmlUbic += '<span style="font-size:11px;color:#86868b;flex:1">'+(r.med||'')+'</span>';
+      htmlUbic += '<span style="font-size:12px;font-weight:700;color:#0071e3">'+posiciones.join(', ')+'</span>';
+      htmlUbic += '</div>';
+    } else {
+      var da = DATA.find(function(d){return d.art===r.art;});
+      htmlUbic += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0">';
+      htmlUbic += '<span style="background:#ff9500;color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700">BLOQUE</span>';
+      htmlUbic += '<span style="font-size:12px;font-weight:600">'+r.art+'</span>';
+      htmlUbic += '<span style="font-size:11px;color:#86868b;flex:1">'+(r.med||'')+'</span>';
+      htmlUbic += '<span style="font-size:12px;color:#555">'+(da&&da.bloque?da.bloque:'alta rotación')+'</span>';
+      htmlUbic += '</div>';
+    }
+  });
+
+  if(res.alertasRepo > 0){
+    htmlUbic += '<div style="margin-top:8px;background:#fff3cd;border-radius:8px;padding:8px;font-size:11px;color:#856404;font-weight:600">⚠️ '+res.alertasRepo+' posiciones del rack con stock bajo — revisá Reposición</div>';
+  }
+  htmlUbic += '</div>';
+
+  // Mostrar en un toast expandido o en el modal de confirmación
+  var modalBody = document.getElementById('cyd-remito-preview');
+  if(modalBody) modalBody.innerHTML += htmlUbic;
 
   // ── SUGERENCIA DE UBICACIÓN POR ROTACIÓN SEMANAL ──────────────────
   // Pallets al rack según rot_sem (1 semana de cobertura máximo):
