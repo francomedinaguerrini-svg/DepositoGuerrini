@@ -817,10 +817,10 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     </div>
     <div id="termo-leyenda" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
       <span style="font-size:11px;color:#86868b;margin-right:4px">Zonas:</span>
-      <span style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600"><span style="width:14px;height:14px;border-radius:3px;background:#0071e3;display:inline-block"></span>Rack</span>
-      <span style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600"><span style="width:14px;height:14px;border-radius:3px;background:#d70015;display:inline-block"></span>A — Caliente (3-4-5)</span>
-      <span style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600"><span style="width:14px;height:14px;border-radius:3px;background:#ff9500;display:inline-block"></span>B — Media (6-7-8)</span>
-      <span style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600"><span style="width:14px;height:14px;border-radius:3px;background:#34c759;display:inline-block"></span>C — Fría (9-10)</span>
+      <span style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600"><span style="width:14px;height:14px;border-radius:3px;background:#0071e3;display:inline-block"></span>A — Rack + Bloques 1-2</span>
+      <span style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600"><span style="width:14px;height:14px;border-radius:3px;background:#d70015;display:inline-block"></span>B — Bloques 3-4-5</span>
+      <span style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600"><span style="width:14px;height:14px;border-radius:3px;background:#ff9500;display:inline-block"></span>C — Bloques 6-7-8</span>
+      <span style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600"><span style="width:14px;height:14px;border-radius:3px;background:#34c759;display:inline-block"></span>D — Bloques 9-10</span>
     </div>
     <div id="termo-mapa" style="display:flex;flex-direction:column;gap:10px"></div>
     <div id="termo-detalle" style="margin-top:20px;display:none;background:#fff;border-radius:16px;padding:16px;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
@@ -1218,14 +1218,15 @@ function loadSavedData(){
     if(!saved) return;
     const savedMap = JSON.parse(saved);
     DATA.forEach(r => {
-      if(savedMap[r.art] !== undefined) r.stock = savedMap[r.art];
+      const v = savedMap[r.art] !== undefined ? savedMap[r.art] : savedMap[String(r.art)];
+      if(v !== undefined) r.stock = parseInt(v)||0;
     });
   } catch(e){}
 }
 
 function saveDataStock(){
   const stockMap = {};
-  DATA.forEach(r => { stockMap[r.art] = r.stock; });
+  DATA.forEach(r => { stockMap[r.art] = parseInt(r.stock)||0; });
   localStorage.setItem('wms_data_stock', JSON.stringify(stockMap));
 }
 
@@ -1239,11 +1240,13 @@ const ROT_REAL_BASE = {"303116":{"r12":0.2,"r6":0.2},"32800":{"r12":23.1,"r6":25
 loadSavedData();
 // v2: frentes actualizados a B4N-B7S — limpiar asignaciones viejas si son de la versión anterior
 var _asignGuardado = JSON.parse(localStorage.getItem('wms_asign2') || 'null');
-if(_asignGuardado && Object.keys(_asignGuardado).some(function(k){return k.startsWith('B');})){
-  _asignGuardado = null; // descarta asignaciones de frentes viejos
+// Descartar si tiene claves del formato viejo (B1N-..., B2S-..., etc.)
+if(_asignGuardado && Object.keys(_asignGuardado).some(function(k){return /^B\d/.test(k);})){
+  _asignGuardado = null;
   localStorage.removeItem('wms_asign2');
 }
-let ASIGN = _asignGuardado || JSON.parse(JSON.stringify(SUGERENCIA));
+// Arrancar vacío si no hay ASIGN guardado — el usuario aplica el motor cuando quiera
+let ASIGN = _asignGuardado || {};
 
 // Aplicar rotación real al arrancar
 (function(){
@@ -2298,26 +2301,31 @@ function generarMotorAsignacion(){
   // Zona B (bloques 6-8): prioridad 1
   // Zona C (bloques 9-10): prioridad 2
   // Sin bloque definido: prioridad 3
-  var ZONA_A = ['3S','4N','4S','4S PICKING','5N','5S'];
-  var ZONA_B = ['6N','6S','7N','7S','8S'];
-  var ZONA_C = ['9N','9S','10'];
+  // Zonas ABCD — prioridad para sacar del rack artículos que ocupan zona caliente
+  // Zona B (bloques 3-5) es la más urgente de liberar
+  // Zona A (bloques 1-2 + rack) no aplica porque ya son el destino
+  var ZONA_B_MOTOR = ['3S','4N','4S','4S PICKING','5N','5S'];
+  var ZONA_C_MOTOR = ['6N','6S','7N','7S','8S'];
+  var ZONA_D_MOTOR = ['9N','9S','10'];
+  var ZONA_A_MOTOR = ['2N/3N','2S/2N']; // piso zona A — también urgente liberar
 
-  function zonaABC(r){
-    if(!r.bloque) return 3;
+  function zonaMotor(r){
+    if(!r.bloque) return 4;
     var bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
-    var mejor = 3;
+    var mejor = 4;
     bs.forEach(function(b){
       var bk = b.trim();
-      if(ZONA_A.indexOf(bk)>=0 && mejor>0) mejor=0;
-      else if(ZONA_B.indexOf(bk)>=0 && mejor>1) mejor=1;
-      else if(ZONA_C.indexOf(bk)>=0 && mejor>2) mejor=2;
+      if(ZONA_A_MOTOR.indexOf(bk)>=0 && mejor>0) mejor=0; // bloques 1-2 piso → urgente
+      else if(ZONA_B_MOTOR.indexOf(bk)>=0 && mejor>1) mejor=1; // B → muy urgente
+      else if(ZONA_C_MOTOR.indexOf(bk)>=0 && mejor>2) mejor=2; // C → urgente
+      else if(ZONA_D_MOTOR.indexOf(bk)>=0 && mejor>3) mejor=3; // D → menor urgencia
     });
     return mejor;
   }
 
   candidatos.sort(function(a,b){
-    var zA = zonaABC(a), zB = zonaABC(b);
-    if(zA !== zB) return zA - zB;           // zona A primero (urge liberarla)
+    var zA = zonaMotor(a), zB = zonaMotor(b);
+    if(zA !== zB) return zA - zB;           // zona más caliente primero
     return (a.rot_sem||0) - (b.rot_sem||0); // empate: más muerto primero → va a N4
   });
 
@@ -6233,30 +6241,28 @@ function exportarPalletizado(){
 // ======= TERMÓMETRO DE NAVE =======
 let _termoCapa = 'rot';
 
-// Zonas ABC: A=caliente, B=media, C=fría, Rack=especial
+// Zonas ABCD: A=Rack+Bloques 1-2, B=3-4-5, C=5-6-7-8, D=9-10
 const ZONAS_TERMO = [
-  { id:'RACK', label:'Rack — Bloques 1 y 2',     bloques:['2N/3N','2S/2N'], zona:'RACK', especial:true },
-  { id:'ZA',   label:'Zona A — Bloques 3, 4 y 5', bloques:['3S','4N','4S','4S PICKING','5N','5S'], zona:'A' },
-  { id:'ZB',   label:'Zona B — Bloques 6, 7 y 8', bloques:['6N','6S','7N','7S','8S'], zona:'B' },
-  { id:'ZC',   label:'Zona C — Bloques 9 y 10',   bloques:['9N','9S','10'], zona:'C' },
+  { id:'ZA', label:'Zona A — Rack + Bloques 1 y 2', bloques:['2N/3N','2S/2N'], zona:'A', esRack:true },
+  { id:'ZB', label:'Zona B — Bloques 3, 4 y 5',     bloques:['3S','4N','4S','4S PICKING','5N','5S'], zona:'B' },
+  { id:'ZC', label:'Zona C — Bloques 6, 7 y 8',     bloques:['6N','6S','7N','7S','8S'], zona:'C' },
+  { id:'ZD', label:'Zona D — Bloques 9 y 10',        bloques:['9N','9S','10'], zona:'D' },
 ];
 
 // Colores por zona
-const ZONA_COLORS = { RACK:'#0071e3', A:'#d70015', B:'#ff9500', C:'#34c759' };
-const ZONA_LABELS = { RACK:'Rack', A:'Zona A 🔥', B:'Zona B', C:'Zona C' };
+const ZONA_COLORS = { A:'#0071e3', B:'#d70015', C:'#ff9500', D:'#34c759' };
+const ZONA_LABELS = { A:'Zona A — Rack & picking 🔥', B:'Zona B — Caliente', C:'Zona C — Media', D:'Zona D — Fría' };
 
 function termoColorZona(zona){ return ZONA_COLORS[zona] || '#8e8e93'; }
 
 function termoLabel(pct, capa, zona){
-  if(zona === 'RACK') return 'Rack — baja rotación';
   if(capa === 'bajo'){
     if(pct === 0) return 'Sin alertas ✓';
     if(pct < 20)  return 'Pocas alertas';
     if(pct < 40)  return 'Varias alertas';
     return '⚠️ Alta criticidad';
   }
-  // Para las demás capas mostramos la zona ABC
-  return { A:'Zona A — Caliente 🔥', B:'Zona B — Media', C:'Zona C — Fría' }[zona] || '';
+  return ZONA_LABELS[zona] || '';
 }
 
 function termoStats(){
@@ -6317,29 +6323,22 @@ function termoStats(){
     if(art) rackRot += art.rot||0;
   });
 
-  // Rotación sin zona (excluidos)
+  // Rotación sin zona = solo artículos sin bloque asignado en DATA
+  // Los de camión (x.5), Speedway, etc. SÍ tienen bloque y rotan — no son "sin zona"
   let rotSinZona=0, artsSinZona=0;
-  const zonasBlqs = [...ZONA_A_BLQ,...ZONA_B_BLQ,...ZONA_C_BLQ,'2N/3N','2S/2N'];
   DATA.forEach(r=>{
-    if(!r.bloque){ rotSinZona+=r.rot||0; artsSinZona++; return; }
-    const bs=r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
-    const enZona=bs.some(b=>zonasBlqs.indexOf(b.trim())>=0);
-    if(!enZona){ rotSinZona+=r.rot||0; artsSinZona++; }
+    if(!r.bloque || r.bloque==='' || r.bloque==='—'){
+      rotSinZona+=r.rot||0;
+      artsSinZona++;
+    }
   });
 
   ZONAS_TERMO.forEach(z=>{
-    if(z.zona==='RACK'){
-      stats[z.id]={
-        rot: rackRot, stock:0, arts: rackTotal, bajo:0, malUbicados:0,
-        rackZonaCount, rackRotActivos, rackMuertos, rackTotal,
-        eficProm:0,
-        pctRot: Math.round((rackRot/totRot)*100),
-        pctStock:0, pctBajo:0, pctEfic:0,
-        pctA: Math.round((rackZonaCount.A/rackTotal)*100),
-        pctB: Math.round((rackZonaCount.B/rackTotal)*100),
-        pctC: Math.round((rackZonaCount.C/rackTotal)*100),
-      };
-      return;
+    if(z.esRack){
+      // Zona A incluye: artículos de los bloques 2S/2N, 2N/3N (piso) + artículos en rack
+      // Los del rack se suman aparte para mostrar el desglose
+      // primero procesar los bloques de piso normalmente (se hace abajo en el forEach)
+      // luego sumar los artículos del rack
     }
     let rot=0, stock=0, arts=0, bajo=0, eficSum=0, eficN=0, malUbicados=0;
     const artsVistos = new Set();
@@ -6358,14 +6357,28 @@ function termoStats(){
         if(z.zona==='A' && candidatosRack.has(r.art)) malUbicados++;
       });
     });
+    // Si es zona A (esRack), sumar también los artículos del rack
+    if(z.esRack){
+      rot   += rackRot;
+      arts  += rackTotal;
+      // rackZonaCount para mostrar desglose de origen en card
+    }
     const eficProm = eficN>0 ? eficSum/eficN : 0;
     stats[z.id] = {
       rot, stock, arts, bajo, malUbicados,
       eficProm,
+      esRack: z.esRack||false,
+      rackZonaCount: z.esRack ? rackZonaCount : null,
+      rackRotActivos: z.esRack ? rackRotActivos : 0,
+      rackMuertos:    z.esRack ? rackMuertos : 0,
+      rackTotal:      z.esRack ? rackTotal : 0,
       pctRot:   Math.round((rot/totRot)*100),
       pctStock: Math.round((stock/totStock)*100),
       pctBajo:  arts>0 ? Math.round((bajo/arts)*100) : 0,
       pctEfic:  Math.round(eficProm*100),
+      pctB: z.esRack ? Math.round(((rackZonaCount.B||0)/Math.max(rackTotal,1))*100) : 0,
+      pctC: z.esRack ? Math.round(((rackZonaCount.C||0)/Math.max(rackTotal,1))*100) : 0,
+      pctD: z.esRack ? Math.round(((rackZonaCount.C||0)/Math.max(rackTotal,1))*100) : 0,
     };
   });
 
@@ -6418,43 +6431,50 @@ function renderTermometro(){
     const tempLbl= termoLabel(val, capa, z.zona);
     const malUbic = s.malUbicados || 0;
 
-    // Card especial para Rack — muestra desglose A/B/C
-    if(z.zona === 'RACK'){
-      const pA = s.pctA||0, pB = s.pctB||0, pC = s.pctC||0, pSin = 100-pA-pB-pC;
+    // Card zona A — incluye piso bloques 1-2 + rack embebido
+    if(z.esRack){
+      const rz = s.rackZonaCount||{B:0,C:0,D:0,sin:0};
+      const rt = s.rackTotal||1;
+      const pB2 = Math.round((rz.B/rt)*100);
+      const pC2 = Math.round((rz.C/rt)*100);
+      const pD2 = Math.round((rz.D||rz.C||0)/rt*100);
+      const pSin2 = Math.max(0, 100-pB2-pC2-pD2);
       const activos = s.rackRotActivos||0, muertos = s.rackMuertos||0;
       html += `
       <div onclick="termoClickZona('${z.id}')"
-           style="background:#f0f6ff;border-radius:14px;padding:14px 16px;cursor:pointer;
-                  box-shadow:0 1px 6px rgba(0,113,227,0.12);border:2px solid #0071e322;
+           style="background:#e8f0fe;border-radius:14px;padding:14px 16px;cursor:pointer;
+                  box-shadow:0 1px 6px rgba(0,113,227,0.12);border:2px solid #0071e344;
                   transition:box-shadow 0.15s"
            onmouseover="this.style.boxShadow='0 3px 16px rgba(0,113,227,0.2)'"
            onmouseout="this.style.boxShadow='0 1px 6px rgba(0,113,227,0.12)'">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
           <div>
             <div style="display:flex;align-items:center;gap:8px">
-              <span style="background:#0071e3;color:#fff;font-size:11px;font-weight:800;padding:2px 9px;border-radius:10px">RACK</span>
+              <span style="background:#0071e3;color:#fff;font-size:11px;font-weight:800;padding:2px 9px;border-radius:10px">A</span>
               <span style="font-size:14px;font-weight:700;color:#1d1d1f">${z.label}</span>
             </div>
-            <div style="font-size:11px;color:#86868b;margin-top:4px">${s.arts} arts. asignados · ${activos} rotan · ${muertos} muertos</div>
+            <div style="font-size:11px;color:#86868b;margin-top:4px">${z.bloques.join(' · ')} + rack (${s.rackTotal} arts · ${activos} rotan · ${muertos} muertos)</div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:22px;font-weight:800;color:#0071e3">${s.pctRot}%</div>
-            <div style="font-size:10px;color:#86868b">rot. total</div>
+            <div style="font-size:26px;font-weight:800;color:#0071e3">${s.pctRot}%</div>
+            <div style="font-size:10px;color:#86868b">% rot. total</div>
           </div>
         </div>
-        <!-- Barra desglose por zona origen -->
-        <div style="font-size:11px;color:#555;margin-bottom:5px;font-weight:600">Origen de los artículos en rack:</div>
-        <div style="height:14px;background:#e8f0fe;border-radius:7px;overflow:hidden;display:flex;margin-bottom:6px">
-          <div title="Zona A" style="height:100%;width:${pA}%;background:#d70015;transition:width 0.4s"></div>
-          <div title="Zona B" style="height:100%;width:${pB}%;background:#ff9500;transition:width 0.4s"></div>
-          <div title="Zona C" style="height:100%;width:${pC}%;background:#34c759;transition:width 0.4s"></div>
-          <div title="Sin zona" style="height:100%;width:${pSin>0?pSin:0}%;background:#c7c7cc;transition:width 0.4s"></div>
+        <div style="height:10px;background:#c7d9f8;border-radius:5px;overflow:hidden;margin-bottom:8px">
+          <div style="height:100%;width:${barW}%;background:#0071e3;border-radius:5px"></div>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <span style="font-size:11px;font-weight:700;color:#d70015">A: ${pA}%</span>
-          <span style="font-size:11px;font-weight:700;color:#ff9500">B: ${pB}%</span>
-          <span style="font-size:11px;font-weight:700;color:#34c759">C: ${pC}%</span>
-          ${pSin>0?`<span style="font-size:11px;font-weight:700;color:#8e8e93">Sin zona: ${pSin}%</span>`:''}
+        <div style="font-size:11px;color:#0071e3;font-weight:600;margin-bottom:5px">Origen de los ${s.rackTotal} arts. en rack:</div>
+        <div style="height:10px;background:#e8f0fe;border-radius:5px;overflow:hidden;display:flex;margin-bottom:5px">
+          <div title="Zona B" style="height:100%;width:${pB2}%;background:#d70015"></div>
+          <div title="Zona C" style="height:100%;width:${pC2}%;background:#ff9500"></div>
+          <div title="Zona D" style="height:100%;width:${pD2}%;background:#34c759"></div>
+          <div title="Sin zona" style="height:100%;width:${pSin2}%;background:#c7c7cc"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px;font-weight:700">
+          <span style="color:#d70015">B: ${pB2}%</span>
+          <span style="color:#ff9500">C: ${pC2}%</span>
+          <span style="color:#34c759">D: ${pD2}%</span>
+          ${pSin2>0?`<span style="color:#8e8e93">Sin zona: ${pSin2}%</span>`:''}
         </div>
       </div>`;
       return;
