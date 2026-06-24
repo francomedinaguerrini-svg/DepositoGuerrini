@@ -533,6 +533,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
   <div class="tab" onclick="switchTab('mapa',this)">🗺️ Mapa Racks</div>
   <div class="tab" onclick="switchTab('repo',this)">🔄 Reposición</div>
   <div class="tab" onclick="switchTab('nave',this)">🏭 Nave</div>
+  <div class="tab" onclick="switchTab('rot',this)">🔥 Rotación</div>
   <div class="tab" onclick="switchTab('termometro',this)">🌡️ Termómetro</div>
   <div class="tab" onclick="switchTab('dash',this)">📊 Dashboard</div>
   <div class="tab" onclick="switchTab('inv',this)">🔢 Inventario</div>
@@ -568,6 +569,11 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
       <div class="home-btn-icon">🚚</div>
       <div class="home-btn-label">Carga/Desc.</div>
       <div class="home-btn-sub">Movimientos</div>
+    </button>
+    <button class="home-btn accent-purple" onclick="goHome('rot')">
+      <div class="home-btn-icon">🔥</div>
+      <div class="home-btn-label">Rotación</div>
+      <div class="home-btn-sub">Remitos + Usos</div>
     </button>
     <button class="home-btn accent-orange" onclick="goHome('mapa')" style="position:relative">
       <div class="home-btn-icon">🗺️</div>
@@ -2370,11 +2376,12 @@ function barridoCandidatosRack(){
 // Posiciones liberadas por pedidos también se re-asignan aquí.
 // ───────────────────────────────────────────────────────────────
 function nivelSegunRot(rotSem){
-  if(rotSem <= 0)    return 4; // muerto → N4
-  if(rotSem < 0.15)  return 4; // casi muerto → N4
-  if(rotSem < 0.35)  return 3; // lento → N3
-  if(rotSem < 0.5)   return 2; // algo lento → N2
-  return 1;                     // baja pero algo rota → N1
+  // Universo: rot 0 a 0.5 (candidatos al rack)
+  // Dividido en 4 rangos iguales → cada nivel cubre 0.125
+  if(rotSem <= 0)     return 4; // muerto total → N4 (arriba, fuera del camino)
+  if(rotSem < 0.17)   return 3; // casi muerto → N3
+  if(rotSem < 0.33)   return 2; // lento → N2
+  return 1;                      // algo rota (0.33-0.5) → N1 (abajo, accesible)
 }
 
 function generarMotorAsignacion(){
