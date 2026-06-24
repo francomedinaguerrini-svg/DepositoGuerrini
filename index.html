@@ -1252,11 +1252,17 @@ let ASIGN = _asignGuardado || {};
 
 // Aplicar rotación real al arrancar
 (function(){
-  // 1. Base embebida
+  // 1. Base embebida — actualiza rot, rot6 Y rot_sem
   let applied = 0;
   DATA.forEach(r=>{
     const rv = ROT_REAL_BASE[String(r.art)];
-    if(rv){ r.rot = rv.r12; r.rot6 = rv.r6; applied++; }
+    if(rv){
+      r.rot     = rv.r12;
+      r.rot6    = rv.r6;
+      r.rot_sem = Math.round((rv.r12 / 4.33) * 100) / 100;
+      r.pall    = Math.floor((r.stock||0) / (r.max_pos||32));
+      applied++;
+    }
   });
   console.log('✅ Rotación embebida: '+applied+' arts');
   // 2. Si hay datos más nuevos en localStorage (subiste archivos recientes), los aplica
@@ -1266,8 +1272,10 @@ let ASIGN = _asignGuardado || {};
       const rotData = JSON.parse(savedRot);
       DATA.forEach(r=>{
         if(rotData[r.art]){
-          r.rot = rotData[r.art].rot12 || r.rot;
-          r.rot6 = rotData[r.art].rot6 || r.rot6;
+          r.rot     = rotData[r.art].rot12 || r.rot;
+          r.rot6    = rotData[r.art].rot6  || r.rot6;
+          r.rot_sem = Math.round((rotData[r.art].rot12 / 4.33) * 100) / 100;
+          r.pall    = Math.floor((r.stock||0) / (r.max_pos||32));
         }
       });
     }
@@ -2310,7 +2318,7 @@ function saveRackStock(rs){ localStorage.setItem('wms_rack_stock', JSON.stringif
 function barridoCandidatosRack(){
   var EXCLUIR_PROV = ['SPEEDWAY'];
   var EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
-  var ROT_MAX = 0.5, PALL_MAX = 4;
+  var ROT_MAX = 5, PALL_MAX = 12; // 85% ocupación rack con datos reales
 
   // Bloques 1 y 2 son la zona física del rack — no se mueven
   var BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
@@ -2535,6 +2543,7 @@ function generarMotorAsignacion(){
   window._motorResumen = {
     asignados:    Object.keys(asign).length,
     sinUbicacion: sinUbicacion.length,
+    sinUbicacionArts: sinUbicacion, // array completo para el informe
     posLibres:    Object.values(posPorNivel).reduce(function(s,a){return s+a.filter(function(p){return p.libre;}).length;},0),
     compartidas:  Object.values(asign).filter(function(v){return v.compartidos&&v.compartidos.length>0;}).length,
     alertasRepo:  alertasRepo.length
@@ -2632,6 +2641,18 @@ function setSugerencia(nombre, btn){
 function aplicarSugerencia(){
   if(!confirm('¿Aplicar sugerencia automática? Esto reemplaza las asignaciones actuales.')) return;
   if(_sugActiva==='stock_bajo'){
+    // Debug: mostrar distribución de candidatos antes de asignar
+  var _cands = barridoCandidatosRack();
+  var _rotDist = {muerto:0, n3:0, n2:0, n1:0};
+  _cands.forEach(function(c){
+    var r = c.rot_sem||0;
+    if(r<=0) _rotDist.muerto++;
+    else if(r<0.17) _rotDist.n3++;
+    else if(r<0.33) _rotDist.n2++;
+    else _rotDist.n1++;
+  });
+  showToast('🔍 Barrido: '+_cands.length+' candidatos — muertos:'+_rotDist.muerto+' N3:'+_rotDist.n3+' N2:'+_rotDist.n2+' N1:'+_rotDist.n1);
+  setTimeout(function(){
     showToast('⚠️ Calculando Stock Bajo...');
     setTimeout(function(){
       try {
@@ -2641,6 +2662,7 @@ function aplicarSugerencia(){
         localStorage.setItem('wms_last_update', ts);
         actualizarUltimaFecha();
         renderMapa();
+        renderCandidatosEnNave();
         var n = Object.keys(ASIGN).length;
         var res = window._motorResumen || {};
         var msg = '✅ Rotación Baja aplicada — ' + n + ' posiciones';
@@ -2654,6 +2676,7 @@ function aplicarSugerencia(){
         alert('Error al calcular Stock Bajo: ' + e.message);
       }
     },100);
+  },100);
   } else {
     ASIGN = JSON.parse(JSON.stringify(SUGERENCIAS[_sugActiva]||SUGERENCIAS.chasis));
     saveAsign();
@@ -2705,7 +2728,7 @@ function renderAlertas(){
 
   alertas.sort((a,b) => (b.stockDisp - a.stockDisp));
 
-  if(!alertas.length){ box.innerHTML=''; return; }
+  if(!alertas.length){ box.innerHTML=''; renderCandidatosEnNave(); return; }
 
   const filas = alertas.map(a => {
     const color = a.sigueCalificando ? '#856404' : '#86868b';
@@ -2732,9 +2755,140 @@ function renderAlertas(){
     </div>
     ${filas}
     <div style="font-size:10px;color:#86868b;margin-top:6px;border-top:1px solid #ffe082;padding-top:6px">
-      Criterio: artículo agotado en rack · reponer si sigue siendo baja rot. (&lt;0.5/sem, 1-4 pall.) · liberar si ya no califica
+      Criterio: artículo agotado en rack · reponer si sigue siendo baja rot. · liberar si ya no califica
     </div>
   </div>`;
+
+  // Panel de candidatos en nave sin lugar en rack
+  renderCandidatosEnNave();
+}
+
+function togglePanelNave(){
+  var body  = document.getElementById('panel-nave-body');
+  var arrow = document.getElementById('panel-nave-arrow');
+  if(!body) return;
+  var open = body.style.display !== 'none';
+  body.style.display  = open ? 'none' : 'block';
+  if(arrow) arrow.textContent = open ? '▼' : '▲';
+}
+
+function renderCandidatosEnNave(){
+  const box = document.getElementById('alertas-box');
+  if(!box) return;
+
+  // Candidatos al rack que no entraron (sin lugar)
+  const res = window._motorResumen || {};
+  const sinLugar = res.sinUbicacionArts || [];
+
+  // También buscar artículos que califican pero nunca fueron asignados (rack lleno desde el arranque)
+  const EXCLUIR_PROV = ['SPEEDWAY'];
+  const EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
+  const BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
+  const ROT_MAX  = 5;
+  const PALL_MAX = 12;
+
+  // Artículos ya en rack
+  const enRack = new Set(Object.values(ASIGN).filter(v=>v&&v.art).map(v=>String(v.art)));
+
+  // Candidatos en nave (no en rack)
+  const candidatosEnNave = DATA.filter(function(r){
+    if(enRack.has(String(r.art))) return false;
+    if(/\d+\.5/.test(r.med||'')) return false;
+    if(EXCLUIR_PROV.indexOf(r.prov)>=0) return false;
+    if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false;
+    if((r.stock||0) <= 0) return false;
+    if((r.rot_sem||0) >= ROT_MAX) return false;
+    if((r.pall||0) > PALL_MAX) return false;
+    if((r.pall||0) < 1) return false;
+    if(r.bloque){
+      const bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
+      if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return false;
+    }
+    return true;
+  });
+
+  if(!candidatosEnNave.length){
+    // Quitar panel anterior si existe
+    const prev = document.getElementById('panel-nave-candidatos');
+    if(prev) prev.remove();
+    return;
+  }
+
+  // Agrupar por zona
+  const ZB = ['3S','4N','4S','4S PICKING','5N','5S'];
+  const ZC = ['6N','6S','7N','7S','8S'];
+  const ZD = ['9N','9S','10'];
+  function zonaArt(r){
+    if(!r.bloque) return 'Sin zona';
+    const bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
+    if(bs.some(b=>ZB.indexOf(b.trim())>=0)) return 'B';
+    if(bs.some(b=>ZC.indexOf(b.trim())>=0)) return 'C';
+    if(bs.some(b=>ZD.indexOf(b.trim())>=0)) return 'D';
+    return 'Sin zona';
+  }
+
+  // Ordenar: menor rot primero (los más urgentes de sacar del bloque)
+  candidatosEnNave.sort(function(a,b){ return (a.rot_sem||0)-(b.rot_sem||0); });
+
+  const porZona = {B:[], C:[], D:[], 'Sin zona':[]};
+  candidatosEnNave.forEach(function(r){ porZona[zonaArt(r)].push(r); });
+
+  const colores = {B:'#d70015', C:'#ff9500', D:'#34c759', 'Sin zona':'#86868b'};
+
+  // Panel colapsable
+  var panelId = 'panel-nave-candidatos';
+  var bodyId  = 'panel-nave-body';
+  var isOpen  = false;
+  // Mantener estado si ya existía
+  var prev2 = document.getElementById(panelId);
+  if(prev2){ var prevBody = document.getElementById(bodyId); isOpen = prevBody && prevBody.style.display !== 'none'; }
+
+  let html = '<div id="'+panelId+'" style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;margin-top:10px;overflow:hidden">';
+
+  // Header clickeable
+  html += '<div onclick="togglePanelNave()" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;cursor:pointer;user-select:none">';
+  html += '<span style="font-size:12px;font-weight:700;color:#1d1d1f">🏭 '+candidatosEnNave.length+' artículos en nave sin lugar en rack</span>';
+  html += '<div style="display:flex;gap:6px;align-items:center">';
+  // Pills por zona
+  ['B','C','D'].forEach(function(z){
+    if(porZona[z].length) html += '<span style="background:'+colores[z]+';color:#fff;font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px">'+z+': '+porZona[z].length+'</span>';
+  });
+  html += '<span id="panel-nave-arrow" style="font-size:14px;color:#86868b;transition:transform 0.2s">'+(isOpen?'▲':'▼')+'</span>';
+  html += '</div></div>';
+
+  // Body (colapsable)
+  html += '<div id="'+bodyId+'" style="display:'+(isOpen?'block':'none')+';padding:0 14px 12px">';
+
+  ['B','C','D','Sin zona'].forEach(function(zona){
+    const arts = porZona[zona];
+    if(!arts.length) return;
+    const color = colores[zona];
+    html += '<div style="margin-bottom:10px">';
+    html += '<div style="font-size:11px;font-weight:700;color:'+color+';margin-bottom:4px;display:flex;align-items:center;gap:5px">';
+    html += '<span style="background:'+color+';color:#fff;padding:1px 6px;border-radius:6px;font-size:10px">'+zona+'</span>';
+    html += 'Zona '+zona+' — '+arts.length+' artículos</div>';
+    html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">';
+    html += '<tr style="background:#f5f5f7"><th style="padding:4px 6px;text-align:left">Art</th><th style="padding:4px 6px;text-align:left">Medida</th><th style="padding:4px 6px;text-align:left">Diseño</th><th style="padding:4px 6px;text-align:right">Rot/sem</th><th style="padding:4px 6px;text-align:right">Pallets</th><th style="padding:4px 6px;text-align:left">Bloque</th></tr>';
+    arts.forEach(function(r){
+      html += '<tr style="border-bottom:1px solid #f0f0f0">';
+      html += '<td style="padding:4px 6px;font-weight:600">'+r.art+'</td>';
+      html += '<td style="padding:4px 6px">'+r.med+'</td>';
+      html += '<td style="padding:4px 6px;color:#555">'+r.diseno+'</td>';
+      html += '<td style="padding:4px 6px;text-align:right;color:'+color+';font-weight:700">'+(r.rot_sem||0).toFixed(2)+'</td>';
+      html += '<td style="padding:4px 6px;text-align:right">'+(r.pall||0)+'</td>';
+      html += '<td style="padding:4px 6px;color:#86868b">'+(r.bloque||'—')+'</td>';
+      html += '</tr>';
+    });
+    html += '</table></div></div>';
+  });
+
+  html += '<div style="font-size:10px;color:#86868b;margin-top:4px;border-top:1px solid #f0f0f0;padding-top:5px">Criterio: rot &lt; '+ROT_MAX+'/sem · pall ≤ '+PALL_MAX+' · excluye .5, Speedway, agrícola, bloques 1-2</div>';
+  html += '</div></div>';
+
+  // Reemplazar o agregar el panel
+  const prev = document.getElementById('panel-nave-candidatos');
+  if(prev) prev.outerHTML = html;
+  else box.innerHTML += html;
 }
 
 
@@ -3721,8 +3875,57 @@ function imprimirMapa(){
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsA), 'Reposición');
   }
 
+  // Hoja: candidatos en nave sin lugar en rack
+  const EXCLUIR_PROV2 = ['SPEEDWAY'];
+  const EXCLUIR_USO2  = ['TT','TL','TLSB','TT ','TL '];
+  const BLOQUES_RACK2 = ['2N/3N','2S/2N','1N','1S'];
+  const enRack2 = new Set(Object.values(ASIGN).filter(v=>v&&v.art).map(v=>String(v.art)));
+  const candidatosNave = DATA.filter(r=>{
+    if(enRack2.has(String(r.art))) return false;
+    if(/\d+\.5/.test(r.med||'')) return false;
+    if(EXCLUIR_PROV2.indexOf(r.prov)>=0) return false;
+    if(EXCLUIR_USO2.indexOf((r.uso||'').trim())>=0) return false;
+    if((r.stock||0)<=0) return false;
+    if((r.rot_sem||0)>=5) return false;
+    if((r.pall||0)>12) return false;
+    if((r.pall||0)<1) return false;
+    if(r.bloque){
+      const bs=r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
+      if(bs.some(b=>BLOQUES_RACK2.indexOf(b.trim())>=0)) return false;
+    }
+    return true;
+  }).sort((a,b)=>(a.rot_sem||0)-(b.rot_sem||0));
+
+  if(candidatosNave.length){
+    const ZB2=['3S','4N','4S','4S PICKING','5N','5S'];
+    const ZC2=['6N','6S','7N','7S','8S'];
+    const ZD2=['9N','9S','10'];
+    function zonaNav(r){
+      if(!r.bloque) return 'Sin zona';
+      const bs=r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
+      if(bs.some(b=>ZB2.indexOf(b.trim())>=0)) return 'B (3-5)';
+      if(bs.some(b=>ZC2.indexOf(b.trim())>=0)) return 'C (6-8)';
+      if(bs.some(b=>ZD2.indexOf(b.trim())>=0)) return 'D (9-10)';
+      return 'Sin zona';
+    }
+    const wsNave = [
+      ['CANDIDATOS EN NAVE SIN LUGAR EN RACK — '+new Date().toLocaleDateString('es-AR')],
+      ['Total: '+candidatosNave.length+' artículos · Criterio: rot < 5/sem · pall ≤ 12'],
+      [],
+      ['ZONA','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','ROT/SEM','ROT/MES','PALLETS','STOCK','BLOQUE','CONDICIÓN'],
+      ...candidatosNave.map(r=>[
+        zonaNav(r), r.art, r.med, r.diseno, r.prov,
+        (r.rot_sem||0).toFixed(2), (r.rot||0).toFixed(1),
+        r.pall||0, r.stock||0, r.bloque||'', r.cond||''
+      ])
+    ];
+    const wsN = XLSX.utils.aoa_to_sheet(wsNave);
+    wsN['!cols'] = [{wch:10},{wch:8},{wch:14},{wch:12},{wch:12},{wch:9},{wch:9},{wch:8},{wch:8},{wch:12},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, wsN, 'En nave sin rack');
+  }
+
   XLSX.writeFile(wb, `Mapa_Racks_${new Date().toLocaleDateString('es-AR').replace(/\//g,'-')}.xlsx`);
-  showToast('✅ Mapa exportado');
+  showToast('✅ Mapa exportado · '+(candidatosNave.length||0)+' sin rack incluidos');
 }
 
 
@@ -5848,8 +6051,10 @@ function aplicarRotacionReal(){
   let updated = 0;
   DATA.forEach(r=>{
     if(_rotData[r.art]){
-      r.rot = _rotData[r.art].rot12; // usar 12m como rot principal
-      r.rot6 = _rotData[r.art].rot6;
+      r.rot     = _rotData[r.art].rot12;         // rotación mensual 12m
+      r.rot6    = _rotData[r.art].rot6;           // rotación mensual 6m
+      r.rot_sem = Math.round((_rotData[r.art].rot12 / 4.33) * 100) / 100; // semanal = mensual/4.33
+      r.pall    = Math.floor((r.stock||0) / (r.max_pos||32)); // recalcular pallets
       updated++;
     }
   });
