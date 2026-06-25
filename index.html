@@ -744,6 +744,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     <div style="margin-bottom:10px">
       <div style="display:flex;gap:8px">
         <button onclick="aplicarSugerencia()" style="flex:1;padding:11px;background:#ff9500;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">📉 Aplicar Rotación Baja</button>
+        <button onclick="reevaluarRack()" style="flex:1;padding:11px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer" title="Reevaluar posiciones libres y candidatos en nave">🔄 Reevaluar</button>
         <button onclick="imprimirMapa()" style="padding:11px 14px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:13px;cursor:pointer" title="Exportar mapa">📥</button>
         <button onclick="limpiarMapa()" style="padding:11px 14px;background:#ffd6d9;color:#d70015;border:none;border-radius:10px;font-size:13px;cursor:pointer">🗑️</button>
       </div>
@@ -2318,29 +2319,47 @@ function saveRackStock(rs){ localStorage.setItem('wms_rack_stock', JSON.stringif
 function barridoCandidatosRack(){
   var EXCLUIR_PROV = ['SPEEDWAY'];
   var EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
-  var ROT_MAX = 5, PALL_MAX = 12; // 85% ocupación rack con datos reales
+  var ROT_MAX  = 5.5;  // rot_sem máxima para entrar al rack
+  var PALL_MAX = 6;   // máximo 6 pallets
 
   // Bloques 1 y 2 son la zona física del rack — no se mueven
   var BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
 
-  var candidatos = DATA.filter(function(r){
-    if(/\d+\.5/.test(r.med||''))           return false; // camión
-    if(EXCLUIR_PROV.indexOf(r.prov)>=0)    return false; // Speedway
-    if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false; // agrícola
-    if((r.stock||0) <= 0)                  return false; // sin stock
-    if((r.rot_sem||0) >= ROT_MAX)          return false; // alta rot → bloque
-    if((r.pall||0) > PALL_MAX)             return false; // demasiado stock
-    if((r.pall||0) < 1)                    return false; // menos de 1 pallet
-    // Excluir bloques 1 y 2 — ya están en zona rack, no tiene sentido moverlos
+  // Diseños excluidos siempre (alta rotación aunque estén en bloque 3)
+  var EXCLUIR_DISENO = ['AT51','AT52','MT51'];
+
+  function pasaFiltroBase(r){
+    if(/\d+\.5/.test(r.med||''))                    return false; // camión
+    if(EXCLUIR_PROV.indexOf(r.prov)>=0)             return false; // Speedway
+    if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0)  return false; // agrícola
+    if(EXCLUIR_DISENO.indexOf((r.diseno||'').trim())>=0) return false; // AT51/AT52/MT51
+    if((r.stock||0) <= 0)                           return false; // sin stock
+    if((r.pall||0) > PALL_MAX)                      return false; // > 5 pallets → bloque
+    if((r.pall||0) < 1)                             return false; // menos de 1 pallet
     if(r.bloque){
       var bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
       if(bs.some(function(b){ return BLOQUES_RACK.indexOf(b.trim())>=0; })) return false;
     }
     return true;
+  }
+
+  // GRUPO 1: rot = 0 (muertos totales) — máxima prioridad
+  var grupo1 = DATA.filter(function(r){
+    if(!pasaFiltroBase(r)) return false;
+    return (r.rot_sem||0) === 0;
   });
 
+  // GRUPO 2: rot baja pero existe (0 < rot < ROT_MAX)
+  var grupo2 = DATA.filter(function(r){
+    if(!pasaFiltroBase(r)) return false;
+    return (r.rot_sem||0) > 0 && (r.rot_sem||0) < ROT_MAX;
+  });
+
+  // Candidatos: grupo 1 primero, luego grupo 2
+  var candidatos = grupo1.concat(grupo2);
+
   // Prioridad de zona: B (3-5) > A piso (1-2) > C (6-8) > D (9-10) > sin zona
-  var ZB = ['3S','4N','4S','4S PICKING','5N','5S'];
+  var ZB = ['4N','4S','4S PICKING','5N','5S'];
   var ZA = ['2N/3N','2S/2N'];
   var ZC = ['6N','6S','7N','7S','8S'];
   var ZD = ['9N','9S','10'];
@@ -2384,16 +2403,23 @@ function barridoCandidatosRack(){
 // Posiciones liberadas por pedidos también se re-asignan aquí.
 // ───────────────────────────────────────────────────────────────
 function nivelSegunRot(rotSem){
-  // Universo: rot 0 a 0.5 (candidatos al rack)
-  // Dividido en 4 rangos iguales → cada nivel cubre 0.125
-  if(rotSem <= 0)     return 4; // muerto total → N4 (arriba, fuera del camino)
-  if(rotSem < 0.17)   return 3; // casi muerto → N3
-  if(rotSem < 0.33)   return 2; // lento → N2
-  return 1;                      // algo rota (0.33-0.5) → N1 (abajo, accesible)
+  // Rangos calibrados para los datos reales de Halpern (rot 0-5/sem)
+  // N4: muertos (rot=0)
+  // N3: casi muertos (0-1.25) → ~38% de candidatos
+  // N2: lentos (1.25-2.5) → ~21% de candidatos
+  // N1: algo rotan (2.5-5) → accesibles abajo → ~23% de candidatos
+  if(rotSem <= 0)    return 4; // muerto total → N4 (arriba)
+  if(rotSem < 1.25)  return 3; // casi muerto → N3
+  if(rotSem < 2.5)   return 2; // lento → N2
+  return 1;                     // algo rota → N1 (abajo, accesible)
 }
 
 function generarMotorAsignacion(){
   var candidatos = barridoCandidatosRack();
+
+  // Límite duro: máximo 80% del rack (358 de 448 posiciones)
+  var LIMITE_POS = Math.floor(448 * 0.80); // 358
+  var _posAsignadas = 0; // contador global del motor
 
   // Generar posiciones disponibles por nivel
   var posPorNivel = {1:[], 2:[], 3:[], 4:[]};
@@ -2421,90 +2447,127 @@ function generarMotorAsignacion(){
 
   var sinUbicacion = [];
 
-  // ── ASIGNACIÓN ──
-  // Para cada candidato sin posición:
-  candidatos.forEach(function(art){
+  // ── ASIGNACIÓN EN 2 PASADAS ──
+  // PASADA 1: artículos que ocupan > 50% del pallet → posición propia
+  // PASADA 2: artículos con ≤ 50% → se emparejan de a 2 por posición
+  // Así los "sueltos" siempre se juntan entre ellos
+
+  function asignarPosicion(art, stockPend, posPorNivel, asign, sinUbicacion, intentarCompartir){
     var artKey = String(art.art);
-    if(!(stockPend[artKey] > 0)) return; // ya tiene rack o sin stock
+    if(!(stockPend[artKey] > 0)) return;
 
     var nivelIdeal = nivelSegunRot(art.rot_sem||0);
     var mp = (typeof PALL_BASE!=='undefined'&&PALL_BASE[artKey]?PALL_BASE[artKey].p_rack:0)||art.max_pos||32;
     if(mp<=0) mp=32;
-
     var unidPend = stockPend[artKey];
-
-    // 1) Buscar posición existente con espacio libre para COMPARTIR pallet
-    // Criterio físico: diagonal del pallet = 1.2m x 1.2m → diagonal ≈ 170cm
-    // ag_articuloA + ag_articuloB ≤ 170cm → entran juntos en el pallet
-    var DIAG_PALLET_CM = 170;
-    var agArt = (typeof PALL_BASE!=='undefined'&&PALL_BASE[artKey])?PALL_BASE[artKey].ag:0;
-
-    var compartida = null;
-    [nivelIdeal, nivelIdeal+1, nivelIdeal-1, 4, 3, 2, 1].forEach(function(nv){
-      if(compartida || nv<1 || nv>4) return;
-      var arr = posPorNivel[nv];
-      if(!arr) return;
-      arr.forEach(function(p){
-        if(compartida) return;
-        if(p.libre) return;
-        if(!p.artActual) return;
-        // Excluir .5 y Speedway como anfitrión — no comparten
-        var daExist = DATA.find(function(r){return r.art==p.artActual;});
-        if(daExist){
-          if(/\d+\.5/.test(daExist.med||'')) return;
-          if(daExist.prov==='SPEEDWAY') return;
-        }
-        // Verificar que entran físicamente en el pallet por diagonal
-        var agExist = (typeof PALL_BASE!=='undefined'&&PALL_BASE[String(p.artActual)])?PALL_BASE[String(p.artActual)].ag:0;
-        if(agArt > 0 && agExist > 0 && (agArt + agExist) > DIAG_PALLET_CM) return; // no entran
-        var espacio = (p.maxPos||32) - (p.stockActual||0);
-        if(espacio >= Math.min(unidPend, mp)) compartida = p;
-      });
-    });
-
-    if(compartida){
-      var esp = (compartida.maxPos||32) - (compartida.stockActual||0);
-      var uComp = Math.min(unidPend, esp, mp);
-      var posAct = asign[compartida.id] || {art:compartida.artActual, unidades:compartida.stockActual, min_u:1, compartidos:[]};
-      posAct.compartidos = posAct.compartidos||[];
-      posAct.compartidos.push({art:art.art, unidades:uComp});
-      asign[compartida.id] = posAct;
-      compartida.stockActual += uComp;
-      stockPend[artKey] -= uComp;
-      unidPend -= uComp;
-      if(unidPend <= 0) return;
-    }
-
-    // 2) Asignar posición libre en nivel ideal (o subir nivel si lleno)
+    var mitadPallet = Math.ceil(mp / 2);
+    var esSuelto = unidPend <= mitadPallet;
     var orden = [nivelIdeal];
     [4,3,2,1].forEach(function(n){ if(n!==nivelIdeal) orden.push(n); });
 
+    // Buscar posición compartida si corresponde
+    if(intentarCompartir && esSuelto){
+      var compartida = null;
+      orden.forEach(function(nv){
+        if(compartida || nv<1 || nv>4) return;
+        var arr = posPorNivel[nv];
+        if(!arr) return;
+        arr.forEach(function(p){
+          if(compartida) return;
+          if(p.libre) return;
+          if(!p.artActual) return;
+          if(p.compartidos && p.compartidos.length >= 1) return; // ya tiene 2 arts
+          var daExist = DATA.find(function(r){return r.art==p.artActual;});
+          if(daExist){
+            if(/\d+\.5/.test(daExist.med||'')) return;
+            if(daExist.prov==='SPEEDWAY') return;
+          }
+          var mpExist = (daExist&&daExist.max_pos)||32;
+          if((p.stockActual||0) > Math.ceil(mpExist/2)) return; // anfitrión ocupa > 50%
+          var espacio = mp - (p.stockActual||0);
+          if(espacio >= unidPend) compartida = p;
+        });
+      });
+
+      if(compartida){
+        var uComp = Math.min(unidPend, mp - (compartida.stockActual||0));
+        var posAct = asign[compartida.id] || {art:compartida.artActual, unidades:compartida.stockActual, min_u:1, compartidos:[]};
+        posAct.compartidos = posAct.compartidos||[];
+        posAct.compartidos.push({art:art.art, unidades:uComp});
+        asign[compartida.id] = posAct;
+        compartida.stockActual += uComp;
+        compartida.compartidos = posAct.compartidos;
+        stockPend[artKey] -= uComp;
+        unidPend -= uComp;
+        if(unidPend <= 0) return;
+      }
+    }
+
+    // Asignar posición libre nueva
     while(unidPend > 0){
+      // Verificar límite 80%
+      if(_posAsignadas >= LIMITE_POS) break;
+
       var posAsig = null;
       orden.forEach(function(nv){
         if(posAsig) return;
         var arr = posPorNivel[nv];
         if(!arr) return;
         for(var i=0;i<arr.length;i++){
-          if(arr[i].libre){
-            posAsig = arr.splice(i,1)[0];
-            break;
-          }
+          if(arr[i].libre){ posAsig = arr.splice(i,1)[0]; break; }
         }
       });
-      if(!posAsig) break; // rack lleno
+      if(!posAsig) break;
 
       var u = Math.min(unidPend, mp);
       posAsig.libre       = false;
       posAsig.stockActual = u;
       posAsig.maxPos      = mp;
       posAsig.artActual   = art.art;
+      posAsig.compartidos = [];
+      // Si es suelto y abre posición nueva, quedar disponible para compartir
+      posAsig.mitadLibre  = esSuelto && u <= Math.ceil(mp/2);
       asign[posAsig.id]   = {art:art.art, unidades:u, min_u:Math.ceil(mp*0.25), compartidos:[]};
+      _posAsignadas++;
+      // Devolver a posPorNivel para que otros sueltos lo encuentren como "anfitrión"
+      if(posAsig.mitadLibre){
+        posPorNivel[posAsig.nivel] = posPorNivel[posAsig.nivel]||[];
+        var posComp = {id:posAsig.id, nivel:posAsig.nivel, libre:false,
+                       stockActual:u, maxPos:mp, artActual:art.art, compartidos:[]};
+        posPorNivel[posAsig.nivel].unshift(posComp);
+      }
       unidPend -= u;
       stockPend[artKey] -= u;
     }
 
     if(stockPend[artKey] > 0) sinUbicacion.push(art);
+  }
+
+  // PASADA 1: los que ocupan pallet entero (> 50%)
+  candidatos.forEach(function(art){
+    var artKey = String(art.art);
+    var mp = (typeof PALL_BASE!=='undefined'&&PALL_BASE[artKey]?PALL_BASE[artKey].p_rack:0)||art.max_pos||32;
+    if(mp<=0) mp=32;
+    if((stockPend[artKey]||0) > Math.ceil(mp/2)){
+      asignarPosicion(art, stockPend, posPorNivel, asign, sinUbicacion, false);
+    }
+  });
+
+  // PASADA 2: los sueltos (≤ 50%) → se emparejan entre ellos
+  // Primero los ordena de mayor a menor para que el primero abra posición
+  // y los siguientes la encuentren disponible para compartir
+  var sueltos = candidatos.filter(function(art){
+    var artKey = String(art.art);
+    var mp = (typeof PALL_BASE!=='undefined'&&PALL_BASE[artKey]?PALL_BASE[artKey].p_rack:0)||art.max_pos||32;
+    if(mp<=0) mp=32;
+    return (stockPend[artKey]||0) > 0 && (stockPend[artKey]||0) <= Math.ceil(mp/2);
+  });
+  // Ordenar: mayor cantidad primero → abre posición con más unidades, el siguiente comparte
+  sueltos.sort(function(a,b){
+    return (stockPend[String(b.art)]||0) - (stockPend[String(a.art)]||0);
+  });
+  sueltos.forEach(function(art){
+    asignarPosicion(art, stockPend, posPorNivel, asign, sinUbicacion, true);
   });
 
   // Actualizar rack_stock con el nuevo asign
@@ -2589,11 +2652,9 @@ function descontarRackPorPedido(art, cant){
 
   saveRackStock(rackSt);
 
-  // Re-ejecutar motor para re-asignar posiciones liberadas
+  // Reevaluar rack incrementalmente al salir un pedido
   if(descontado > 0){
-    var nuevoAsign = generarMotorAsignacion();
-    ASIGN = nuevoAsign;
-    saveAsign();
+    reevaluarRack();
   }
 
   return descontado;
@@ -2636,6 +2697,219 @@ function setSugerencia(nombre, btn){
     badge.textContent = nombres[nombre];
     badge.style.background = colores[nombre];
   }
+}
+
+function reevaluarRack(){
+  // Reevaluación incremental:
+  // 1. Libera posiciones de artículos que ya no califican
+  // 2. Asigna candidatos pendientes a posiciones libres
+  // 3. Actualiza mapa y informe
+
+  var EXCLUIR_PROV = ['SPEEDWAY'];
+  var EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
+  var BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
+  var ROT_MAX  = 5.5;
+  var PALL_MAX = 6;
+
+  var EXCLUIR_DIS2 = ['AT51','AT52','MT51'];
+  function califica(art){
+    if(!art) return false;
+    if(/\d+\.5/.test(art.med||'')) return false;
+    if(EXCLUIR_PROV.indexOf(art.prov)>=0) return false;
+    if(EXCLUIR_USO.indexOf((art.uso||'').trim())>=0) return false;
+    if(EXCLUIR_DIS2.indexOf((art.diseno||'').trim())>=0) return false;
+    if((art.stock||0) <= 0) return false;
+    if((art.rot_sem||0) >= ROT_MAX) return false;
+    if((art.pall||0) > PALL_MAX) return false;
+    if((art.pall||0) < 1) return false;
+    if(art.bloque){
+      var bs = art.bloque.includes('/')?art.bloque.split('/'):[art.bloque];
+      if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return false;
+    }
+    return true;
+  }
+
+  var liberadas = 0;
+  var asignadas = 0;
+
+  // PASO 1: liberar posiciones de artículos que ya no califican
+  Object.keys(ASIGN).forEach(function(posId){
+    var v = ASIGN[posId];
+    if(!v || !v.art) return;
+    var art = DATA.find(function(r){return r.art==v.art;});
+    if(!califica(art)){
+      delete ASIGN[posId];
+      liberadas++;
+    }
+  });
+
+  // PASO 2: liberar posiciones con rack_stock = 0 (pedidos despachados)
+  var rackSt = loadRackStock();
+  Object.keys(ASIGN).forEach(function(posId){
+    var rs = rackSt[posId];
+    if(rs && (rs.stock||0) <= 0){
+      delete ASIGN[posId];
+      liberadas++;
+    }
+  });
+
+  if(liberadas === 0 && Object.keys(ASIGN).length >= 380){
+    showToast('✅ Rack al máximo — sin posiciones libres para reevaluar');
+    return;
+  }
+
+  // PASO 3: candidatos en nave que no están en rack
+  var enRack = new Set(Object.values(ASIGN).filter(function(v){return v&&v.art;}).map(function(v){return String(v.art);}));
+  var candidatosNave = DATA.filter(function(r){
+    if(enRack.has(String(r.art))) return false;
+    return califica(r);
+  });
+
+  if(candidatosNave.length === 0 && liberadas === 0){
+    showToast('✅ Todo en orden — sin cambios necesarios');
+    renderMapa();
+    renderCandidatosEnNave();
+    return;
+  }
+
+  // Ordenar: zona más urgente primero, luego menor rot
+  var ZB = ['4N','4S','4S PICKING','5N','5S'];
+  var ZA = ['2N/3N','2S/2N'];
+  var ZC = ['6N','6S','7N','7S','8S'];
+  var ZD = ['9N','9S','10'];
+  function zonaUrg(r){
+    if(!r.bloque) return 5;
+    var bs=r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
+    var m=5;
+    bs.forEach(function(b){
+      var bk=b.trim();
+      if(ZB.indexOf(bk)>=0&&m>0) m=0;
+      else if(ZA.indexOf(bk)>=0&&m>1) m=1;
+      else if(ZC.indexOf(bk)>=0&&m>2) m=2;
+      else if(ZD.indexOf(bk)>=0&&m>3) m=3;
+    });
+    return m;
+  }
+  candidatosNave.sort(function(a,b){
+    var za=zonaUrg(a),zb=zonaUrg(b);
+    if(za!==zb) return za-zb;
+    return (a.rot_sem||0)-(b.rot_sem||0);
+  });
+
+  // PASO 4: construir lista de posiciones libres
+  var posPorNivel = {1:[],2:[],3:[],4:[]};
+  FRENTES.forEach(function(f){
+    [4,3,2,1].forEach(function(nv){
+      if(f.niveles.indexOf(nv)<0) return;
+      for(var m=1;m<=f.modulos;m++){
+        var pid = f.id+'-N'+nv+'-P'+(m<10?'0'+m:''+m);
+        if(!ASIGN[pid]){
+          posPorNivel[nv].push({id:pid,nivel:nv,libre:true,stockActual:0,compartidos:[]});
+        }
+      }
+    });
+  });
+
+  var posLibres = Object.values(posPorNivel).reduce(function(s,a){return s+a.length;},0);
+
+  if(posLibres === 0){
+    showToast('✅ Rack lleno — sin posiciones libres · '+liberadas+' liberadas pero ya ocupadas');
+    saveAsign();
+    renderMapa();
+    renderCandidatosEnNave();
+    return;
+  }
+
+  // PASO 5: asignar candidatos a posiciones libres (misma lógica 2 pasadas)
+  var stockPend = {};
+  candidatosNave.forEach(function(c){ stockPend[String(c.art)] = c.stock||0; });
+  var sinUbicacion2 = [];
+
+  function asignarPos(art){
+    var artKey = String(art.art);
+    if(!(stockPend[artKey]>0)) return;
+    var nivelIdeal = nivelSegunRot(art.rot_sem||0);
+    var mp = (typeof PALL_BASE!=='undefined'&&PALL_BASE[artKey]?PALL_BASE[artKey].p_rack:0)||art.max_pos||32;
+    if(mp<=0) mp=32;
+    var unidPend = stockPend[artKey];
+    var mitad = Math.ceil(mp/2);
+    var esSuelto = unidPend <= mitad;
+    var orden = [nivelIdeal];
+    [4,3,2,1].forEach(function(n){if(n!==nivelIdeal) orden.push(n);});
+
+    // Buscar compartida si es suelto
+    if(esSuelto){
+      var comp = null;
+      orden.forEach(function(nv){
+        if(comp||nv<1||nv>4) return;
+        Object.keys(ASIGN).forEach(function(posId){
+          if(comp) return;
+          var v = ASIGN[posId];
+          if(!v||!v.art) return;
+          if((v.compartidos||[]).length>=1) return;
+          var m2 = posId.match(/^.+-N(\d)-P/);
+          if(!m2||parseInt(m2[1])!==nv) return;
+          var daEx = DATA.find(function(r){return r.art==v.art;});
+          if(!daEx||(v.unidades||0)>Math.ceil((daEx.max_pos||32)/2)) return;
+          if(mp-(v.unidades||0)>=unidPend) comp={id:posId,v:v,daEx:daEx};
+        });
+      });
+      if(comp){
+        var uComp = Math.min(unidPend, mp-(comp.v.unidades||0));
+        comp.v.compartidos = comp.v.compartidos||[];
+        comp.v.compartidos.push({art:art.art, unidades:uComp});
+        ASIGN[comp.id] = comp.v;
+        stockPend[artKey] -= uComp;
+        asignadas++;
+        return;
+      }
+    }
+
+    // Posición libre nueva
+    while(stockPend[artKey]>0){
+      var posAsig=null;
+      orden.forEach(function(nv){
+        if(posAsig) return;
+        var arr=posPorNivel[nv];
+        if(!arr) return;
+        for(var i=0;i<arr.length;i++){
+          if(arr[i].libre){posAsig=arr.splice(i,1)[0];break;}
+        }
+      });
+      if(!posAsig) break;
+      var u=Math.min(stockPend[artKey],mp);
+      posAsig.libre=false;
+      ASIGN[posAsig.id]={art:art.art,unidades:u,min_u:Math.ceil(mp*0.25),compartidos:[]};
+      stockPend[artKey]-=u;
+      asignadas++;
+    }
+    if(stockPend[artKey]>0) sinUbicacion2.push(art);
+  }
+
+  // Pasada 1: llenos
+  candidatosNave.forEach(function(art){
+    var artKey=String(art.art);
+    var mp=(typeof PALL_BASE!=='undefined'&&PALL_BASE[artKey]?PALL_BASE[artKey].p_rack:0)||art.max_pos||32;
+    if(mp<=0)mp=32;
+    if((stockPend[artKey]||0)>Math.ceil(mp/2)) asignarPos(art);
+  });
+  // Pasada 2: sueltos
+  candidatosNave.forEach(function(art){
+    var artKey=String(art.art);
+    var mp=(typeof PALL_BASE!=='undefined'&&PALL_BASE[artKey]?PALL_BASE[artKey].p_rack:0)||art.max_pos||32;
+    if(mp<=0)mp=32;
+    if((stockPend[artKey]||0)>0&&(stockPend[artKey]||0)<=Math.ceil(mp/2)) asignarPos(art);
+  });
+
+  saveAsign();
+  renderMapa();
+  renderCandidatosEnNave();
+
+  var msg = '🔄 Reevaluación: ';
+  if(liberadas) msg += liberadas+' liberadas · ';
+  if(asignadas) msg += asignadas+' nuevas asignaciones · ';
+  msg += sinUbicacion2.length+' sin lugar';
+  showToast(msg);
 }
 
 function aplicarSugerencia(){
@@ -2815,7 +3089,7 @@ function renderCandidatosEnNave(){
   }
 
   // Agrupar por zona
-  const ZB = ['3S','4N','4S','4S PICKING','5N','5S'];
+  const ZB = ['4N','4S','4S PICKING','5N','5S'];
   const ZC = ['6N','6S','7N','7S','8S'];
   const ZD = ['9N','9S','10'];
   function zonaArt(r){
@@ -3885,9 +4159,10 @@ function imprimirMapa(){
     if(/\d+\.5/.test(r.med||'')) return false;
     if(EXCLUIR_PROV2.indexOf(r.prov)>=0) return false;
     if(EXCLUIR_USO2.indexOf((r.uso||'').trim())>=0) return false;
+    if(['AT51','AT52','MT51'].indexOf((r.diseno||'').trim())>=0) return false;
     if((r.stock||0)<=0) return false;
-    if((r.rot_sem||0)>=5) return false;
-    if((r.pall||0)>12) return false;
+    if((r.rot_sem||0)>=5.5) return false;
+    if((r.pall||0)>6) return false;
     if((r.pall||0)<1) return false;
     if(r.bloque){
       const bs=r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
@@ -3897,7 +4172,7 @@ function imprimirMapa(){
   }).sort((a,b)=>(a.rot_sem||0)-(b.rot_sem||0));
 
   if(candidatosNave.length){
-    const ZB2=['3S','4N','4S','4S PICKING','5N','5S'];
+    const ZB2=['4N','4S','4S PICKING','5N','5S'];
     const ZC2=['6N','6S','7N','7S','8S'];
     const ZD2=['9N','9S','10'];
     function zonaNav(r){
@@ -7204,798 +7479,499 @@ if('serviceWorker' in navigator){
 
 <!-- CARGA Y DESCARGA -->
 <div class="view" id="view-cydesc">
-<div style="padding:12px;padding-bottom:120px">
+<div style="padding:12px;max-width:900px;margin:0 auto">
 
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-  <span style="font-size:13px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px">🚚 Operaciones diarias</span>
-  <div style="display:flex;gap:6px">
-    <button onclick="cydNuevo('carga')" style="padding:8px 14px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">+ Nueva carga</button>
-    <button onclick="cydNuevo('descarga')" style="padding:8px 14px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">+ Nueva descarga</button>
-    <button onclick="cydAbrirPegarRemito()" style="padding:8px 14px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">📋 Pegar remito</button>
-  </div>
-</div>
-
-<!-- Sub-tabs -->
-<div style="display:flex;gap:6px;margin-bottom:12px;background:#f5f5f7;border-radius:12px;padding:4px">
-  <button id="cyd-tab-cargas" onclick="cydSetTab('cargas')" style="flex:1;padding:8px;border:none;background:#fff;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;color:#1d1d1f;box-shadow:0 1px 3px rgba(0,0,0,.1)">📤 Cargas</button>
-  <button id="cyd-tab-descargas" onclick="cydSetTab('descargas')" style="flex:1;padding:8px;border:none;background:transparent;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;color:#86868b">📥 Descargas</button>
-  <button id="cyd-tab-informes" onclick="cydSetTab('informes')" style="flex:1;padding:8px;border:none;background:transparent;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;color:#86868b">📊 Informes</button>
-</div>
-
-<!-- LISTA CARGAS -->
-<div id="cyd-view-cargas">
-  <div id="cyd-lista-cargas"></div>
-</div>
-
-<!-- LISTA DESCARGAS -->
-<div id="cyd-view-descargas" style="display:none">
-  <div id="cyd-lista-descargas"></div>
-</div>
-
-<!-- INFORMES -->
-<div id="cyd-view-informes" style="display:none">
-  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-    <select id="cyd-inf-periodo" onchange="cydRenderInformes()" style="padding:8px 10px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;background:#fff;outline:none">
-      <option value="hoy">Hoy</option>
-      <option value="semana">Esta semana</option>
-      <option value="mes" selected>Este mes</option>
-      <option value="todo">Todo</option>
-    </select>
-    <button onclick="cydExportarInforme()" style="padding:8px 14px;background:#1d1d1f;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">📥 Exportar</button>
-  </div>
-  <div id="cyd-inf-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:14px"></div>
-  <div id="cyd-inf-detalle"></div>
-</div>
-
-</div>
-</div>
-
-<!-- MODAL NUEVA CARGA/DESCARGA -->
-<div id="cyd-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;overflow-y:auto">
-<div style="background:#fff;border-radius:16px;max-width:900px;margin:20px auto;padding:20px;position:relative">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-    <div id="cyd-modal-title" style="font-size:16px;font-weight:700"></div>
-    <button onclick="cydCerrarModal()" style="background:#f5f5f7;border:none;border-radius:8px;width:32px;height:32px;font-size:18px;cursor:pointer;color:#86868b">×</button>
+  <!-- Tabs -->
+  <div style="display:flex;gap:6px;margin-bottom:14px;background:#f5f5f7;border-radius:12px;padding:4px">
+    <button id="cyd-tab-carga" onclick="cydTab('carga')" style="flex:1;padding:9px;border:none;background:#fff;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;color:#1d1d1f;box-shadow:0 1px 3px rgba(0,0,0,.1)">📦 Carga</button>
+    <button id="cyd-tab-descarga" onclick="cydTab('descarga')" style="flex:1;padding:9px;border:none;background:transparent;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;color:#86868b">🚚 Descarga</button>
+    <button id="cyd-tab-historial" onclick="cydTab('historial')" style="flex:1;padding:9px;border:none;background:transparent;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;color:#86868b">📋 Historial</button>
   </div>
 
-  <!-- Header datos -->
-  <div style="background:#f5f5f7;border-radius:10px;padding:12px;margin-bottom:14px">
-    <div id="cyd-modal-header-fields"></div>
+  <!-- Panel pegar -->
+  <div id="cyd-panel-carga" style="">
+    <div style="font-size:12px;color:#86868b;margin-bottom:8px">Pegá el texto copiado del Drive — formato Halpern (carga desde proveedor)</div>
+    <textarea id="cyd-paste-carga" rows="8" placeholder="Pegá acá el contenido de la carga..." style="width:100%;padding:10px;border:.5px solid #d2d2d7;border-radius:10px;font-size:11px;font-family:monospace;resize:vertical;outline:none;box-sizing:border-box"></textarea>
+    <div id="cyd-preview-carga" style="margin-top:10px"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button onclick="cydProcesar('carga')" style="flex:1;padding:10px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">🔍 Procesar</button>
+      <button id="cyd-btn-confirmar-carga" onclick="cydConfirmar('carga')" style="display:none;flex:1;padding:10px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">✅ Confirmar ingreso</button>
+    </div>
   </div>
 
-  <!-- Tabla artículos -->
-  <div id="cyd-modal-tabla-wrap"></div>
+  <div id="cyd-panel-descarga" style="display:none">
+    <div style="font-size:12px;color:#86868b;margin-bottom:8px">Pegá el texto copiado del Drive — formato ZF Guerrini (descarga a clientes)</div>
+    <textarea id="cyd-paste-descarga" rows="8" placeholder="Pegá acá el contenido de la descarga..." style="width:100%;padding:10px;border:.5px solid #d2d2d7;border-radius:10px;font-size:11px;font-family:monospace;resize:vertical;outline:none;box-sizing:border-box"></textarea>
+    <div id="cyd-preview-descarga" style="margin-top:10px"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button onclick="cydProcesar('descarga')" style="flex:1;padding:10px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">🔍 Procesar</button>
+      <button id="cyd-btn-confirmar-descarga" onclick="cydConfirmar('descarga')" style="display:none;flex:1;padding:10px;background:#d70015;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">✅ Confirmar descarga</button>
+    </div>
+  </div>
 
-  <!-- Footer -->
-  <div id="cyd-modal-footer" style="margin-top:12px"></div>
+  <div id="cyd-panel-historial" style="display:none">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <select id="cyd-hist-periodo" onchange="cydRenderHistorial()" style="padding:8px 10px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;background:#fff;outline:none">
+        <option value="hoy">Hoy</option>
+        <option value="semana">Esta semana</option>
+        <option value="mes" selected>Este mes</option>
+        <option value="todo">Todo</option>
+      </select>
+      <select id="cyd-hist-tipo" onchange="cydRenderHistorial()" style="padding:8px 10px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;background:#fff;outline:none">
+        <option value="todo">Cargas y Descargas</option>
+        <option value="carga">Solo Cargas</option>
+        <option value="descarga">Solo Descargas</option>
+      </select>
+      <button onclick="cydExportar()" style="padding:8px 14px;background:#1d1d1f;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">📥 Exportar Excel</button>
+    </div>
+    <div id="cyd-hist-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:14px"></div>
+    <div id="cyd-hist-lista"></div>
+  </div>
+
 </div>
 </div>
 
 <script>
-var _cydRows=[], _cydModalTipo='', _cydEditId=null;
+// ═══════════════════════════════════════════════════════════
+// MÓDULO CARGAS / DESCARGAS
+// ═══════════════════════════════════════════════════════════
+// Carga: texto pegado del drive, formato Halpern (proveedor)
+//   ART | PROV | SECC | ALTO | TIPO | LLANTA | DISEÑO | USO | ... | FECHA | NRO_FACT | ... | CLIENTE | ... | ART | ... | CANT | ... | PALL | NRO_REM | TTE
+// Descarga: texto pegado del drive, formato ZF Guerrini
+//   ART | DESCRIPCION | CANT | ORIGEN | NRO_DOC | IMPORTE | FECHA | TTE | EMPRESA | VENDEDOR
 
-function initCyDesc(){
-  cydSetTab('cargas');
-}
+var _cydItems = [];     // items del proceso actual
+var _cydTipo  = '';     // 'carga' o 'descarga'
 
-function cydSetTab(tab){
-  ['cargas','descargas','informes'].forEach(function(t){
-    var v=document.getElementById('cyd-view-'+t);
-    var b=document.getElementById('cyd-tab-'+t);
-    if(v) v.style.display=t===tab?'block':'none';
-    if(b){
-      b.style.background=t===tab?'#fff':'transparent';
-      b.style.color=t===tab?'#1d1d1f':'#86868b';
-      b.style.boxShadow=t===tab?'0 1px 3px rgba(0,0,0,.1)':'none';
+function cydTab(tab){
+  ['carga','descarga','historial'].forEach(function(t){
+    var panel = document.getElementById('cyd-panel-'+t);
+    var btn   = document.getElementById('cyd-tab-'+t);
+    if(panel) panel.style.display = t===tab ? '' : 'none';
+    if(btn){
+      btn.style.background  = t===tab ? '#fff' : 'transparent';
+      btn.style.color       = t===tab ? '#1d1d1f' : '#86868b';
+      btn.style.boxShadow   = t===tab ? '0 1px 3px rgba(0,0,0,.1)' : 'none';
     }
   });
-  if(tab==='cargas') cydRenderLista('carga');
-  if(tab==='descargas') cydRenderLista('descarga');
-  if(tab==='informes') cydRenderInformes();
+  if(tab==='historial') cydRenderHistorial();
 }
 
-function cydGetHist(tipo){
-  return JSON.parse(localStorage.getItem('wms_'+tipo+'_hist')||'[]');
-}
-function cydSaveHist(tipo,hist){
-  localStorage.setItem('wms_'+tipo+'_hist',JSON.stringify(hist.slice(0,500)));
-}
+// ─── PARSERS ───────────────────────────────────────────────
 
-function cydRenderLista(tipo){
-  var wrap=document.getElementById('cyd-lista-'+tipo+'s');
-  if(!wrap)return;
-  var hist=cydGetHist(tipo);
-  if(!hist.length){
-    wrap.innerHTML='<div style="text-align:center;padding:50px;color:#86868b"><div style="font-size:32px;margin-bottom:10px">'+(tipo==='carga'?'📤':'📥')+'</div>No hay '+tipo+'s registradas todavía.<br>Tocá "+ Nueva '+tipo+'" para empezar.</div>';
-    return;
+function cydParseCarga(texto){
+  // Formato Halpern: cada artículo ocupa 2 líneas
+  // Línea 1: ART | PROV | SECC | ALTO | TIPO | LLANTA | DISEÑO | USO | ...
+  // Línea 2: FECHA | NRO_FACT | ... | CLIENTE | ... | ART(dup) | ... | CANT | ... | PALL | NRO_REM | TTE
+  // Las líneas pares son continuación de las impares → hay que unirlas
+
+  var items = [];
+  var errores = [];
+  var lineas = texto.split('\n').map(function(l){return l.trimEnd();}).filter(function(l){return l.trim();});
+
+  // Detectar si cada artículo ocupa 2 líneas
+  // La línea 1 empieza con número (art), la línea 2 empieza con fecha (dd/mm/yyyy) o número de factura
+  var registros = [];
+  var i = 0;
+  while(i < lineas.length){
+    var cols1 = lineas[i].split('\t');
+    var art1 = parseInt(cols1[0]);
+    if(isNaN(art1)){ i++; continue; }
+
+    // Ver si la siguiente línea es la continuación (empieza con fecha o número que no es art)
+    var lineaCompleta = lineas[i];
+    if(i+1 < lineas.length){
+      var siguiente = lineas[i+1];
+      var primerCol = (siguiente.split('\t')[0]||'').trim();
+      // Si la siguiente línea empieza con fecha (dd/mm/yyyy) o no es un art → es continuación
+      var esFecha = /^\d{1,2}\/\d{1,2}\/\d{4}/.test(primerCol);
+      var esContin = esFecha || (primerCol && isNaN(parseInt(primerCol)));
+      if(esContin){
+        lineaCompleta = lineas[i] + '\t' + lineas[i+1];
+        i += 2;
+      } else {
+        i++;
+      }
+    } else {
+      i++;
+    }
+    registros.push(lineaCompleta);
   }
-  var html='';
-  hist.forEach(function(reg,i){
-    var totPed=0,totReal=0,totU=0;
-    if(tipo==='carga'){
-      totPed=(reg.items||[]).reduce(function(s,r){return s+(+r.cant||0);},0);
-      totReal=(reg.items||[]).reduce(function(s,r){return s+(+r.real||0);},0);
-    } else {
-      totU=(reg.items||[]).reduce(function(s,r){return s+(+r.cant||0);},0);
+
+  registros.forEach(function(linea){
+    var cols = linea.split('\t').map(function(c){return c.trim();});
+    var art = parseInt(cols[0]);
+    if(isNaN(art)) return;
+
+    var prov    = cols[1]||'';
+    var secc    = cols[2]||'';
+    var alto    = cols[3]||'';
+    var tipo    = cols[4]||'';
+    var llanta  = cols[5]||'';
+    var diseno  = cols[6]||'';
+    var uso     = cols[7]||'';
+
+    // Columnas fijas del formato Halpern (2 líneas unidas = 69 cols aprox):
+    // [37]=FECHA [38]=NRO_FACT [40]=CLIENTE [56]=ART_DUP [62]=CANT [66]=PALL [67]=NRO_REM [68]=TTE
+    // Si el formato varía, buscar por contenido como fallback
+    var fecha   = cols[37]||'';
+    var nroFact = cols[38]||'';
+    var cliente = cols[40]||'';
+    var cant    = parseInt(cols[62]||0)||0;
+    var pallets = parseFloat((cols[66]||'0').replace(',','.'))||0;
+    var nroRem  = cols[67]||'';
+    var tte     = cols[68]||'';
+
+    // Fallback: buscar por contenido si las cols fijas no dan resultados
+    if(!fecha){
+      cols.forEach(function(c){ if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(c)) fecha=c; });
     }
-    var diff=totPed-totReal;
-    var diffColor=diff>0?'#d70015':diff<0?'#ff9500':'#34c759';
-    var estadoBadge='';
-    if(tipo==='carga'){
-      var noC=(reg.items||[]).filter(function(r){return r.cargado===false;}).length;
-      if(noC>0) estadoBadge='<span style="padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;background:#ffd6d9;color:#d70015">'+noC+' sin cargar</span>';
-      else estadoBadge='<span style="padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;background:#d4edda;color:#1c7c2c">Completa</span>';
-    } else {
-      var noL=(reg.items||[]).filter(function(r){return r.llego===false;}).length;
-      if(noL>0) estadoBadge='<span style="padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;background:#ffd6d9;color:#d70015">'+noL+' faltante</span>';
-      else estadoBadge='<span style="padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;background:#d4edda;color:#1c7c2c">Completa</span>';
+    if(!nroRem){
+      cols.forEach(function(c){ if(/^\d{6}-\d+$/.test(c)) nroRem=c; });
     }
-    html+='<div style="background:#fff;border-radius:12px;border:.5px solid #e5e5ea;padding:14px;margin-bottom:8px;cursor:pointer" onclick="cydVerPlanilla(\''+tipo+'\','+i+')">';
-    html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">';
-    html+='<div><div style="font-size:15px;font-weight:700;color:#0071e3">'+(reg.remito||'Sin remito')+'</div>';
-    html+='<div style="font-size:12px;color:#86868b;margin-top:2px">'+(reg.fecha||'')+(reg.tte?' · '+reg.tte:'')+(tipo==='carga'&&reg.destino?' → '+reg.destino:'')+(tipo==='descarga'&&reg.origen?' ← '+reg.origen:'')+'</div></div>';
-    html+='<div style="display:flex;gap:6px;align-items:center">'+estadoBadge;
-    html+='<div style="display:flex;gap:4px"><button onclick="event.stopPropagation();cydEditarPlanilla(\''+tipo+'\','+i+')" style="padding:5px 10px;background:#e6f1fb;color:#185fa5;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">✏️ Editar</button>';
-    html+='<button onclick="event.stopPropagation();cydBorrarPlanilla(\''+tipo+'\','+i+')" style="padding:5px 10px;background:#ffd6d9;color:#d70015;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">🗑️</button></div></div></div>';
-    html+='<div style="display:flex;gap:16px">';
-    if(tipo==='carga'){
-      html+='<div><div style="font-size:10px;color:#86868b">Artículos</div><div style="font-weight:700">'+(reg.items||[]).length+'</div></div>';
-      html+='<div><div style="font-size:10px;color:#86868b">Pedido</div><div style="font-weight:700">'+totPed+'</div></div>';
-      html+='<div><div style="font-size:10px;color:#86868b">Real</div><div style="font-weight:700;color:#34c759">'+totReal+'</div></div>';
-      if(diff!==0)html+='<div><div style="font-size:10px;color:#86868b">Diferencia</div><div style="font-weight:700;color:'+diffColor+'">'+diff+'</div></div>';
-    } else {
-      html+='<div><div style="font-size:10px;color:#86868b">Artículos</div><div style="font-weight:700">'+(reg.items||[]).length+'</div></div>';
-      html+='<div><div style="font-size:10px;color:#86868b">Unidades</div><div style="font-weight:700">'+totU+'</div></div>';
-      var dotsReg=(reg.items||[]).filter(function(r){return r.dot;}).length;
-      html+='<div><div style="font-size:10px;color:#86868b">DOTs</div><div style="font-weight:700;color:#0071e3">'+dotsReg+'</div></div>';
+    if(!cant){
+      // Buscar art duplicado y tomar cant después
+      for(var j=8;j<cols.length;j++){
+        if(parseInt(cols[j])===art){
+          for(var k=j+1;k<Math.min(j+8,cols.length);k++){
+            var v=parseInt(cols[k]);
+            if(!isNaN(v)&&v>0&&v<10000){cant=v;break;}
+          }
+          break;
+        }
+      }
     }
-    html+='</div></div>';
-  });
-  wrap.innerHTML=html;
-}
+    if(!cliente){
+      var enFact=false;
+      cols.forEach(function(c){
+        if(/^\d{2,}[,.]\d{3}$/.test(c)) enFact=true;
+        if(enFact&&!cliente&&c.length>5&&/[A-Za-z]/.test(c)&&!/^\d{6}-/.test(c)) cliente=c;
+      });
+    }
+    if(!tte){
+      for(var t=cols.length-1;t>=0;t--){
+        if(cols[t]&&/^[A-Z]{3,}$/.test(cols[t])){tte=cols[t];break;}
+      }
+    }
 
-function cydVerPlanilla(tipo,i){
-  var hist=cydGetHist(tipo);
-  var reg=hist[i];
-  if(!reg)return;
-  _cydEditId=i;
-  _cydModalTipo=tipo;
-  _cydRows=(reg.items||[]).map(function(r){return Object.assign({},r);});
-  cydAbrirModal(tipo,reg);
-}
+    if(!art || cant <= 0) return;
 
-function cydEditarPlanilla(tipo,i){
-  cydVerPlanilla(tipo,i);
-}
+    var med = secc + (alto?' '+alto:'') + (tipo?' '+tipo:'') + (llanta?' '+llanta:'');
+    var da = DATA.find(function(r){return r.art===art;});
 
-function cydBorrarPlanilla(tipo,i){
-  if(!confirm('¿Borrar esta planilla?'))return;
-  var hist=cydGetHist(tipo);
-  hist.splice(i,1);
-  cydSaveHist(tipo,hist);
-  cydRenderLista(tipo);
-  showToast('🗑️ Planilla eliminada');
-}
-
-function cydNuevo(tipo){
-  _cydModalTipo=tipo;
-  _cydEditId=null;
-  _cydRows=[];
-  cydAbrirModal(tipo,null);
-}
-
-function cydAbrirModal(tipo,reg){
-  document.getElementById('cyd-modal').style.display='block';
-  document.getElementById('cyd-modal-title').textContent=(tipo==='carga'?'📤 Control de Carga':'📥 Control de Descarga');
-  // Header fields
-  var hf=document.getElementById('cyd-modal-header-fields');
-  if(tipo==='carga'){
-    var pedOptions='<option value="">Seleccionar pedido WMS...</option>';
-    var cola=JSON.parse(localStorage.getItem('wms_pedidos_cola')||'[]');
-    cola.slice(0,50).forEach(function(p,pi){
-      pedOptions+='<option value="'+pi+'">'+(p.nroPedido||'WMS-'+pi)+' — '+(p.destino||'Sin destino')+(p.fecha?' ('+p.fecha+')':'')+'</option>';
+    items.push({
+      art, prov: prov||(da?da.prov:''), med: da?da.med:med.trim(),
+      diseno: diseno||(da?da.diseno:''), uso,
+      cant, pallets, fecha, nroFact, nroRem, tte, cliente,
+      stockActual: da?da.stock:0, bloque: da?da.bloque:'',
+      enData: !!da
     });
-    hf.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap">'
-      +'<div style="flex:1;min-width:120px"><div style="font-size:10px;color:#86868b;margin-bottom:3px">Transportista</div><input id="cydm-tte" value="'+(reg&&reg.tte?reg.tte:'')+'" placeholder="TTE / Empresa" style="width:100%;padding:7px 10px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;background:#fff"></div>'
-      +'<div style="flex:1;min-width:120px"><div style="font-size:10px;color:#86868b;margin-bottom:3px">Destino</div><input id="cydm-destino" value="'+(reg&&reg.destino?reg.destino:'')+'" placeholder="Cliente / Ciudad" style="width:100%;padding:7px 10px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;background:#fff"></div>'
-      +'<div style="flex:0 0 185px"><div style="font-size:10px;color:#86868b;margin-bottom:3px">N° Remito Halpern</div><input id="cydm-remito" value="'+(reg&&reg.remito?reg.remito:'')+'" placeholder="0001-00046190" style="width:100%;padding:7px 10px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;font-weight:700;color:#0071e3;outline:none;background:#fff"></div>'
-      +'<div style="flex:0 0 190px"><div style="font-size:10px;color:#86868b;margin-bottom:3px">Cargar desde pedido WMS</div><select id="cydm-pedido" onchange="cydModalCargarPedido()" style="width:100%;padding:7px 10px;border:.5px solid #d2d2d7;border-radius:8px;font-size:12px;outline:none;background:#fff">'+pedOptions+'</select></div>'
-      +'</div>';
-  } else {
-    hf.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap">'
-      +'<div style="flex:1;min-width:120px"><div style="font-size:10px;color:#86868b;margin-bottom:3px">Transportista</div><input id="cydm-tte" value="'+(reg&&reg.tte?reg.tte:'')+'" placeholder="TTE / Empresa" style="width:100%;padding:7px 10px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;background:#fff"></div>'
-      +'<div style="flex:1;min-width:120px"><div style="font-size:10px;color:#86868b;margin-bottom:3px">Origen / Proveedor</div><input id="cydm-origen" value="'+(reg&&reg.origen?reg.origen:'')+'" placeholder="Proveedor / Ciudad" style="width:100%;padding:7px 10px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;background:#fff"></div>'
-      +'<div style="flex:0 0 180px"><div style="font-size:10px;color:#86868b;margin-bottom:3px">N° Remito Proveedor</div><input id="cydm-remito" value="'+(reg&&reg.remito?reg.remito:'')+'" placeholder="Nº remito" style="width:100%;padding:7px 10px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;font-weight:700;color:#0071e3;outline:none;background:#fff"></div>'
-      +'<div style="flex:0 0 140px"><div style="font-size:10px;color:#86868b;margin-bottom:3px">Fecha</div><input id="cydm-fecha" type="date" value="'+(reg&&reg.fechaISO?reg.fechaISO:new Date().toISOString().split('T')[0])+'" style="width:100%;padding:7px 10px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;background:#fff"></div>'
-      +'</div>';
-  }
-  cydRenderModalTabla();
+  });
+
+  return {items, errores};
 }
 
-function cydCerrarModal(){
-  document.getElementById('cyd-modal').style.display='none';
-  _cydRows=[];_cydEditId=null;
+function cydParseDescarga(texto){
+  // Formato ZF Guerrini:
+  // Col 0: ART | Col 1: DESCRIPCION | Col 2: CANT | Col 3: ORIGEN(ENISA/CLEMENT)
+  // Col 4: NRO_DOC | Col 5: IMPORTE | Col 6: FECHA | Col 7: TTE | Col 8: EMPRESA | Col 9: VENDEDOR
+  var items = [];
+  var errores = [];
+  var lineas = texto.split('\n').map(function(l){return l.trim();}).filter(function(l){return l;});
+
+  lineas.forEach(function(linea, idx){
+    var cols = linea.split('\t');
+    if(cols.length < 3) return;
+
+    var art = parseInt(cols[0]);
+    if(isNaN(art)) return;
+
+    var desc    = (cols[1]||'').trim();
+    var cant    = parseInt(cols[2]||0) || 0;
+    var origen  = (cols[3]||'').trim();
+    var nroDoc  = (cols[4]||'').trim();
+    var importe = parseFloat((cols[5]||'0').replace(',','.')) || 0;
+    var fecha   = (cols[6]||'').trim();
+    var tte     = (cols[7]||'').trim();
+    var vendedor= (cols[9]||'').trim();
+
+    if(!art || cant <= 0) return;
+
+    // Extraer medida y diseño de la descripción (ej: "245/70 R16 TR292 111S XL -TRIANGLE")
+    var da = DATA.find(function(r){return r.art===art;});
+    var med = da ? da.med : desc.split(' ').slice(0,2).join(' ');
+    var prov = da ? da.prov : (desc.split('-').pop()||'').trim();
+
+    // Ver si tiene stock en rack
+    var enRack = Object.entries(ASIGN).filter(function(e){
+      var v=e[1];
+      return v && (v.art==art || (v.compartidos&&v.compartidos.some(function(c){return c.art==art;})));
+    });
+
+    items.push({
+      art, med, prov, desc, cant, origen, nroDoc, importe,
+      fecha, tte, vendedor,
+      stockActual: da?da.stock:0, bloque: da?da.bloque:'',
+      enRack: enRack.map(function(e){return e[0];}),
+      enData: !!da
+    });
+  });
+
+  return {items, errores};
 }
 
-function cydModalCargarPedido(){
-  var sel=document.getElementById('cydm-pedido');
-  if(!sel||sel.value==='')return;
-  var cola=JSON.parse(localStorage.getItem('wms_pedidos_cola')||'[]');
-  var ped=cola[+sel.value];
-  if(!ped)return;
-  var el;
-  el=document.getElementById('cydm-tte');if(el)el.value=ped.tte||'';
-  el=document.getElementById('cydm-destino');if(el)el.value=ped.destino||'';
-  _cydRows=(ped.todos||[]).map(function(r){return{art:r.art,desc:(r.med||'')+' '+(r.diseno||''),prov:r.prov||'',cant:r.cant||0,stock:r.stock||0,cargado:null,real:'',detalle:''};});
-  cydRenderModalTabla();
-  showToast('✅ '+_cydRows.length+' artículos cargados');
-}
+// ─── PROCESAR (preview) ────────────────────────────────────
 
-function cydRenderModalTabla(){
-  var tipo=_cydModalTipo;
-  var wrap=document.getElementById('cyd-modal-tabla-wrap');
-  var footer=document.getElementById('cyd-modal-footer');
-  if(!wrap)return;
+function cydProcesar(tipo){
+  _cydTipo = tipo;
+  var texto = (document.getElementById('cyd-paste-'+tipo)||{}).value||'';
+  if(!texto.trim()){showToast('❌ Pegá el contenido primero'); return;}
 
-  // Botón agregar
-  var addBtn='<button onclick="cydModalAgregarFila()" style="padding:7px 12px;background:#f5f5f7;color:#1d1d1f;border:.5px solid #d2d2d7;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:8px">+ Agregar artículo</button>';
+  var res = tipo==='carga' ? cydParseCarga(texto) : cydParseDescarga(texto);
+  _cydItems = res.items;
 
-  if(!_cydRows.length){
-    wrap.innerHTML=addBtn+'<div style="text-align:center;padding:30px;color:#86868b;border:.5px dashed #d2d2d7;border-radius:10px">Sin artículos todavía</div>';
-    if(footer)footer.innerHTML='';
+  if(!_cydItems.length){
+    document.getElementById('cyd-preview-'+tipo).innerHTML =
+      '<div style="color:#d70015;font-size:13px;padding:10px">No se encontraron artículos válidos.</div>';
     return;
   }
 
-  function inp(f,i,ph,w,tp){
-    var val=_cydRows[i][f];
-    return '<input type="'+(tp||'text')+'" style="width:'+(w||'100%')+';padding:4px 6px;border:.5px solid #d2d2d7;border-radius:6px;font-size:11px;background:#fff;outline:none;color:#1d1d1f" placeholder="'+ph+'" value="'+(val||'')+'" oninput="_cydRows['+i+'][\''+f+'\']=this.value'+(f==='cant'||f==='real'?';cydModalActualizarTotales()':'')+'">';
-  }
+  var totalU = _cydItems.reduce(function(s,r){return s+r.cant;},0);
+  var noData = _cydItems.filter(function(r){return !r.enData;}).length;
 
-  var html=addBtn+'<div style="overflow-x:auto;border-radius:10px;border:.5px solid #e5e5ea"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#1d1d1f;color:#fff">';
+  var html = '<div style="background:#f5f5f7;border-radius:10px;padding:10px;margin-bottom:8px">';
+  html += '<div style="display:flex;gap:16px;margin-bottom:8px;flex-wrap:wrap">';
+  html += '<div><div style="font-size:10px;color:#86868b">Artículos</div><div style="font-size:18px;font-weight:700">'+_cydItems.length+'</div></div>';
+  html += '<div><div style="font-size:10px;color:#86868b">Unidades</div><div style="font-size:18px;font-weight:700">'+totalU+'</div></div>';
+  if(noData) html += '<div><div style="font-size:10px;color:#86868b">Sin DATA</div><div style="font-size:18px;font-weight:700;color:#d70015">'+noData+'</div></div>';
+
   if(tipo==='carga'){
-    html+='<th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;width:70px">Art.</th>';
-    html+='<th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase">Descripción</th>';
-    html+='<th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;width:65px">Prov.</th>';
-    html+='<th style="padding:7px 10px;text-align:center;font-size:10px;text-transform:uppercase;width:55px">Pedido</th>';
-    html+='<th style="padding:7px 10px;text-align:center;font-size:10px;text-transform:uppercase;width:55px">Stock</th>';
-    html+='<th style="padding:7px 10px;text-align:center;font-size:10px;text-transform:uppercase;width:58px">Real</th>';
-    html+='<th style="padding:7px 10px;text-align:center;font-size:10px;text-transform:uppercase;width:72px">¿Cargó?</th>';
-    html+='<th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase">Detalle</th>';
-    html+='<th style="width:26px"></th>';
+    // Agrupar por remito
+    var rems = {};
+    _cydItems.forEach(function(r){
+      var k = r.nroRem||'sin remito';
+      if(!rems[k]) rems[k]={items:[],cliente:r.cliente,tte:r.tte,fecha:r.fecha};
+      rems[k].items.push(r);
+    });
+    html += '</div>';
+    Object.entries(rems).forEach(function(e){
+      var nroRem=e[0], g=e[1];
+      var uRem = g.items.reduce(function(s,r){return s+r.cant;},0);
+      html += '<div style="margin-bottom:10px;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden">';
+      html += '<div style="background:#1d1d1f;color:#fff;padding:7px 10px;font-size:12px;font-weight:700;display:flex;justify-content:space-between">';
+      html += '<span>📦 Remito '+nroRem+' · '+g.cliente+'</span>';
+      html += '<span>'+g.items.length+' arts · '+uRem+' un · '+g.fecha+'</span></div>';
+      html += '<table style="width:100%;border-collapse:collapse;font-size:11px">';
+      html += '<tr style="background:#f5f5f7"><th style="padding:4px 8px;text-align:left">Art</th><th style="padding:4px 8px;text-align:left">Medida</th><th style="padding:4px 8px;text-align:left">Diseño</th><th style="padding:4px 8px;text-align:right">Cant</th><th style="padding:4px 8px;text-align:right">Stock</th><th style="padding:4px 8px;text-align:right">→ Nuevo</th><th style="padding:4px 8px;text-align:left">Bloque</th></tr>';
+      g.items.forEach(function(r,i){
+        var bg = i%2?'background:#fafafa':'';
+        var nd = !r.enData?'color:#d70015':'';
+        html += '<tr style="'+bg+'"><td style="padding:4px 8px;'+nd+'">'+r.art+'</td>';
+        html += '<td style="padding:4px 8px">'+r.med+'</td>';
+        html += '<td style="padding:4px 8px;color:#555">'+r.diseno+'</td>';
+        html += '<td style="padding:4px 8px;text-align:right;font-weight:700;color:#34c759">+'+r.cant+'</td>';
+        html += '<td style="padding:4px 8px;text-align:right;color:#86868b">'+r.stockActual+'</td>';
+        html += '<td style="padding:4px 8px;text-align:right;font-weight:700">'+(r.stockActual+r.cant)+'</td>';
+        html += '<td style="padding:4px 8px;font-size:10px">'+(r.bloque||'—')+'</td></tr>';
+      });
+      html += '</table></div>';
+    });
   } else {
-    html+='<th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;width:95px">Art.</th>';
-    html+='<th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase">Descripción</th>';
-    html+='<th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;width:65px">Prov.</th>';
-    html+='<th style="padding:7px 10px;text-align:center;font-size:10px;text-transform:uppercase;width:55px">Cant.</th>';
-    html+='<th style="padding:7px 10px;text-align:center;font-size:10px;text-transform:uppercase;width:65px">¿Llegó?</th>';
-    html+='<th style="padding:7px 10px;text-align:center;font-size:10px;text-transform:uppercase;width:85px">Bloque <span style="color:#0071e3;font-size:9px">auto</span></th>';
-    html+='<th style="padding:7px 10px;text-align:center;font-size:10px;text-transform:uppercase;width:65px">P/Pallet</th>';
-    html+='<th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;width:85px">DOT</th>';
-    html+='<th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;width:75px">Lote</th>';
-    html+='<th style="width:26px"></th>';
+    html += '</div>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:11px">';
+    html += '<tr style="background:#1d1d1f;color:#fff"><th style="padding:5px 8px;text-align:left">Art</th><th style="padding:5px 8px;text-align:left">Medida</th><th style="padding:5px 8px;text-align:right">Cant</th><th style="padding:5px 8px;text-align:right">Stock</th><th style="padding:5px 8px;text-align:right">→ Nuevo</th><th style="padding:5px 8px;text-align:left">Rack</th><th style="padding:5px 8px;text-align:left">Origen</th></tr>';
+    _cydItems.forEach(function(r,i){
+      var bg = i%2?'background:#fafafa':'';
+      var nd = !r.enData?'color:#d70015':'';
+      var nuevoStock = Math.max(0,(r.stockActual||0)-r.cant);
+      var enRackStr = r.enRack&&r.enRack.length ? r.enRack.join(', ') : '—';
+      html += '<tr style="'+bg+'"><td style="padding:4px 8px;'+nd+'">'+r.art+'</td>';
+      html += '<td style="padding:4px 8px">'+r.med+'</td>';
+      html += '<td style="padding:4px 8px;text-align:right;font-weight:700;color:#d70015">-'+r.cant+'</td>';
+      html += '<td style="padding:4px 8px;text-align:right;color:#86868b">'+r.stockActual+'</td>';
+      html += '<td style="padding:4px 8px;text-align:right;font-weight:700">'+nuevoStock+'</td>';
+      html += '<td style="padding:4px 8px;font-size:10px;color:#0071e3">'+enRackStr+'</td>';
+      html += '<td style="padding:4px 8px;font-size:10px">'+r.origen+'</td></tr>';
+    });
+    html += '</table>';
   }
-  html+='</tr></thead><tbody>';
 
-  _cydRows.forEach(function(r,i){
-    var bg=i%2?'background:#fafafa':'';
-    if(tipo==='carga'){
-      var evOk=r.cargado===true,evNo=r.cargado===false;
-      html+='<tr style="'+bg+'">';
-      html+='<td style="padding:5px 10px">'+(r.art?'<span style="font-size:11px;font-weight:600">'+r.art+'</span>':inp('art',i,'Art#','60px','number'))+'</td>';
-      html+='<td style="padding:5px 10px;font-size:11px">'+(r.desc?'<span>'+r.desc+'</span>':inp('desc',i,'Descripción','100%'))+'</td>';
-      html+='<td style="padding:5px 10px;font-size:11px">'+(r.prov?r.prov:inp('prov',i,'Prov','60px'))+'</td>';
-      html+='<td style="padding:5px 10px;text-align:center;font-weight:700">'+(r.cant?r.cant:inp('cant',i,'0','48px','number'))+'</td>';
-      html+='<td style="padding:5px 10px;text-align:center;font-size:11px;color:'+(r.stock<r.cant&&r.stock?'#d70015':'inherit')+'">'+r.stock+'</td>';
-      html+='<td style="padding:5px 10px;text-align:center">'+inp('real',i,'0','48px','number')+'</td>';
-      html+='<td style="padding:5px 10px;text-align:center"><div style="display:flex;gap:3px;justify-content:center"><button onclick="cydModalSetCargado('+i+',true)" style="width:26px;height:26px;border:none;border-radius:6px;cursor:pointer;font-size:13px;background:'+(evOk?'#d4edda':'#f5f5f7')+';color:'+(evOk?'#1c7c2c':'#86868b')+'">✓</button><button onclick="cydModalSetCargado('+i+',false)" style="width:26px;height:26px;border:none;border-radius:6px;cursor:pointer;font-size:13px;background:'+(evNo?'#ffd6d9':'#f5f5f7')+';color:'+(evNo?'#d70015':'#86868b')+'">✗</button></div></td>';
-      html+='<td style="padding:5px 10px">'+inp('detalle',i,'Justificación...','100%')+'</td>';
-      html+='<td style="padding:5px 10px"><button onclick="_cydRows.splice('+i+',1);cydRenderModalTabla()" style="background:none;border:none;color:#d70015;cursor:pointer;font-size:15px">×</button></td>';
-    } else {
-      var evOk=r.llego===true,evNo=r.llego===false;
-      html+='<tr style="'+bg+'">';
-      html+='<td style="padding:5px 10px"><div style="display:flex;gap:3px;align-items:center"><input type="number" style="width:56px;padding:4px 6px;border:.5px solid #d2d2d7;border-radius:6px;font-size:11px;background:#fff;outline:none;color:#1d1d1f" placeholder="Art#" value="'+(r.art||'')+'" oninput="_cydRows['+i+'].art=this.value"><button onclick="cydModalAutocompletar('+i+')" style="background:#e6f1fb;border:none;border-radius:5px;padding:3px 6px;font-size:10px;cursor:pointer;color:#185fa5;font-weight:700">↻</button></div></td>';
-      html+='<td style="padding:5px 10px;font-size:11px">'+(r.desc?'<span>'+r.desc+'</span>':inp('desc',i,'Descripción','100%'))+'</td>';
-      html+='<td style="padding:5px 10px;font-size:11px">'+(r.prov?r.prov:inp('prov',i,'Prov','60px'))+'</td>';
-      html+='<td style="padding:5px 10px;text-align:center">'+inp('cant',i,'0','48px','number')+'</td>';
-      html+='<td style="padding:5px 10px;text-align:center"><div style="display:flex;gap:3px;justify-content:center"><button onclick="cydModalSetLlego('+i+',true)" style="width:26px;height:26px;border:none;border-radius:6px;cursor:pointer;font-size:13px;background:'+(evOk?'#d4edda':'#f5f5f7')+';color:'+(evOk?'#1c7c2c':'#86868b')+'">✓</button><button onclick="cydModalSetLlego('+i+',false)" style="width:26px;height:26px;border:none;border-radius:6px;cursor:pointer;font-size:13px;background:'+(evNo?'#ffd6d9':'#f5f5f7')+';color:'+(evNo?'#d70015':'#86868b')+'">✗</button></div></td>';
-      html+='<td style="padding:5px 10px;text-align:center">'+(r.bloque?'<span style="padding:2px 7px;border-radius:7px;font-size:10px;font-weight:700;background:#e6f1fb;color:#185fa5">'+r.bloque+'</span>':inp('bloque',i,'Bloque','75px'))+'</td>';
-      html+='<td style="padding:5px 10px;text-align:center">'+(r.pallet?'<span style="font-weight:700;color:#0071e3">'+r.pallet+'</span><div style="font-size:9px;color:#86868b">u/p</div>':'<span style="color:#86868b">—</span>')+'</td>';
-      html+='<td style="padding:5px 10px">'+inp('dot',i,'SSAA','80px')+'</td>';
-      html+='<td style="padding:5px 10px">'+inp('lote',i,'Lote','70px')+'</td>';
-      html+='<td style="padding:5px 10px"><button onclick="_cydRows.splice('+i+',1);cydRenderModalTabla()" style="background:none;border:none;color:#d70015;cursor:pointer;font-size:15px">×</button></td>';
-    }
-    html+='</tr>';
-  });
-  html+='</tbody></table></div>';
-  wrap.innerHTML=html;
-  cydModalActualizarTotales();
-
-  // Footer guardar
-  if(footer){
-    var tots='';
-    if(tipo==='carga'){
-      var tP=_cydRows.reduce(function(s,r){return s+(+r.cant||0);},0);
-      var tR=_cydRows.reduce(function(s,r){return s+(+r.real||0);},0);
-      var tS=_cydRows.filter(function(r){return r.cargado===false;}).length;
-      tots='<span style="font-size:12px;color:#86868b">Pedido: <b>'+tP+'</b> · Real: <b style="color:#34c759">'+tR+'</b> · Sin cargar: <b style="color:#d70015">'+tS+'</b></span>';
-    } else {
-      var tU=_cydRows.reduce(function(s,r){return s+(+r.cant||0);},0);
-      var tD=_cydRows.filter(function(r){return r.dot;}).length;
-      tots='<span style="font-size:12px;color:#86868b">Unidades: <b>'+tU+'</b> · DOTs: <b style="color:#0071e3">'+tD+'</b></span>';
-    }
-    footer.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:.5px solid #e5e5ea">'+tots+'<button onclick="cydGuardarPlanilla()" style="padding:9px 20px;background:#1d1d1f;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">💾 Guardar planilla</button></div>';
-  }
+  html += '</div>';
+  document.getElementById('cyd-preview-'+tipo).innerHTML = html;
+  document.getElementById('cyd-btn-confirmar-'+tipo).style.display = 'block';
 }
 
-function cydModalAgregarFila(){
-  if(_cydModalTipo==='carga') _cydRows.push({art:'',desc:'',prov:'',cant:0,stock:0,cargado:null,real:'',detalle:''});
-  else _cydRows.push({art:'',desc:'',prov:'',cant:0,stock:0,llego:null,bloque:'',pallet:'',dot:'',lote:''});
-  cydRenderModalTabla();
-}
+// ─── CONFIRMAR ─────────────────────────────────────────────
 
-function cydModalSetCargado(i,val){_cydRows[i].cargado=val;if(val&&!_cydRows[i].real)_cydRows[i].real=_cydRows[i].cant;cydRenderModalTabla();}
-function cydModalSetLlego(i,val){_cydRows[i].llego=val;cydRenderModalTabla();}
+function cydConfirmar(tipo){
+  if(!_cydItems.length){showToast('❌ Procesá primero'); return;}
 
-function cydModalAutocompletar(i){
-  var art=_cydRows[i].art;if(!art)return;
-  var d=DATA.find(function(r){return r.art===+art;});
-  if(d){_cydRows[i].desc=(d.med||'')+' '+(d.diseno||'');_cydRows[i].prov=d.prov||'';_cydRows[i].stock=d.stock||0;_cydRows[i].bloque=d.bloque||'';_cydRows[i].pallet=d.max_pos||'';cydRenderModalTabla();showToast('💡 Bloque: '+(_cydRows[i].bloque||'—')+' · '+(_cydRows[i].pallet||'—')+' u/p');}
-  else showToast('⚠️ Art. '+art+' no encontrado');
-}
+  var fecha = new Date().toLocaleDateString('es-AR');
+  var fechaISO = new Date().toISOString().split('T')[0];
 
-function cydModalActualizarTotales(){cydRenderModalTabla&&null;}
-
-function cydGuardarPlanilla(){
-  var tipo=_cydModalTipo;
-  var remito=(document.getElementById('cydm-remito')||{}).value||'';
-  if(!remito){showToast('❌ Ingresá el N° de remito');return;}
-  if(!_cydRows.length){showToast('❌ No hay artículos');return;}
-
-  var fechaISO=(document.getElementById('cydm-fecha')||{}).value||new Date().toISOString().split('T')[0];
-  var fecha=fechaISO?new Date(fechaISO+'T12:00:00').toLocaleDateString('es-AR'):new Date().toLocaleDateString('es-AR');
-
-  var reg={
-    tipo:tipo, remito:remito, fecha:fecha, fechaISO:fechaISO, ts:Date.now(),
-    tte:(document.getElementById('cydm-tte')||{}).value||'',
-    items:_cydRows.map(function(r){return Object.assign({},r);})
-  };
-  if(tipo==='carga') reg.destino=(document.getElementById('cydm-destino')||{}).value||'';
-  else reg.origen=(document.getElementById('cydm-origen')||{}).value||'';
-
-  // Si descarga, replicar DOTs
-  if(tipo==='descarga'){
-    var dots=JSON.parse(localStorage.getItem('wms_dots')||'{}');
-    var dotsLog=JSON.parse(localStorage.getItem('wms_cyd_dots_log')||'[]');
-    var newDots=0;
-    _cydRows.forEach(function(r){
-      if(r.dot&&r.art){
-        var an=r.dot.length>=4?parseInt('20'+r.dot.slice(-2)):new Date().getFullYear();
-        var sem=r.dot.length>=4?parseInt(r.dot.slice(0,2)):0;
-        var artId=String(r.art);
-        if(!dots[artId])dots[artId]=[];
-        var idx=dots[artId].findIndex(function(d){return d.anio===an;});
-        if(idx>=0)dots[artId][idx].unidades=(dots[artId][idx].unidades||0)+(+r.cant||0);
-        else dots[artId].push({anio:an,semana:sem,unidades:+r.cant||0});
-        dotsLog.unshift({art:r.art,desc:r.desc,prov:r.prov,dot:r.dot,lote:r.lote,cant:+r.cant,bloque:r.bloque,remito:remito,fecha:fecha,ts:Date.now()});
-        newDots++;
+  if(tipo === 'carga'){
+    // Sumar stock
+    _cydItems.forEach(function(r){
+      var da = DATA.find(function(d){return d.art===r.art;});
+      if(da){
+        da.stock = (da.stock||0) + r.cant;
+        da.pall  = Math.floor(da.stock / (da.max_pos||32));
       }
     });
-    localStorage.setItem('wms_dots',JSON.stringify(dots));
-    localStorage.setItem('wms_cyd_dots_log',JSON.stringify(dotsLog.slice(0,500)));
-    if(newDots) showToast('✅ Planilla guardada · '+newDots+' DOTs replicados');
-    else showToast('✅ Planilla de descarga guardada');
+    saveDataStock();
+
+    // Guardar en historial
+    var rems = {};
+    _cydItems.forEach(function(r){
+      var k = r.nroRem||fecha;
+      if(!rems[k]) rems[k]={nroRem:k, fecha:r.fecha||fecha, fechaISO, tte:r.tte, cliente:r.cliente, tipo:'carga', items:[]};
+      rems[k].items.push({art:r.art, med:r.med, diseno:r.diseno, prov:r.prov, cant:r.cant, pallets:r.pallets, nroFact:r.nroFact});
+    });
+    var hist = cydGetHist('carga');
+    Object.values(rems).forEach(function(rem){ hist.unshift(rem); });
+    localStorage.setItem('wms_hist_carga', JSON.stringify(hist.slice(0,500)));
+
+    // Reevaluar rack
+    reevaluarRack();
+
+    showToast('✅ Carga confirmada — '+_cydItems.length+' arts · '+_cydItems.reduce(function(s,r){return s+r.cant;},0)+' un.');
+
   } else {
-    showToast('✅ Planilla de carga guardada — Remito '+remito);
+    // Restar stock — del rack primero, luego del general
+    var alertasRepo = [];
+    _cydItems.forEach(function(r){
+      var da = DATA.find(function(d){return d.art===r.art;});
+      if(!da) return;
+
+      // Descontar del rack si tiene posición
+      var descRack = descontarRackPorPedido(r.art, r.cant);
+
+      // Descontar del stock general
+      da.stock = Math.max(0, (da.stock||0) - r.cant);
+      da.pall  = Math.floor(da.stock / (da.max_pos||32));
+
+      // Alerta reposición si rack bajó del 40%
+      var rackSt = loadRackStock();
+      Object.entries(rackSt).forEach(function(e){
+        var posId=e[0], rs=e[1];
+        if(!rs||rs.art!=r.art) return;
+        var mp = da.max_pos||32;
+        if((rs.stock||0) <= Math.ceil(mp*0.4)){
+          alertasRepo.push({pos:posId, art:r.art, med:da.med, stock:rs.stock, min_u:Math.ceil(mp*0.4), traer:mp-(rs.stock||0), bloque:da.bloque||''});
+        }
+      });
+    });
+    saveDataStock();
+
+    // Guardar en historial
+    var hist2 = cydGetHist('descarga');
+    hist2.unshift({
+      fecha, fechaISO, tipo:'descarga',
+      items: _cydItems.map(function(r){return {art:r.art,med:r.med,prov:r.prov,cant:r.cant,origen:r.origen,nroDoc:r.nroDoc,tte:r.tte,vendedor:r.vendedor};})
+    });
+    localStorage.setItem('wms_hist_descarga', JSON.stringify(hist2.slice(0,500)));
+
+    // Guardar alertas reposición
+    if(alertasRepo.length){
+      localStorage.setItem('wms_repo_pendiente', JSON.stringify(alertasRepo));
+    }
+
+    reevaluarRack();
+
+    var msg = '✅ Descarga confirmada — '+_cydItems.reduce(function(s,r){return s+r.cant;},0)+' un.';
+    if(alertasRepo.length) msg += ' · ⚠️ '+alertasRepo.length+' posiciones bajo 40%';
+    showToast(msg);
   }
 
-  var hist=cydGetHist(tipo);
-  if(_cydEditId!==null) hist[_cydEditId]=reg;
-  else hist.unshift(reg);
-  cydSaveHist(tipo,hist);
-
-  cydCerrarModal();
-  if(tipo==='carga') cydRenderLista('carga');
-  else cydRenderLista('descarga');
+  // Limpiar
+  _cydItems = [];
+  document.getElementById('cyd-paste-'+tipo).value = '';
+  document.getElementById('cyd-preview-'+tipo).innerHTML = '';
+  document.getElementById('cyd-btn-confirmar-'+tipo).style.display = 'none';
 }
 
-// INFORMES
-function cydRenderInformes(){
-  var periodo=(document.getElementById('cyd-inf-periodo')||{}).value||'mes';
-  var ahora=new Date();
-  function enPeriodo(fechaISO){
+// ─── HISTORIAL ─────────────────────────────────────────────
+
+function cydGetHist(tipo){
+  try{ return JSON.parse(localStorage.getItem('wms_hist_'+tipo)||'[]'); }catch(e){return [];}
+}
+
+function cydRenderHistorial(){
+  var periodo = (document.getElementById('cyd-hist-periodo')||{}).value||'mes';
+  var filtroTipo = (document.getElementById('cyd-hist-tipo')||{}).value||'todo';
+  var ahora = new Date();
+
+  function enPeriodo(h){
     if(periodo==='todo') return true;
-    if(!fechaISO) return false;
-    var d=new Date(fechaISO+'T12:00:00');
+    var d = new Date(h.fechaISO||h.fecha);
+    if(isNaN(d)) return true;
     if(periodo==='hoy') return d.toDateString()===ahora.toDateString();
-    if(periodo==='semana'){var s=new Date(ahora);s.setDate(ahora.getDate()-7);return d>=s;}
-    if(periodo==='mes') return d.getMonth()===ahora.getMonth()&&d.getFullYear()===ahora.getFullYear();
+    if(periodo==='semana'){ var s=new Date(ahora); s.setDate(s.getDate()-7); return d>=s; }
+    if(periodo==='mes'){ var m=new Date(ahora); m.setMonth(m.getMonth()-1); return d>=m; }
     return true;
   }
-  var cargas=cydGetHist('carga').filter(function(r){return enPeriodo(r.fechaISO);});
-  var descargas=cydGetHist('descarga').filter(function(r){return enPeriodo(r.fechaISO);});
 
-  var totCargasPed=0,totCargasReal=0,totDescU=0,totDots=0;
-  cargas.forEach(function(r){r.items.forEach(function(it){totCargasPed+=(+it.cant||0);totCargasReal+=(+it.real||0);});});
-  descargas.forEach(function(r){r.items.forEach(function(it){totDescU+=(+it.cant||0);if(it.dot)totDots++;});});
+  var cargas   = filtroTipo!=='descarga' ? cydGetHist('carga').filter(enPeriodo)   : [];
+  var descargas= filtroTipo!=='carga'    ? cydGetHist('descarga').filter(enPeriodo) : [];
 
-  var stats=document.getElementById('cyd-inf-stats');
-  if(stats){
-    function statCard(lbl,val,color){return '<div style="background:#fff;border-radius:10px;border:.5px solid #e5e5ea;padding:12px;text-align:center"><div style="font-size:10px;color:#86868b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">'+lbl+'</div><div style="font-size:22px;font-weight:700;color:'+(color||'#1d1d1f')+'">'+val+'</div></div>';}
-    stats.innerHTML=statCard('Planillas carga',cargas.length,'#0071e3')+statCard('Planillas descarga',descargas.length,'#34c759')+statCard('Unidades cargadas',totCargasReal,'#1d1d1f')+statCard('vs Pedido',totCargasPed-totCargasReal===0?'OK':totCargasPed-totCargasReal,totCargasPed-totCargasReal===0?'#34c759':'#d70015')+statCard('Unidades recibidas',totDescU,'#1d1d1f')+statCard('DOTs registrados',totDots,'#185fa5');
-  }
+  // Stats
+  var totalCargaU  = cargas.reduce(function(s,h){return s+h.items.reduce(function(ss,i){return ss+(i.cant||0);},0);},0);
+  var totalDescU   = descargas.reduce(function(s,h){return s+h.items.reduce(function(ss,i){return ss+(i.cant||0);},0);},0);
+  var statsEl = document.getElementById('cyd-hist-stats');
+  if(statsEl) statsEl.innerHTML =
+    '<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:#86868b">Cargas</div><div style="font-size:20px;font-weight:700;color:#34c759">'+cargas.length+'</div><div style="font-size:11px;color:#86868b">'+totalCargaU+' un.</div></div>'+
+    '<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:#86868b">Descargas</div><div style="font-size:20px;font-weight:700;color:#d70015">'+descargas.length+'</div><div style="font-size:11px;color:#86868b">'+totalDescU+' un.</div></div>'+
+    '<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:#86868b">Movimientos</div><div style="font-size:20px;font-weight:700">'+(cargas.length+descargas.length)+'</div></div>';
 
-  var det=document.getElementById('cyd-inf-detalle');
-  if(!det)return;
-  var html='';
+  // Lista
+  var todos = cargas.concat(descargas).sort(function(a,b){return (b.fechaISO||'')>(a.fechaISO||'')?1:-1;});
+  var html = '';
+  todos.forEach(function(h){
+    var esCarga = h.tipo==='carga';
+    var totalU2 = h.items.reduce(function(s,i){return s+(i.cant||0);},0);
+    html += '<div style="background:#fff;border-radius:10px;padding:10px;margin-bottom:8px;border-left:3px solid '+(esCarga?'#34c759':'#d70015')+'">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+    html += '<div style="font-size:12px;font-weight:700">'+(esCarga?'📦 Carga':'🚚 Descarga')+(h.nroRem?' · '+h.nroRem:'')+'</div>';
+    html += '<div style="font-size:11px;color:#86868b">'+h.fecha+' · '+h.items.length+' arts · '+totalU2+' un.</div></div>';
+    if(h.cliente||h.tte) html += '<div style="font-size:11px;color:#86868b;margin-bottom:4px">'+(h.cliente||h.tte||'')+'</div>';
+    html += '<div style="font-size:10px;color:#86868b">'+h.items.slice(0,5).map(function(i){return i.art+' ('+i.cant+'u)';}).join(' · ')+(h.items.length>5?' +más...':'')+'</div>';
+    html += '</div>';
+  });
 
-  if(cargas.length){
-    html+='<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#86868b;margin-bottom:8px;margin-top:4px">📤 Cargas</div>';
-    html+='<div style="overflow-x:auto;border-radius:10px;border:.5px solid #e5e5ea;margin-bottom:14px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#1d1d1f;color:#fff"><th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase">Fecha</th><th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase">Remito</th><th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase">TTE</th><th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase">Destino</th><th style="padding:7px 10px;text-align:center;font-size:10px;text-transform:uppercase">Arts.</th><th style="padding:7px 10px;text-align:center;font-size:10px;text-transform:uppercase">Pedido</th><th style="padding:7px 10px;text-align:center;font-size:10px;text-transform:uppercase">Real</th><th style="padding:7px 10px;text-align:center;font-size:10px;text-transform:uppercase">Dif.</th></tr></thead><tbody>';
-    cargas.forEach(function(r,ri){
-      var tP=r.items.reduce(function(s,it){return s+(+it.cant||0);},0);
-      var tR=r.items.reduce(function(s,it){return s+(+it.real||0);},0);
-      var dif=tP-tR;
-      var bg=ri%2?'background:#fafafa':'';
-      html+='<tr style="'+bg+'"><td style="padding:6px 10px;font-size:11px">'+r.fecha+'</td><td style="padding:6px 10px;font-weight:700;color:#0071e3">'+r.remito+'</td><td style="padding:6px 10px;font-size:11px">'+(r.tte||'—')+'</td><td style="padding:6px 10px;font-size:11px">'+(r.destino||'—')+'</td><td style="padding:6px 10px;text-align:center">'+r.items.length+'</td><td style="padding:6px 10px;text-align:center;font-weight:700">'+tP+'</td><td style="padding:6px 10px;text-align:center;font-weight:700;color:#34c759">'+tR+'</td><td style="padding:6px 10px;text-align:center;font-weight:700;color:'+(dif===0?'#34c759':dif>0?'#d70015':'#ff9500')+'">'+dif+'</td></tr>';
-    });
-    html+='</tbody></table></div>';
-  }
-
-  if(descargas.length){
-    html+='<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#86868b;margin-bottom:8px">📥 Descargas</div>';
-    html+='<div style="overflow-x:auto;border-radius:10px;border:.5px solid #e5e5ea"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#1d1d1f;color:#fff"><th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase">Fecha</th><th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase">Remito</th><th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase">TTE</th><th style="padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase">Origen</th><th style="padding:7px 10px;text-align:center;font-size:10px;text-transform:uppercase">Arts.</th><th style="padding:7px 10px;text-align:center;font-size:10px;text-transform:uppercase">Unidades</th><th style="padding:7px 10px;text-align:center;font-size:10px;text-transform:uppercase">DOTs</th></tr></thead><tbody>';
-    descargas.forEach(function(r,ri){
-      var tU=r.items.reduce(function(s,it){return s+(+it.cant||0);},0);
-      var tD=r.items.filter(function(it){return it.dot;}).length;
-      var bg=ri%2?'background:#fafafa':'';
-      html+='<tr style="'+bg+'"><td style="padding:6px 10px;font-size:11px">'+r.fecha+'</td><td style="padding:6px 10px;font-weight:700;color:#34c759">'+r.remito+'</td><td style="padding:6px 10px;font-size:11px">'+(r.tte||'—')+'</td><td style="padding:6px 10px;font-size:11px">'+(r.origen||'—')+'</td><td style="padding:6px 10px;text-align:center">'+r.items.length+'</td><td style="padding:6px 10px;text-align:center;font-weight:700">'+tU+'</td><td style="padding:6px 10px;text-align:center;font-weight:700;color:#185fa5">'+tD+'</td></tr>';
-    });
-    html+='</tbody></table></div>';
-  }
-
-  if(!cargas.length&&!descargas.length) html='<div style="text-align:center;padding:40px;color:#86868b">Sin registros para el período seleccionado</div>';
-  det.innerHTML=html;
+  var listaEl = document.getElementById('cyd-hist-lista');
+  if(listaEl) listaEl.innerHTML = html||'<div style="text-align:center;color:#86868b;padding:20px">Sin movimientos en el período</div>';
 }
 
-function cydExportarInforme(){
-  if(typeof XLSX==='undefined'){showToast('❌ XLSX no disponible');return;}
-  var periodo=(document.getElementById('cyd-inf-periodo')||{}).value||'mes';
-  var cargas=cydGetHist('carga');
-  var descargas=cydGetHist('descarga');
-  var wb=XLSX.utils.book_new();
-  var wsCarga=[['Fecha','Remito','TTE','Destino','Artículo','Descripción','Proveedor','Pedido','Real','¿Cargó?','Detalle']];
-  cargas.forEach(function(r){r.items.forEach(function(it){wsCarga.push([r.fecha,r.remito,r.tte||'',r.destino||'',it.art,it.desc||'',it.prov||'',it.cant||0,it.real||0,it.cargado===true?'SÍ':it.cargado===false?'NO':'',it.detalle||'']);});});
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(wsCarga),'Cargas');
-  var wsDesc=[['Fecha','Remito','TTE','Origen','Artículo','Descripción','Proveedor','Cantidad','¿Llegó?','Bloque','P/Pallet','DOT','Lote']];
-  descargas.forEach(function(r){r.items.forEach(function(it){wsDesc.push([r.fecha,r.remito,r.tte||'',r.origen||'',it.art,it.desc||'',it.prov||'',it.cant||0,it.llego===true?'SÍ':it.llego===false?'NO':'',it.bloque||'',it.pallet||'',it.dot||'',it.lote||'']);});});
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(wsDesc),'Descargas');
-  XLSX.writeFile(wb,'Informe_CyD_'+new Date().toLocaleDateString('es-AR').replace(/\//g,'-')+'.xlsx');
-  showToast('✅ Informe exportado');
+// ─── EXPORTAR ──────────────────────────────────────────────
+
+function cydExportar(){
+  var cargas    = cydGetHist('carga');
+  var descargas = cydGetHist('descarga');
+  var wb = XLSX.utils.book_new();
+
+  var wsC = [['Fecha','Remito','Cliente','TTE','Artículo','Medida','Diseño','Proveedor','Cant','Pallets','Nro Factura']];
+  cargas.forEach(function(h){
+    h.items.forEach(function(i){
+      wsC.push([h.fecha, h.nroRem||'', h.cliente||'', h.tte||'', i.art, i.med||'', i.diseno||'', i.prov||'', i.cant||0, i.pallets||0, i.nroFact||'']);
+    });
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsC), 'Cargas');
+
+  var wsD = [['Fecha','Artículo','Medida','Proveedor','Cant','Origen','Nro Doc','Transportista','Vendedor']];
+  descargas.forEach(function(h){
+    h.items.forEach(function(i){
+      wsD.push([h.fecha, i.art, i.med||'', i.prov||'', i.cant||0, i.origen||'', i.nroDoc||'', i.tte||'', i.vendedor||'']);
+    });
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsD), 'Descargas');
+
+  XLSX.writeFile(wb, 'CargasDescargas_'+new Date().toLocaleDateString('es-AR').replace(/\//g,'-')+'.xlsx');
+  showToast('✅ Exportado');
 }
+
+function initCyDesc(){ cydTab('carga'); }
 </script>
 
-<!-- MODAL PEGAR REMITO -->
-<div id="cyd-remito-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;overflow-y:auto">
-<div style="background:#fff;border-radius:16px;max-width:700px;margin:30px auto;padding:20px">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-    <div style="font-size:16px;font-weight:700">📋 Pegar remito de ingreso</div>
-    <button onclick="document.getElementById('cyd-remito-modal').style.display='none'" style="background:#f5f5f7;border:none;border-radius:8px;width:32px;height:32px;font-size:18px;cursor:pointer;color:#86868b">×</button>
-  </div>
-  <div style="font-size:12px;color:#86868b;margin-bottom:8px">Pegá el contenido del remito (acepta formato Halpern/Enisa o Kumho/Firemax). Detecta el formato automáticamente.</div>
-  <textarea id="cyd-remito-paste" rows="10" placeholder="Pegá acá el contenido copiado del remito..." style="width:100%;padding:10px;border:.5px solid #d2d2d7;border-radius:10px;font-size:12px;font-family:monospace;resize:vertical;outline:none;background:#fff;color:#1d1d1f;line-height:1.5"></textarea>
-  <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-    <input id="cyd-remito-nro" placeholder="N° Remito / Despacho" style="flex:1;padding:9px 12px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;background:#fff">
-    <input id="cyd-remito-origen" placeholder="Origen / Proveedor" style="flex:1;padding:9px 12px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;background:#fff">
-  </div>
-  <div id="cyd-remito-preview" style="margin-top:10px"></div>
-  <div style="display:flex;gap:8px;margin-top:12px">
-    <button onclick="cydProcesarRemito()" style="flex:1;padding:10px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">🔍 Procesar y previsualizar</button>
-    <button id="cyd-remito-confirmar" onclick="cydConfirmarRemito()" style="display:none;flex:1;padding:10px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">✅ Confirmar ingreso</button>
-  </div>
-</div>
-</div>
-
-<script>
-var _cydRemitoItems=[];
-function cydAbrirPegarRemito(){document.getElementById('cyd-remito-modal').style.display='block';document.getElementById('cyd-remito-paste').value='';document.getElementById('cyd-remito-preview').innerHTML='';document.getElementById('cyd-remito-confirmar').style.display='none';_cydRemitoItems=[];}
-function cydProcesarRemito(){
-  var texto=document.getElementById('cyd-remito-paste').value.trim();
-  if(!texto){showToast('❌ Pegá el contenido del remito primero');return;}
-  var lineas=texto.split('\n').map(function(l){return l.trim();}).filter(function(l){return l;});
-  _cydRemitoItems=[];var errores=[];
-  lineas.forEach(function(linea,idx){
-    if(linea.match(/^ART\t|^Proveedor\t/i)) return;
-    var cols=linea.split('\t');
-    var art=null,cant=0,detalle='',prov='',nroDoc='';
-    // Formato 1 Halpern: ART DETALLE Q DESPA DESPACHO...
-    if(!isNaN(cols[0])&&cols.length>=3&&!isNaN(cols[2])){
-      art=parseInt(cols[0]);detalle=cols[1]||'';cant=parseInt(cols[2])||0;nroDoc=cols[4]||'';prov=cols[8]||'';
-    }
-    // Formato 2 Kumho/Firemax: PROV ART DETALLE FACTURA CONTENEDOR Q
-    else if(isNaN(cols[0])&&!isNaN(cols[1])&&cols.length>=6){
-      prov=cols[0]||'';art=parseInt(cols[1]);detalle=cols[2]||'';nroDoc=cols[3]||'';cant=parseInt(cols[5])||0;
-    } else {if(linea.length>3)errores.push('Línea '+(idx+1)+': no reconocida');return;}
-    if(!art||cant<=0)return;
-    var dataArt=DATA.find(function(r){return r.art===art;});
-    _cydRemitoItems.push({art:art,detalle:detalle,prov:prov||(dataArt?dataArt.prov:''),cant:cant,nroDoc:nroDoc,enData:!!dataArt,med:dataArt?dataArt.med:'',diseno:dataArt?dataArt.diseno:'',stockActual:dataArt?dataArt.stock:0,bloque:dataArt?dataArt.bloque:''});
-  });
-  if(!_cydRemitoItems.length){document.getElementById('cyd-remito-preview').innerHTML='<div style="color:#d70015;font-size:13px;padding:10px">No se encontraron artículos válidos.</div>';return;}
-  var totalU=_cydRemitoItems.reduce(function(s,r){return s+r.cant;},0);
-  var noEnData=_cydRemitoItems.filter(function(r){return !r.enData;}).length;
-  var html='<div style="background:#f5f5f7;border-radius:10px;padding:10px;margin-bottom:8px"><div style="display:flex;gap:16px;margin-bottom:8px"><div><div style="font-size:10px;color:#86868b">Artículos</div><div style="font-size:18px;font-weight:700">'+_cydRemitoItems.length+'</div></div><div><div style="font-size:10px;color:#86868b">Unidades</div><div style="font-size:18px;font-weight:700">'+totalU+'</div></div>'+(noEnData?'<div><div style="font-size:10px;color:#86868b">No en DATA</div><div style="font-size:18px;font-weight:700;color:#d70015">'+noEnData+'</div></div>':'')+'</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1d1d1f;color:#fff"><th style="padding:5px 8px;text-align:left">Art.</th><th style="padding:5px 8px;text-align:left">Descripción</th><th style="padding:5px 8px;text-align:center">Cant.</th><th style="padding:5px 8px;text-align:center">Stock actual</th><th style="padding:5px 8px;text-align:center">Stock nuevo</th><th style="padding:5px 8px;text-align:left">Bloque</th></tr></thead><tbody>';
-  _cydRemitoItems.forEach(function(r,i){var bg=i%2?'background:#fafafa':'';var noD=!r.enData?'color:#d70015;font-weight:700':'';html+='<tr style="'+bg+'"><td style="padding:5px 8px;'+noD+'">'+r.art+(!r.enData?'⚠️':'')+'</td><td style="padding:5px 8px;font-size:10px">'+(r.med?r.med+' '+r.diseno:r.detalle.substring(0,30))+'</td><td style="padding:5px 8px;text-align:center;font-weight:700">+'+r.cant+'</td><td style="padding:5px 8px;text-align:center;color:#86868b">'+r.stockActual+'</td><td style="padding:5px 8px;text-align:center;font-weight:700;color:#34c759">'+(r.stockActual+r.cant)+'</td><td style="padding:5px 8px;font-size:10px">'+(r.bloque||'—')+'</td></tr>';});
-  html+='</tbody></table></div></div>'+(errores.length?'<div style="font-size:11px;color:#d70015;margin-top:4px">'+errores.join('<br>')+'</div>':'');
-  document.getElementById('cyd-remito-preview').innerHTML=html;
-  document.getElementById('cyd-remito-confirmar').style.display='block';
-}
-function cydConfirmarRemito(){
-  if(!_cydRemitoItems.length){showToast('❌ Procesá el remito primero');return;}
-  var nro=document.getElementById('cyd-remito-nro').value||'';
-  var origen=document.getElementById('cyd-remito-origen').value||'';
-  var fecha=new Date().toLocaleDateString('es-AR');
-  var fechaISO=new Date().toISOString().split('T')[0];
-  var actualizados=0;
-
-  // Actualizar stock en DATA
-  _cydRemitoItems.forEach(function(r){
-    var dataArt=DATA.find(function(d){return d.art===r.art;});
-    if(dataArt){dataArt.stock=(dataArt.stock||0)+r.cant;dataArt.pall=Math.floor(dataArt.stock/(dataArt.max_pos||32));actualizados++;saveDataStock();}
-  });
-
-  // Re-ejecutar motor de rack con el nuevo stock
-  // El motor hace el barrido, asigna posiciones y genera alertas de reposición
-  var nuevoAsign = generarMotorAsignacion();
-  ASIGN = nuevoAsign;
-  saveAsign();
-
-  // Mostrar resumen de asignación al operario
-  var res = window._motorResumen || {};
-  var rackSt = loadRackStock();
-  var itemsConRack = _cydRemitoItems.filter(function(r){
-    return Object.values(rackSt).some(function(rs){return rs && rs.art==r.art;});
-  });
-  var itemsSinRack = _cydRemitoItems.filter(function(r){
-    return !Object.values(rackSt).some(function(rs){return rs && rs.art==r.art;});
-  });
-
-  // Construir mensaje de ubicación por artículo
-  var htmlUbic = '<div style="background:#fff;border-radius:12px;padding:12px;margin-top:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08)">';
-  htmlUbic += '<div style="font-size:13px;font-weight:700;color:#1d1d1f;margin-bottom:8px">📍 Ubicación sugerida</div>';
-
-  _cydRemitoItems.forEach(function(r){
-    var posiciones = Object.entries(rackSt).filter(function(e){
-      var rs=e[1]; return rs && rs.art==r.art;
-    }).map(function(e){return e[0];});
-
-    if(posiciones.length > 0){
-      htmlUbic += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0">';
-      htmlUbic += '<span style="background:#0071e3;color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700">RACK</span>';
-      htmlUbic += '<span style="font-size:12px;font-weight:600">'+r.art+'</span>';
-      htmlUbic += '<span style="font-size:11px;color:#86868b;flex:1">'+(r.med||'')+'</span>';
-      htmlUbic += '<span style="font-size:12px;font-weight:700;color:#0071e3">'+posiciones.join(', ')+'</span>';
-      htmlUbic += '</div>';
-    } else {
-      var da = DATA.find(function(d){return d.art===r.art;});
-      htmlUbic += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0">';
-      htmlUbic += '<span style="background:#ff9500;color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700">BLOQUE</span>';
-      htmlUbic += '<span style="font-size:12px;font-weight:600">'+r.art+'</span>';
-      htmlUbic += '<span style="font-size:11px;color:#86868b;flex:1">'+(r.med||'')+'</span>';
-      htmlUbic += '<span style="font-size:12px;color:#555">'+(da&&da.bloque?da.bloque:'alta rotación')+'</span>';
-      htmlUbic += '</div>';
-    }
-  });
-
-  if(res.alertasRepo > 0){
-    htmlUbic += '<div style="margin-top:8px;background:#fff3cd;border-radius:8px;padding:8px;font-size:11px;color:#856404;font-weight:600">⚠️ '+res.alertasRepo+' posiciones del rack con stock bajo — revisá Reposición</div>';
-  }
-  htmlUbic += '</div>';
-
-  // Mostrar en un toast expandido o en el modal de confirmación
-  var modalBody = document.getElementById('cyd-remito-preview');
-  if(modalBody) modalBody.innerHTML += htmlUbic;
-
-  // ── SUGERENCIA DE UBICACIÓN POR ROTACIÓN SEMANAL ──────────────────
-  // Pallets al rack según rot_sem (1 semana de cobertura máximo):
-  //   rot_sem 6-8  → 2 pallets al rack
-  //   rot_sem 3-6  → 1 pallet al rack
-  //   rot_sem 1-3  → medio pallet (redondeado arriba)
-  //   rot_sem 0.25-1 → pocas unidades (ceil de rot_sem)
-  //   fuera de rango → todo al bloque
-  var ingresosUbic=[];
-  _cydRemitoItems.forEach(function(r){
-    var da=DATA.find(function(d){return d.art===r.art;});
-    if(!da) return;
-    var rotSem=da.rot_sem||0;
-    var mp=(typeof PALL_BASE!=='undefined'&&PALL_BASE[String(r.art)]?PALL_BASE[String(r.art)].p_rack:0)||da.max_pos||32;
-    if(mp<=0) mp=32;
-
-    // Buscar si tiene posición en rack asignada
-    var posRack=Object.entries(ASIGN).filter(function(e){
-      var v=e[1];
-      if(!v) return false;
-      if(v.art==r.art) return true;
-      if(v.compartidos&&v.compartidos.some(function(c){return c.art==r.art;})) return true;
-      return false;
-    }).map(function(e){return e[0];});
-    var tieneRack = posRack.length > 0;
-
-    // Calcular cuánto va al rack según rot_sem
-    var unidRack=0;
-    if(tieneRack && rotSem>=0.25 && rotSem<=8){
-      if(rotSem>6)      unidRack = Math.min(mp*2, r.cant);   // 2 pallets
-      else if(rotSem>3) unidRack = Math.min(mp,   r.cant);   // 1 pallet
-      else if(rotSem>1) unidRack = Math.min(Math.ceil(mp/2), r.cant); // medio pallet
-      else              unidRack = Math.min(Math.ceil(rotSem*4), r.cant); // ~4 sem cobertura
-    }
-    var unidBloque = r.cant - unidRack;
-
-    ingresosUbic.push({
-      art:r.art, med:da.med, diseno:da.diseno, prov:da.prov,
-      cant:r.cant, rotSem:rotSem, maxPos:mp,
-      unidRack:unidRack, unidBloque:unidBloque,
-      bloque:da.bloque||'', posRack:posRack,
-      fecha:fecha, fechaISO:fechaISO, estado:'pendiente'
-    });
-  });
-  if(ingresosUbic.length){
-    var histIng=JSON.parse(localStorage.getItem('wms_repo_ingresos')||'[]');
-    ingresosUbic.forEach(function(r){histIng.unshift(r);});
-    localStorage.setItem('wms_repo_ingresos',JSON.stringify(histIng.slice(0,500)));
-  }
-
-  // Guardar planilla de descarga
-  var reg={tipo:'descarga',remito:nro||('REM-'+Date.now()),origen:origen,tte:'',fecha:fecha,fechaISO:fechaISO,ts:Date.now(),items:_cydRemitoItems.map(function(r){return{art:r.art,desc:(r.med+' '+r.diseno).trim()||r.detalle,prov:r.prov,cant:r.cant,llego:true,bloque:r.bloque,dot:'',lote:''};})};
-  var hist=JSON.parse(localStorage.getItem('wms_descarga_hist')||'[]');
-  hist.unshift(reg);
-  localStorage.setItem('wms_descarga_hist',JSON.stringify(hist.slice(0,500)));
-
-  // Generar planilla de recepción imprimible
-  cydImprimirRecepcion(_cydRemitoItems, nro, origen, fecha);
-
-  document.getElementById('cyd-remito-modal').style.display='none';
-  _cydRemitoItems=[];
-  cydSetTab('descargas');
-  showToast('✅ Ingreso confirmado — '+actualizados+' artículos actualizados en stock');
-  setTimeout(function(){showToast('💡 Revisá el Mapa de Racks y aplicá Rotación Baja si cambió mucho el stock');},2500);
-}
-
-/* ── HELPER DE IMPRESIÓN ─────────────────────────────────────────
-   Intenta abrir popup. Si está bloqueado, usa iframe embebido.
-   Funciona siempre, sin depender de ventanas emergentes. */
-function _wmsPrint(html){
-  var blob = new Blob([html],{type:'text/html'});
-  var url  = URL.createObjectURL(blob);
-  var win  = window.open(url,'_blank');
-  if(win){ return; } // popup OK ✓
-  URL.revokeObjectURL(url);
-
-  // ── Fallback: overlay iframe ──
-  var prev = document.getElementById('__wms_print_overlay');
-  if(prev) prev.remove();
-
-  var overlay = document.createElement('div');
-  overlay.id  = '__wms_print_overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#fff;display:flex;flex-direction:column';
-
-  var bar = document.createElement('div');
-  bar.style.cssText = 'background:#1d1d1f;padding:8px 16px;display:flex;gap:10px;align-items:center;flex-shrink:0';
-  bar.innerHTML =
-    '<span style="color:#fff;font-size:13px;font-weight:600;flex:1">🖨️ Vista previa</span>'
-   +'<button id="__wms_pb" style="padding:7px 18px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Imprimir</button>'
-   +'<button onclick="document.getElementById(\'__wms_print_overlay\').remove()" style="padding:7px 14px;background:#d70015;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">✕ Cerrar</button>';
-
-  var iframe = document.createElement('iframe');
-  iframe.id   = '__wms_iframe';
-  iframe.style.cssText = 'flex:1;border:none;width:100%';
-
-  overlay.appendChild(bar);
-  overlay.appendChild(iframe);
-  document.body.appendChild(overlay);
-
-  document.getElementById('__wms_pb').onclick = function(){
-    document.getElementById('__wms_iframe').contentWindow.print();
-  };
-
-  var doc = iframe.contentDocument || iframe.contentWindow.document;
-  doc.open(); doc.write(html); doc.close();
-  setTimeout(function(){ iframe.contentWindow.print(); }, 600);
-}
-
-function cydImprimirRecepcion(items, nro, origen, fecha){
-  var filas='';
-  items.forEach(function(r){
-    var da=DATA.find(function(d){return d.art===r.art;});
-    var rotSem=da?da.rot_sem||0:0;
-    var mp=(da&&typeof PALL_BASE!=='undefined'&&PALL_BASE[String(r.art)]?PALL_BASE[String(r.art)].p_rack:0)||(da?da.max_pos:0)||32;
-
-    // Buscar posiciones rack asignadas
-    var posRack=[];
-    Object.entries(ASIGN).forEach(function(entry){
-      var pos=entry[0],v=entry[1];
-      if(v&&v.art==r.art) posRack.push(pos);
-      if(v&&v.compartidos) v.compartidos.forEach(function(c){if(c.art==r.art) posRack.push(pos);});
-    });
-    posRack.sort(function(a,b){return a.localeCompare(b);});
-    var tieneRack=posRack.length>0;
-
-    // Calcular split rack/bloque según rot_sem
-    var unidRack=0;
-    if(tieneRack && rotSem>=0.25 && rotSem<=8){
-      if(rotSem>6)      unidRack=Math.min(mp*2,r.cant);
-      else if(rotSem>3) unidRack=Math.min(mp,r.cant);
-      else if(rotSem>1) unidRack=Math.min(Math.ceil(mp/2),r.cant);
-      else              unidRack=Math.min(Math.ceil(rotSem*4),r.cant);
-    }
-    var unidBloque=r.cant-unidRack;
-
-    // Celda de ubicación: dos líneas — rack y bloque
-    var celdaRack='';
-    if(unidRack>0 && posRack.length){
-      celdaRack='<div style="margin-bottom:4px">'
-        +'<span style="background:#e6f1fb;color:#185fa5;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:700">🔵 RACK</span>'
-        +' <span style="font-size:13px;font-weight:700;color:#0071e3">'+unidRack+' un.</span>'
-        +' → <span style="font-size:11px;color:#185fa5">'+posRack.slice(0,3).join(', ')+(posRack.length>3?' +'+( posRack.length-3)+' más':'')+'</span>'
-        +'</div>';
-    }
-    var celdaBloque='';
-    if(unidBloque>0){
-      var bloq=da?da.bloque||'':'';
-      celdaBloque='<div>'
-        +'<span style="background:#fff3cd;color:#856404;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:700">🟡 BLOQUE</span>'
-        +' <span style="font-size:13px;font-weight:700;color:#856404">'+unidBloque+' un.</span>'
-        +(bloq?' → <span style="font-size:11px;color:#856404">'+bloq+'</span>':'')
-        +'</div>';
-    }
-    if(!celdaRack&&!celdaBloque){
-      celdaBloque='<span style="color:#d70015;font-size:11px">⚠️ Sin ubicación — definir bloque</span>';
-    }
-
-    var rotLabel=rotSem>0?'<span style="font-size:10px;color:#86868b">'+rotSem.toFixed(1)+'/sem</span>':'';
-
-    filas+='<tr style="border-bottom:1px solid #e5e5ea">'
-      +'<td style="padding:8px;font-weight:700;font-size:13px">'+r.art+'</td>'
-      +'<td style="padding:8px;font-size:12px">'+(r.med?r.med+' '+r.diseno:r.detalle)+'<br>'+rotLabel+'</td>'
-      +'<td style="padding:8px;font-size:12px">'+r.prov+'</td>'
-      +'<td style="padding:8px;text-align:center;font-size:16px;font-weight:700;color:#0071e3">'+r.cant+'</td>'
-      +'<td style="padding:8px">'+celdaRack+celdaBloque+'</td>'
-      +'<td style="padding:8px;width:80px;border:1px solid #d2d2d7;border-radius:4px">&nbsp;</td>'
-      +'</tr>';
-  });
-
-  var totalU=items.reduce(function(s,r){return s+r.cant;},0);
-
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Recepción '+nro+'</title>'
-    +'<style>*{font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin:0;padding:0;box-sizing:border-box}'
-    +'body{padding:20px;color:#1d1d1f}'
-    +'@media print{body{padding:10px}.no-print{display:none}}'
-    +'table{width:100%;border-collapse:collapse}'
-    +'th{background:#1d1d1f;color:#fff;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px}'
-    +'tr:nth-child(even){background:#fafafa}'
-    +'</style></head><body>'
-    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">'
-    +'<div><div style="font-size:22px;font-weight:700">📥 Planilla de Recepción</div>'
-    +'<div style="font-size:14px;color:#86868b;margin-top:4px">'+(nro||'Sin N° remito')+' · '+(origen||'Sin origen')+' · '+fecha+'</div></div>'
-    +'<div style="text-align:right">'
-    +'<div style="font-size:28px;font-weight:700;color:#0071e3">'+items.length+' arts.</div>'
-    +'<div style="font-size:14px;color:#86868b">'+totalU+' unidades</div>'
-    +'<button class="no-print" onclick="window.print()" style="margin-top:8px;padding:8px 16px;background:#1d1d1f;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">🖨️ Imprimir</button>'
-    +'</div></div>'
-    +'<table><thead><tr>'
-    +'<th style="width:70px">Art.</th>'
-    +'<th>Descripción</th>'
-    +'<th style="width:90px">Proveedor</th>'
-    +'<th style="width:60px;text-align:center">Cant.</th>'
-    +'<th>Dónde va</th>'
-    +'<th style="width:80px">✓ Hecho</th>'
-    +'</tr></thead><tbody>'+filas+'</tbody></table>'
-    +'<div style="margin-top:16px;font-size:11px;color:#86868b;border-top:1px solid #e5e5ea;padding-top:8px">'
-    +'WMS Casero · Halpern Neumáticos · Generado: '+new Date().toLocaleString('es-AR')+'</div>'
-    +("<scr")+"ipt>setTimeout(function(){window.print();},500);<"+"/scri"+"pt>"
-    +'</body></html>';
-
-  _wmsPrint(html);
-}
-</script>
 
 
 
