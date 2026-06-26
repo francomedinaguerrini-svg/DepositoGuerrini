@@ -205,6 +205,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 .mov-tipo{font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;flex-shrink:0}
 .mov-tipo.carga{background:#e8f8ee;color:#1c7c2c}
 .mov-tipo.descarga{background:#fff3e0;color:#856404}
+.mov-tipo.despacho{background:#e8f0fe;color:#0071e3}
 .mov-tipo.chasis{background:#f3e8ff;color:#6e36a0}
 .mov-info{flex:1;min-width:0}
 .mov-title{font-size:13px;font-weight:600}
@@ -3827,6 +3828,9 @@ function cydConfirmarSalidaDesdeTransito(id){
   // Generar planilla de despacho automáticamente
   cydPlanillaDespacho(id);
 
+  var totalUnD = tr.items.reduce(function(s,r){return s+(r.cantReal||r.cant);},0);
+  registrarMovProd('despacho', totalUnD, tr.destino||tr.tipoLabel);
+
   var msg = '✅ Despacho confirmado';
   if(diferencias.length)  msg += ' · '+diferencias.length+' diferencias';
   if(repoSugerido.length) msg += ' · ⚠️ '+repoSugerido.length+' arts. para reponer';
@@ -5707,6 +5711,43 @@ function exportarInformeMensual(){
 let _prodTipo = 'carga';
 let _prodGrupo = 'G1';
 
+// ── Registrar movimiento automático en productividad ──────────
+function registrarMovProd(tipo, unidades, detalle){
+  try {
+    var fecha = new Date().toLocaleDateString('es-AR');
+    var hora  = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+    // Obtener grupo activo del día (primer grupo con presentes)
+    var personal = getGruposHoy();
+    var gruposPresentes = [];
+    personal.filter(function(p){return p.presente;}).forEach(function(p){
+      if(gruposPresentes.indexOf(p.grupoHoy)<0) gruposPresentes.push(p.grupoHoy);
+    });
+    var grupo = gruposPresentes[0] || _prodGrupo || 'G1';
+
+    var mov = {
+      fecha: fecha, hora: hora,
+      tipo: tipo,           // 'carga' | 'descarga' | 'despacho'
+      grupo: grupo,
+      unidades: unidades,
+      semis: 1,
+      destino: detalle||'',
+      darsena: '', inicio: '', fin: '', durMin: 0,
+      auto: true            // marca que fue generado automáticamente
+    };
+
+    var dayKey = getProdKey();
+    var movsDia = JSON.parse(localStorage.getItem(dayKey)||'[]');
+    movsDia.push(mov);
+    localStorage.setItem(dayKey, JSON.stringify(movsDia));
+
+    var mes = new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+    var histKey = 'prod_hist_'+mes;
+    var hist = JSON.parse(localStorage.getItem(histKey)||'[]');
+    hist.push(mov);
+    localStorage.setItem(histKey, JSON.stringify(hist));
+  } catch(e){ console.warn('registrarMovProd error', e); }
+}
+
 function getProdKey(){
   return 'prod_'+new Date().toLocaleDateString('es-AR').replace(/\//g,'-');
 }
@@ -5958,7 +5999,7 @@ function renderProdLista(){
   const coloresTipo = {carga:'#34c759',descarga:'#ff9500',chasis:'#af52de'};
   el.innerHTML = movs.map((m,i)=>`
     <div class="mov-card">
-      <span class="mov-tipo ${m.tipo}">${m.tipo==='carga'?'📥 CARGA':m.tipo==='descarga'?'📤 DESCARGA':'🚗 CHASIS'}</span>
+      <span class="mov-tipo ${m.tipo}">${m.tipo==='carga'?'📥 CARGA':m.tipo==='descarga'?'📤 DESCARGA':m.tipo==='despacho'?'📋 DESPACHO':'🚗 CHASIS'}${m.auto?' <span style="font-size:8px;opacity:.6">auto</span>':''}</span>
       <div class="mov-info">
         <div class="mov-title">${m.destino||'Sin destino'} ${m.darsena?'· D:'+m.darsena:''}</div>
         <div class="mov-sub" style="color:${GRUPOS_COLORES[m.grupo]||'#86868b'}">${m.grupo} · ${m.semis} semi${m.semis>1?'s':''} · ${m.inicio}${m.fin?' → '+m.fin:''}</div>
@@ -7908,7 +7949,7 @@ if('serviceWorker' in navigator){
   <!-- Tab selector desplegable -->
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
     <select id="cyd-tab-select" onchange="cydTab(this.value)"
-      style="flex:1;padding:10px 12px;border:1px solid #d2d2d7;border-radius:10px;font-size:14px;font-weight:600;background:#fff;color:#1d1d1f;outline:none;appearance:none;-webkit-appearance:none;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2386868b' d='M6 8L1 3h10z'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;cursor:pointer">
+      style="flex:1;padding:10px 12px;border:1px solid #d2d2d7;border-radius:10px;font-size:14px;font-weight:600;background:#fff;color:#1d1d1f;outline:none;cursor:pointer">
       <option value="carga">📦 Carga</option>
       <option value="descarga">🚚 Descarga</option>
       <option value="transito">🟡 Tránsito</option>
@@ -8202,14 +8243,35 @@ function cydConfirmarDesdeTransito(id){
   var fecha = new Date().toLocaleDateString('es-AR');
   var fechaISO = new Date().toISOString().split('T')[0];
 
-  // Sumar stock
+  // Sumar stock general + actualizar rack_stock para posiciones ya asignadas
+  var rackSt = loadRackStock();
   tr.items.forEach(function(r){
     var da = DATA.find(function(d){return d.art===r.art;});
     if(da){
       da.stock = (da.stock||0) + r.cant;
       da.pall  = Math.floor(da.stock / (da.max_pos||32));
     }
+    // Actualizar rack_stock en todas las posiciones asignadas a este artículo
+    Object.keys(ASIGN).forEach(function(posId){
+      var v = ASIGN[posId];
+      if(!v) return;
+      // Posición principal
+      if(String(v.art) === String(r.art)){
+        if(!rackSt[posId]) rackSt[posId] = {art:r.art, stock:0};
+        rackSt[posId].stock = (rackSt[posId].stock||0) + r.cant;
+        rackSt[posId].art   = r.art;
+      }
+      // Compartidos
+      (v.compartidos||[]).forEach(function(c){
+        if(String(c.art) === String(r.art)){
+          var key = posId+'_c_'+c.art;
+          if(!rackSt[key]) rackSt[key] = {art:r.art, stock:0};
+          rackSt[key].stock = (rackSt[key].stock||0) + r.cant;
+        }
+      });
+    });
   });
+  saveRackStock(rackSt);
   saveDataStock();
 
   // Guardar en historial carga
@@ -8231,9 +8293,12 @@ function cydConfirmarDesdeTransito(id){
   transitoSave(lista);
 
   reevaluarRack();
+  saveAsign();
   transitoBadge();
   cydRenderTransito();
-  showToast('✅ Recepción confirmada — '+tr.items.reduce(function(s,r){return s+r.cant;},0)+' un. sumadas al stock');
+  var totalUn = tr.items.reduce(function(s,r){return s+r.cant;},0);
+  registrarMovProd('carga', totalUn, tr.tipoLabel+(tr.nroContenedor?' '+tr.nroContenedor:''));
+  showToast('✅ Recepción confirmada — '+totalUn+' un. sumadas al stock · rack actualizado');
 }
 
 function cydEliminarTransito(id){
