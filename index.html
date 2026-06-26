@@ -1030,7 +1030,11 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
       <!-- Resumen del día -->
       <div class="prod-resumen" id="prod-resumen"></div>
 
-      <!-- Formulario -->
+      <!-- Lista del día — ARRIBA -->
+      <div style="font-size:11px;font-weight:600;color:#86868b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Movimientos de hoy</div>
+      <div id="prod-lista" style="margin-bottom:12px"></div>
+
+      <!-- Formulario — ABAJO -->
       <div class="prod-form">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <div class="prod-form-title" style="margin-bottom:0">+ Registrar movimiento</div>
@@ -1083,10 +1087,6 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
         </div>
         <button class="prod-save-btn" onclick="guardarMovimientoFecha()" style="margin-top:8px">💾 Guardar movimiento</button>
       </div>
-
-      <!-- Lista del día -->
-      <div style="font-size:11px;font-weight:600;color:#86868b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Movimientos de hoy</div>
-      <div id="prod-lista"></div>
     </div>
 
     <!-- TAB: COLA DE PEDIDOS -->
@@ -1607,6 +1607,7 @@ function actualizarUltimaFecha(){
 }
 
 function toggleUpdate(){ document.getElementById('update-bar').classList.toggle('visible'); }
+
 
 function showToast(msg){
   const t=document.getElementById('toast');
@@ -3723,6 +3724,14 @@ function pedidoEnviarTransito(){
   var nroPed  = (document.getElementById('ped-nropedido')||{}).value||generarNroPedido();
   var modo    = typeof _modoPedido!=='undefined' ? _modoPedido : 'pedidos';
 
+  // Si no tiene destino, pedirlo ahora
+  if(!destino){
+    destino = (prompt('¿Destino / Cliente para el pedido '+nroPed+'?')||'').trim();
+    if(!destino){ showToast('⚠️ Ingresá un destino para continuar'); return; }
+    var pedDestinoEl = document.getElementById('ped-destino');
+    if(pedDestinoEl) pedDestinoEl.value = destino;
+  }
+
   var ahora = new Date();
   var transito = {
     id: 'TS-'+ahora.getTime(),
@@ -3865,36 +3874,19 @@ function cydPlanillaDespacho(id){
       ? '<span style="color:#ff9500;font-weight:700">'+r.bloque+'</span>'
       : '<span style="color:#d70015">—</span>';
     var alertaBg = r.stock < r.cant ? 'background:#fff3cd' : (numFila%2?'background:#fafafa':'');
+    var rango = (typeof RANGOS !== 'undefined' && RANGOS[String(r.art)]) ? RANGOS[String(r.art)] : '—';
 
-    // Si tiene rangos múltiples, expandir una fila por rango
-    if(r.rangos && r.rangos.length > 1){
-      r.rangos.forEach(function(rg, ri){
-        var bgRg = ri===0 ? alertaBg : (numFila%2?'background:#f5f5f7':'background:#f0f7ff');
-        rows += '<tr style="'+bgRg+'">';
-        rows += '<td style="font-weight:700;color:'+(ri>0?'#86868b':'#1d1d1f')+'">'+r.art+'</td>';
-        rows += '<td style="white-space:nowrap'+(ri>0?';color:#86868b':'')+'">'+r.med+'</td>';
-        rows += '<td'+(ri>0?' style="color:#86868b"':'')+'>'+(r.diseno||'')+'</td>';
-        rows += '<td style="color:#86868b">'+(ri===0?(r.prov||''):'↳')+'</td>';
-        rows += '<td>'+(ri===0?ubic:'')+'</td>';
-        rows += '<td style="text-align:right;color:#86868b">'+(ri===0?(r.stock||0):'')+'</td>';
-        rows += '<td style="text-align:right;font-weight:700;color:#d70015">'+rg.cant+'</td>';
-        rows += '<td style="text-align:right;color:#86868b">'+(rg.rangoDesc||('Rng '+(ri+1)))+'</td>';
-        rows += '<td style="border:2px solid #bbb;min-width:60px">&nbsp;</td>';
-        rows += '</tr>';
-      });
-    } else {
-      rows += '<tr style="'+alertaBg+'">';
-      rows += '<td style="font-weight:700">'+r.art+'</td>';
-      rows += '<td style="white-space:nowrap">'+r.med+'</td>';
-      rows += '<td>'+(r.diseno||'')+'</td>';
-      rows += '<td style="color:#86868b">'+(r.prov||'')+'</td>';
-      rows += '<td>'+ubic+'</td>';
-      rows += '<td style="text-align:right;color:#86868b">'+(r.stock||0)+'</td>';
-      rows += '<td style="text-align:right;font-weight:700;color:#d70015">'+cantReal+'</td>';
-      rows += '<td style="text-align:right;color:#86868b">—</td>';
-      rows += '<td style="border:2px solid #bbb;min-width:60px">&nbsp;</td>';
-      rows += '</tr>';
-    }
+    rows += '<tr style="'+alertaBg+'">';
+    rows += '<td style="font-weight:700">'+r.art+'</td>';
+    rows += '<td style="white-space:nowrap">'+r.med+'</td>';
+    rows += '<td>'+(r.diseno||'')+'</td>';
+    rows += '<td style="color:#86868b">'+(r.prov||'')+'</td>';
+    rows += '<td>'+ubic+'</td>';
+    rows += '<td style="text-align:right;color:#86868b">'+(r.stock||0)+'</td>';
+    rows += '<td style="text-align:right;font-weight:700;color:#d70015">'+cantReal+'</td>';
+    rows += '<td style="text-align:center;font-weight:700;color:#0071e3">'+rango+'</td>';
+    rows += '<td style="border:2px solid #bbb;min-width:60px">&nbsp;</td>';
+    rows += '</tr>';
     numFila++;
   });
 
@@ -3934,7 +3926,7 @@ function cydPlanillaDespacho(id){
       '<thead><tr>'+
         '<th>Art.</th><th>Medida</th><th>Diseño</th><th>Proveedor</th>'+
         '<th>Ubicación</th><th style="text-align:right">Stock</th>'+
-        '<th style="text-align:right">Cant.</th><th>Rango / Ref.</th>'+
+        '<th style="text-align:right">Cant.</th><th>Rango</th>'+
         '<th style="min-width:60px">Ctrl ✍</th>'+
       '</tr></thead>'+
       '<tbody>'+rows+'</tbody>'+
@@ -3997,32 +3989,19 @@ function cydPlanillaPicking(id){
       : seccion==='bloque'
       ? '<b style="color:#ff9500">'+r.bloque+'</b>'
       : '<b style="color:#d70015">SIN UBIC.</b>';
-    // Detalle de rangos si hay más de uno (o siempre como referencia del pedido)
-    var rangosHtml = '';
-    if(r.rangos && r.rangos.length > 0){
-      var rangosConDesc = r.rangos.filter(function(rg){ return rg.rangoDesc; });
-      if(rangosConDesc.length > 1 || (r.rangos.length > 1)){
-        rangosHtml = '<tr style="background:#f8f8f8;border-top:none"><td colspan="9" style="padding:2px 8px 5px 24px;font-size:8.5px;color:#666">'+
-          r.rangos.map(function(rg,i){
-            return '<span style="display:inline-block;margin-right:12px">'+
-              (rg.rangoDesc ? '<b>'+rg.rangoDesc+'</b>: ' : 'Rango '+(i+1)+': ')+
-              '<b>'+rg.cant+'</b> u.</span>';
-          }).join('')+
-        '</td></tr>';
-      }
-    }
+    var rango = (typeof RANGOS !== 'undefined' && RANGOS[String(r.art)]) ? RANGOS[String(r.art)] : '—';
     return '<tr style="'+alerta+'">'+
       '<td style="font-weight:700">'+r.art+'</td>'+
       '<td style="white-space:nowrap">'+r.med+'</td>'+
       '<td>'+(r.diseno||'')+'</td>'+
-      '<td style="color:#555">'+( r.prov||'')+'</td>'+
+      '<td style="color:#555">'+(r.prov||'')+'</td>'+
       '<td>'+ubic+'</td>'+
+      '<td style="text-align:center;font-weight:700;color:#0071e3">'+rango+'</td>'+
       '<td style="text-align:right;font-weight:700;color:#d70015">'+r.cant+'</td>'+
-      '<td style="text-align:right;color:#86868b">'+( r.stock||0)+'</td>'+
+      '<td style="text-align:right;color:#86868b">'+(r.stock||0)+'</td>'+
       (diff!==0?'<td style="text-align:right;color:#d70015;font-weight:700">'+(diff>0?'+':'')+diff+'</td>':'<td style="text-align:right;color:#34c759">OK</td>')+
       '<td style="border:2px solid #bbb;min-width:80px">&nbsp;</td>'+
-      '</tr>'+
-      rangosHtml;
+      '</tr>';
   }
 
   var totalCant = tr.items.reduce(function(s,r){return s+(r.cantReal||r.cant);},0);
@@ -4060,15 +4039,15 @@ function cydPlanillaPicking(id){
     '</div>'+
     (enRack.length?
       '<div class="sec sec-rack">RACK — preparar primero ('+enRack.length+' arts · N1 antes que N4)</div>'+
-      '<table><thead><tr><th>Art</th><th>Medida</th><th>Diseño</th><th>Prov</th><th>Posición rack</th><th style="text-align:right">Cant</th><th style="text-align:right">Stock</th><th style="text-align:right">Dif</th><th style="min-width:80px">Visto ✍</th></tr></thead>'+
+      '<table><thead><tr><th>Art</th><th>Medida</th><th>Diseño</th><th>Prov</th><th>Posición rack</th><th style="text-align:center">Rango</th><th style="text-align:right">Cant</th><th style="text-align:right">Stock</th><th style="text-align:right">Dif</th><th style="min-width:80px">Visto ✍</th></tr></thead>'+
       '<tbody>'+rowsRack+'</tbody></table>':'')+
     (enBloque.length?
       '<div class="sec sec-bloque">BLOQUES ('+enBloque.length+' arts)</div>'+
-      '<table><thead><tr><th>Art</th><th>Medida</th><th>Diseño</th><th>Prov</th><th>Bloque</th><th style="text-align:right">Cant</th><th style="text-align:right">Stock</th><th style="text-align:right">Dif</th><th style="min-width:80px">Visto ✍</th></tr></thead>'+
+      '<table><thead><tr><th>Art</th><th>Medida</th><th>Diseño</th><th>Prov</th><th>Bloque</th><th style="text-align:center">Rango</th><th style="text-align:right">Cant</th><th style="text-align:right">Stock</th><th style="text-align:right">Dif</th><th style="min-width:80px">Visto ✍</th></tr></thead>'+
       '<tbody>'+rowsBloque+'</tbody></table>':'')+
     (sinUbic.length?
       '<div class="sec sec-sin">SIN UBICACIÓN ('+sinUbic.length+' arts)</div>'+
-      '<table><thead><tr><th>Art</th><th>Medida</th><th>Diseño</th><th>Prov</th><th>Ubicación</th><th style="text-align:right">Cant</th><th style="text-align:right">Stock</th><th style="text-align:right">Dif</th><th style="min-width:80px">Visto ✍</th></tr></thead>'+
+      '<table><thead><tr><th>Art</th><th>Medida</th><th>Diseño</th><th>Prov</th><th>Ubicación</th><th style="text-align:center">Rango</th><th style="text-align:right">Cant</th><th style="text-align:right">Stock</th><th style="text-align:right">Dif</th><th style="min-width:80px">Visto ✍</th></tr></thead>'+
       '<tbody>'+rowsSin+'</tbody></table>':'')+
     '<div class="pie">Amarillo = stock insuficiente · Azul = rack · Naranja = bloque · '+
     'Generado '+new Date().toLocaleString('es-AR')+' — WMS Halpern Depósito</div>'+
@@ -4080,6 +4059,15 @@ function cydPlanillaPicking(id){
 
 function abrirConfirmacion(){
   if(!window._pedidoActual){ showToast('❌ No hay pedido cargado'); return; }
+
+  // Si no tiene destino, pedirlo antes de abrir el modal
+  var pedDestinoEl = document.getElementById('ped-destino');
+  if(pedDestinoEl && !pedDestinoEl.value.trim()){
+    var dest = (prompt('¿Destino / Cliente?')||'').trim();
+    if(!dest){ showToast('⚠️ Ingresá un destino para continuar'); return; }
+    pedDestinoEl.value = dest;
+  }
+
   const {rack, bloque, sin} = window._pedidoActual;
   const todos = [...rack, ...bloque, ...sin];
 
@@ -8297,8 +8285,8 @@ if('serviceWorker' in navigator){
       </select>
       <select id="cyd-hist-tipo" onchange="cydRenderHistorial()" style="flex:1;min-width:140px;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;background:#fff;outline:none">
         <option value="todo">Todos los movimientos</option>
-        <option value="carga">📦 Solo Cargas</option>
-        <option value="descarga">🚚 Solo Descargas</option>
+        <option value="carga">📥 Solo Ingresos</option>
+        <option value="descarga">📦 Solo Descargas C/D</option>
         <option value="salida">📋 Solo Despachos</option>
       </select>
       <button onclick="cydExportar()" style="padding:8px 14px;background:#1d1d1f;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">📥 Exportar Excel</button>
@@ -8754,7 +8742,7 @@ function cydRenderTransito(){
     // Cabecera del tránsito
     html += '<div style="background:'+colorBg+';padding:10px 12px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px">';
     html += '<div>';
-    html += '<div style="font-size:13px;font-weight:700;color:#1d1d1f">'+tr.tipoIcon+' '+tr.tipoLabel+'</div>';
+    html += '<div style="font-size:13px;font-weight:700;color:#1d1d1f">'+tr.tipoIcon+' '+tr.tipoLabel+(tr.destino?' &nbsp;→&nbsp; <span style="color:'+(esSalidaTr?'#d70015':'#ff9500')+'">'+tr.destino+'</span>':'')+'</div>';
     html += '<div style="font-size:11px;color:#86868b;margin-top:2px">';
     html += 'TTE: <b>'+(tr.tte||'—')+'</b>';
     if(tr.nroContenedor) html += ' &nbsp;·&nbsp; Cont: <b>'+tr.nroContenedor+'</b>';
@@ -9330,12 +9318,12 @@ function cydRenderHistorial(){
   var statsEl = document.getElementById('cyd-hist-stats');
   if(statsEl) statsEl.innerHTML =
     '<div style="background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:10px;text-align:center">'+
-      '<div style="font-size:10px;color:#86868b">Cargas</div>'+
+      '<div style="font-size:10px;color:#86868b">Ingresos</div>'+
       '<div style="font-size:22px;font-weight:700;color:#34c759">'+cargas.length+'</div>'+
       '<div style="font-size:11px;color:#86868b">'+totalCU.toLocaleString('es-AR')+' un.</div></div>'+
     '<div style="background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:10px;text-align:center">'+
-      '<div style="font-size:10px;color:#86868b">Descargas</div>'+
-      '<div style="font-size:22px;font-weight:700;color:#d70015">'+descargas.length+'</div>'+
+      '<div style="font-size:10px;color:#86868b">Descargas C/D</div>'+
+      '<div style="font-size:22px;font-weight:700;color:#ff9500">'+descargas.length+'</div>'+
       '<div style="font-size:11px;color:#86868b">'+totalDU.toLocaleString('es-AR')+' un.</div></div>'+
     '<div style="background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:10px;text-align:center">'+
       '<div style="font-size:10px;color:#86868b">Despachos</div>'+
@@ -9368,8 +9356,8 @@ function cydRenderHistorial(){
     var uid = h._tipo+'-'+ni;
     var esCarga    = h._tipo==='carga';
     var esSalida   = h._tipo==='salida';
-    var colorBorde = esCarga ? '#34c759' : esSalida ? '#0071e3' : '#d70015';
-    var icono      = esCarga ? '📦 Carga' : esSalida ? '📋 Despacho' : '🚚 Descarga';
+    var colorBorde = esCarga ? '#34c759' : esSalida ? '#0071e3' : '#ff9500';
+    var icono      = esCarga ? '📥 Ingreso' : esSalida ? '📋 Despacho' : '📦 Descarga C/D';
     var totalU = h.items.reduce(function(s,i){return s+(i.cant||0);},0);
     var resumen = h.items.slice(0,4).map(function(i){
       return '<span style="background:#f5f5f7;border-radius:4px;padding:1px 5px;margin-right:4px;font-size:10px">'+
