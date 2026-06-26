@@ -1000,9 +1000,13 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     <div class="grupos-tabs">
       <button class="grupos-tab active" onclick="setGruposTab('hoy',this)">📅 Hoy</button>
       <button class="grupos-tab" onclick="setGruposTab('hist',this)">📋 Historial</button>
+      <button class="grupos-tab" onclick="setGruposTab('kpi',this)">📊 KPIs</button>
+      <button class="grupos-tab" onclick="setGruposTab('abm',this)">👤 Personal</button>
     </div>
     <div id="grupos-hoy-panel"></div>
     <div id="grupos-hist-panel" style="display:none"></div>
+    <div id="grupos-kpi-panel" style="display:none"></div>
+    <div id="grupos-abm-panel" style="display:none"></div>
   </div>
 </div>
 
@@ -4208,6 +4212,10 @@ function confirmarDespacho(){
   }
 
   closeModalDirect();
+
+  var totalUnDir = _confirmItems.reduce(function(s,i){return s+(i.cantReal||i.cant);},0);
+  registrarMovProd('despacho', totalUnDir, destino);
+
   limpiarPedido();
 
   let msg = '✅ Despacho confirmado';
@@ -5382,7 +5390,7 @@ function calcCategorias(){
 
 
 // === MÓDULO GRUPOS ===
-const PERSONAL_BASE = [
+const PERSONAL_BASE_DEFAULT = [
   {nombre:'Ochoa Miguel Angel', grupo:'C'},
   {nombre:'Kunich Alberto', grupo:'C'},
   {nombre:'Fernandez Emanuel', grupo:'G1'},
@@ -5405,6 +5413,12 @@ const PERSONAL_BASE = [
   {nombre:'Nicastro Fabricio Exequiel', grupo:'R'},
   {nombre:'Bravo Ariel', grupo:'R'},
 ];
+function getPersonalBase(){
+  try{ var s=localStorage.getItem('wms_personal_base'); if(s) return JSON.parse(s); }catch(e){}
+  return PERSONAL_BASE_DEFAULT.map(function(p){ return {nombre:p.nombre,grupo:p.grupo}; });
+}
+function savePersonalBase(data){ localStorage.setItem('wms_personal_base',JSON.stringify(data)); }
+var PERSONAL_BASE = getPersonalBase();
 
 const GRUPOS_COLORES = {C:'#86868b', G1:'#0071e3', G2:'#34c759', G3:'#ff9500', R:'#af52de', ZF:'#ff3b30'};
 const GRUPOS_NOMBRES = {C:'Controladores', G1:'Grupo 1', G2:'Grupo 2', G3:'Grupo 3', R:'Chasis', ZF:'Equipo ZF'};
@@ -5414,154 +5428,460 @@ function getTodayKey(){
 }
 
 function getGruposHoy(){
-  const key = getTodayKeyFecha();
-  const saved = localStorage.getItem(key);
+  var key = getTodayKeyFecha();
+  var saved = localStorage.getItem(key);
   if(saved) return JSON.parse(saved);
-  // Default: todos presentes en su grupo base
-  return PERSONAL_BASE.map(p=>({...p, presente:true, grupoHoy:p.grupo}));
+  var base = getPersonalBase();
+  return base.map(function(p){ return {nombre:p.nombre,grupo:p.grupo,grupoHoy:p.grupo,presente:true,novedad:'',novedadDetalle:''}; });
 }
 
 function saveGruposHoy(data){
   localStorage.setItem(getTodayKey(), JSON.stringify(data));
-  // Save to history
-  const hist = JSON.parse(localStorage.getItem('grupos_hist')||'[]');
-  const fecha = new Date().toLocaleDateString('es-AR');
-  const idx = hist.findIndex(h=>h.fecha===fecha);
-  const entry = {fecha, data};
+  var hist = JSON.parse(localStorage.getItem('grupos_hist')||'[]');
+  var fecha = new Date().toLocaleDateString('es-AR');
+  var idx = hist.findIndex(function(h){return h.fecha===fecha;});
+  var entry = {fecha:fecha, data:data};
   if(idx>=0) hist[idx]=entry; else hist.unshift(entry);
-  localStorage.setItem('grupos_hist', JSON.stringify(hist.slice(0,60)));
+  localStorage.setItem('grupos_hist', JSON.stringify(hist.slice(0,90)));
 }
 
 function renderGrupos(){
   document.getElementById('grupos-fecha').textContent = new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
 }
 
+var _gruposTabActual = 'hoy';
 function setGruposTab(tab, btn){
-  document.querySelectorAll('.grupos-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.grupos-tab').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
-  document.getElementById('grupos-hoy-panel').style.display = tab==='hoy'?'block':'none';
-  document.getElementById('grupos-hist-panel').style.display = tab==='hist'?'block':'none';
-  if(tab==='hoy') renderGruposHoy();
+  _gruposTabActual = tab;
+  document.getElementById('grupos-hoy-panel').style.display   = tab==='hoy'  ?'block':'none';
+  document.getElementById('grupos-hist-panel').style.display  = tab==='hist' ?'block':'none';
+  document.getElementById('grupos-kpi-panel').style.display   = tab==='kpi'  ?'block':'none';
+  document.getElementById('grupos-abm-panel').style.display   = tab==='abm'  ?'block':'none';
+  if(tab==='hoy')  renderGruposHoy();
   if(tab==='hist') renderGruposHist();
+  if(tab==='kpi')  renderGruposKPI();
+  if(tab==='abm')  renderGruposABM();
+}
+
+function renderGruposKPI(){
+  var panel = document.getElementById('grupos-kpi-panel');
+  if(!panel) return;
+
+  // --- Datos del día actual ---
+  var personal   = getGruposHoy();
+  var fecha      = new Date().toLocaleDateString('es-AR');
+  var dayKey     = 'prod_' + fecha.replace(/\//g,'-');
+  var movsDia    = JSON.parse(localStorage.getItem(dayKey)||'[]');
+
+  // Unidades por grupo hoy
+  var unidPorGrupo = {};
+  movsDia.forEach(function(m){
+    unidPorGrupo[m.grupo] = (unidPorGrupo[m.grupo]||0) + (m.unidades||0);
+  });
+
+  // Personas presentes por grupo hoy
+  var presGrupo = {};
+  personal.forEach(function(p){
+    if(!p.presente) return;
+    presGrupo[p.grupoHoy] = (presGrupo[p.grupoHoy]||0) + 1;
+  });
+
+  var grupos = ['G1','G2','G3','R','C'];
+  var totalUnidDia = movsDia.reduce(function(s,m){return s+(m.unidades||0);},0);
+  var totalPres    = personal.filter(function(p){return p.presente;}).length;
+  var unidPorCabezaDia = totalPres > 0 ? Math.round(totalUnidDia/totalPres) : 0;
+
+  // --- Datos históricos del mes ---
+  var mesKey = new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+  var histProd   = JSON.parse(localStorage.getItem('prod_hist_'+mesKey)||'[]');
+  var histGrupos = JSON.parse(localStorage.getItem('grupos_hist')||'[]');
+
+  // Acumular unidades y días por grupo en el mes
+  var mesGrupo = {};
+  grupos.forEach(function(g){ mesGrupo[g]={unid:0,dias:0,cabezaDias:[]}; });
+
+  // Por cada día del historial de grupos, cruzar con prod
+  histGrupos.forEach(function(h){
+    var dKey = 'prod_'+h.fecha.replace(/\//g,'-');
+    var movsD = JSON.parse(localStorage.getItem(dKey)||'[]');
+    if(!movsD.length) return;
+    grupos.forEach(function(g){
+      var u = movsD.filter(function(m){return m.grupo===g;}).reduce(function(s,m){return s+(m.unidades||0);},0);
+      if(!u) return;
+      var pres = h.data.filter(function(p){return p.presente && p.grupoHoy===g;}).length;
+      mesGrupo[g].unid += u;
+      mesGrupo[g].dias++;
+      if(pres>0) mesGrupo[g].cabezaDias.push(u/pres);
+    });
+  });
+
+  // Promedio unidades/cabeza/día por grupo en el mes
+  function promCabeza(g){
+    var arr = mesGrupo[g].cabezaDias;
+    if(!arr.length) return 0;
+    return Math.round(arr.reduce(function(s,v){return s+v;},0)/arr.length);
+  }
+
+  // Mejor grupo del mes
+  var mejorGrupo = grupos.slice().sort(function(a,b){ return promCabeza(b)-promCabeza(a); })[0];
+  var maxProm = promCabeza(mejorGrupo)||1;
+
+  // ── HTML ──
+  var html = '';
+
+  // Tarjetas resumen día
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">';
+  html += _kpiCard('Unidades hoy','#0071e3', totalUnidDia.toLocaleString('es-AR'), 'total');
+  html += _kpiCard('Personas presentes','#34c759', totalPres, 'personas');
+  html += _kpiCard('Unid/cabeza hoy','#ff9500', unidPorCabezaDia, 'promedio');
+  html += '</div>';
+
+  // Ranking por grupo — HOY
+  html += '<div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:12px;margin-bottom:10px">';
+  html += '<div style="font-size:12px;font-weight:700;color:#86868b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Hoy — Unidades por grupo</div>';
+  var maxHoy = Math.max.apply(null, grupos.map(function(g){return unidPorGrupo[g]||0;})) || 1;
+  grupos.forEach(function(g){
+    var u    = unidPorGrupo[g]||0;
+    var pres = presGrupo[g]||0;
+    var upc  = pres>0 ? Math.round(u/pres) : 0;
+    var color = GRUPOS_COLORES[g]||'#86868b';
+    var pct  = Math.round((u/maxHoy)*100);
+    if(!u && !pres) return;
+    html += '<div style="margin-bottom:8px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">';
+    html += '<span style="font-size:12px;font-weight:700;color:'+color+'">'+GRUPOS_NOMBRES[g]+'</span>';
+    html += '<span style="font-size:11px;color:#86868b">'+pres+' pers. · <b style="color:'+color+'">'+u.toLocaleString('es-AR')+'</b> un. · <b>'+upc+'</b>/cabeza</span>';
+    html += '</div>';
+    html += '<div style="background:#f5f5f7;border-radius:6px;height:8px;overflow:hidden">';
+    html += '<div style="width:'+pct+'%;height:100%;background:'+color+';border-radius:6px;transition:width .4s"></div>';
+    html += '</div></div>';
+  });
+  html += '</div>';
+
+  // Ranking por grupo — MES
+  html += '<div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:12px;margin-bottom:10px">';
+  html += '<div style="font-size:12px;font-weight:700;color:#86868b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Mes — Promedio unidades/cabeza/día</div>';
+  var rankMes = grupos
+    .map(function(g){ return {g:g, prom:promCabeza(g), total:mesGrupo[g].unid, dias:mesGrupo[g].dias}; })
+    .filter(function(x){return x.total>0;})
+    .sort(function(a,b){return b.prom-a.prom;});
+
+  rankMes.forEach(function(x,ri){
+    var color = GRUPOS_COLORES[x.g]||'#86868b';
+    var pct   = Math.round((x.prom/Math.max(rankMes[0].prom,1))*100);
+    var medal = ri===0?'🥇':ri===1?'🥈':ri===2?'🥉':'';
+    html += '<div style="margin-bottom:8px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">';
+    html += '<span style="font-size:12px;font-weight:700;color:'+color+'">'+medal+' '+GRUPOS_NOMBRES[x.g]+'</span>';
+    html += '<span style="font-size:11px;color:#86868b"><b style="color:'+color+'">'+x.prom+'</b> un/cab/día · '+x.total.toLocaleString('es-AR')+' total · '+x.dias+' días</span>';
+    html += '</div>';
+    html += '<div style="background:#f5f5f7;border-radius:6px;height:8px;overflow:hidden">';
+    html += '<div style="width:'+pct+'%;height:100%;background:'+color+';border-radius:6px"></div>';
+    html += '</div></div>';
+  });
+  html += '</div>';
+
+  // Ranking individual (por cabeza estimado: unid grupo / personas presentes por día)
+  html += '<div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:12px;margin-bottom:10px">';
+  html += '<div style="font-size:12px;font-weight:700;color:#86868b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Mes — Estimado por persona</div>';
+  html += '<div style="font-size:10px;color:#86868b;margin-bottom:8px">Unidades de su grupo ÷ personas presentes ese día, acumulado en el mes</div>';
+
+  // Por persona: sumar (unidGrupo/presGrupo) por cada día que estuvo presente
+  var rankPersona = [];
+  getPersonalBase().forEach(function(pb){
+    var totalEst = 0; var diasContados = 0;
+    histGrupos.forEach(function(h){
+      var per = h.data.find(function(p){return p.nombre===pb.nombre;});
+      if(!per||!per.presente) return;
+      var g    = per.grupoHoy||per.grupo;
+      var dKey2 = 'prod_'+h.fecha.replace(/\//g,'-');
+      var movsD2 = JSON.parse(localStorage.getItem(dKey2)||'[]');
+      var uG   = movsD2.filter(function(m){return m.grupo===g;}).reduce(function(s,m){return s+(m.unidades||0);},0);
+      var presG = h.data.filter(function(p){return p.presente&&(p.grupoHoy||p.grupo)===g;}).length;
+      if(uG>0 && presG>0){ totalEst += uG/presG; diasContados++; }
+    });
+    if(diasContados>0) rankPersona.push({
+      nombre:pb.nombre, grupo:pb.grupo,
+      est: Math.round(totalEst),
+      promDia: Math.round(totalEst/diasContados),
+      dias: diasContados
+    });
+  });
+  rankPersona.sort(function(a,b){return b.promDia-a.promDia;});
+  var maxInd = rankPersona.length ? rankPersona[0].promDia||1 : 1;
+
+  if(!rankPersona.length){
+    html += '<div style="text-align:center;color:#86868b;padding:20px;font-size:12px">Sin datos suficientes aún — se acumula automáticamente con cada ingreso/despacho</div>';
+  } else {
+    rankPersona.forEach(function(p,ri){
+      var color = GRUPOS_COLORES[p.grupo]||'#86868b';
+      var pct   = Math.round((p.promDia/maxInd)*100);
+      var medal = ri===0?'🥇':ri===1?'🥈':ri===2?'🥉':'';
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+      html += '<div style="width:18px;text-align:center;font-size:11px;color:#86868b;flex-shrink:0">'+(ri<3?medal:(ri+1))+'</div>';
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="display:flex;justify-content:space-between;margin-bottom:2px">';
+      html += '<span style="font-size:11px;font-weight:600;color:#1d1d1f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.nombre.split(' ').slice(0,2).join(' ')+'</span>';
+      html += '<span style="font-size:10px;color:#86868b;flex-shrink:0;margin-left:4px"><b style="color:'+color+'">'+p.promDia+'</b>/día · '+p.est+' total · '+p.dias+'d</span>';
+      html += '</div>';
+      html += '<div style="background:#f5f5f7;border-radius:4px;height:6px;overflow:hidden">';
+      html += '<div style="width:'+pct+'%;height:100%;background:'+color+';border-radius:4px"></div>';
+      html += '</div></div>';
+      html += '<span style="font-size:9px;font-weight:700;color:'+color+';background:'+color+'18;padding:1px 5px;border-radius:6px;flex-shrink:0">'+p.grupo+'</span>';
+      html += '</div>';
+    });
+  }
+  html += '</div>';
+
+  panel.innerHTML = html;
+}
+
+function _kpiCard(label, color, val, sub){
+  return '<div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:10px;text-align:center">'+
+    '<div style="font-size:9px;color:#86868b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">'+label+'</div>'+
+    '<div style="font-size:24px;font-weight:700;color:'+color+'">'+val+'</div>'+
+    '</div>';
+}
+
+var NOVEDADES = [
+  {v:'',        label:'— Normal'},
+  {v:'tarde',   label:'⏰ Llegada tarde'},
+  {v:'licMed',  label:'🏥 Licencia médica'},
+  {v:'licPart', label:'📋 Licencia particular'},
+  {v:'parte',   label:'⚠️ Parte'},
+  {v:'suspens', label:'🚫 Suspensión'},
+  {v:'vacac',   label:'🌴 Vacaciones'},
+  {v:'otro',    label:'📝 Otro'},
+];
+
+function novLabel(v){
+  var n = NOVEDADES.find(function(x){return x.v===v;});
+  return n ? n.label : v||'';
 }
 
 function renderGruposHoy(){
-  const personal = getGruposHoy();
-  const grupos = ['C','G1','G2','G3','R','ZF'];
-  const panel = document.getElementById('grupos-hoy-panel');
+  var personal = getGruposHoy();
+  var grupos = ['C','G1','G2','G3','R','ZF'];
+  var panel = document.getElementById('grupos-hoy-panel');
 
-  // Summary header
-  const totalPresentes = personal.filter(p=>p.presente).length;
-  const totalPersonal = personal.length;
-  const zfResumen = JSON.parse(localStorage.getItem('zf_'+getTodayKey())||'{"personas":0,"presente":false}');
-  const resumenGrupos = ['C','G1','G2','G3','R'].map(g=>{
-    const m = personal.filter(p=>p.grupoHoy===g);
-    const pres = m.filter(p=>p.presente).length;
-    return `<div style="text-align:center;background:${GRUPOS_COLORES[g]}15;border-radius:8px;padding:6px 8px;border:1px solid ${GRUPOS_COLORES[g]}40">
-      <div style="font-size:11px;font-weight:700;color:${GRUPOS_COLORES[g]}">${g}</div>
-      <div style="font-size:16px;font-weight:700">${pres}/${m.length}</div>
-    </div>`;
-  }).join('') + (zfResumen.presente?`
-    <div style="text-align:center;background:#ff3b3015;border-radius:8px;padding:6px 8px;border:1px solid #ff3b3040">
-      <div style="font-size:11px;font-weight:700;color:#ff3b30">ZF</div>
-      <div style="font-size:16px;font-weight:700">${zfResumen.personas}</div>
-    </div>`:'');
+  var totalPresentes = personal.filter(function(p){return p.presente;}).length;
+  var totalPersonal  = personal.length;
+  var zfResumen = JSON.parse(localStorage.getItem('zf_'+getTodayKey())||'{"personas":0,"presente":false}');
 
-  let html3 = `
-    <div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:12px;margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div style="font-size:13px;font-weight:600">Total presentes</div>
-        <div style="font-size:22px;font-weight:700;color:#34c759">${totalPresentes}<span style="font-size:13px;color:#86868b">/${totalPersonal}</span></div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">${resumenGrupos}</div>
-    </div>`;
+  var resumenGrupos = ['C','G1','G2','G3','R'].map(function(g){
+    var m    = personal.filter(function(p){return p.grupoHoy===g;});
+    var pres = m.filter(function(p){return p.presente;}).length;
+    return '<div style="text-align:center;background:'+GRUPOS_COLORES[g]+'15;border-radius:8px;padding:6px 4px;border:1px solid '+GRUPOS_COLORES[g]+'40">'+
+      '<div style="font-size:10px;font-weight:700;color:'+GRUPOS_COLORES[g]+'">'+g+'</div>'+
+      '<div style="font-size:15px;font-weight:700">'+pres+'/'+m.length+'</div>'+
+      '</div>';
+  }).join('') + (zfResumen.presente?
+    '<div style="text-align:center;background:#ff3b3015;border-radius:8px;padding:6px 4px;border:1px solid #ff3b3040">'+
+    '<div style="font-size:10px;font-weight:700;color:#ff3b30">ZF</div>'+
+    '<div style="font-size:15px;font-weight:700">'+zfResumen.personas+'</div></div>':'');
 
-  grupos.forEach(g=>{
-    const miembros = personal.filter(p=>p.grupoHoy===g);
-    const presentes = miembros.filter(p=>p.presente).length;
-    const color = GRUPOS_COLORES[g];
-    html3 += `<div class="grupo-card">
-      <div class="grupo-header" style="border-left:4px solid ${color}">
-        <div>
-          <div class="grupo-nombre" style="color:${color}">${GRUPOS_NOMBRES[g]}</div>
-          <div class="grupo-count">${presentes}/${miembros.length} presentes</div>
-        </div>
-      </div>`;
-    
-    miembros.forEach((p,i)=>{
-      const idx = personal.indexOf(p);
-      html3 += `<div class="persona-row">
-        <div class="persona-nombre" style="font-size:12px">${p.nombre.split(' ').slice(0,2).join(' ')}</div>
-        <select class="persona-grupo-sel" onchange="cambiarGrupo(${idx},this.value)" style="font-size:10px;padding:3px 6px">
-          ${grupos.map(gg=>`<option value="${gg}" ${p.grupoHoy===gg?'selected':''}>${gg}</option>`).join('')}
-        </select>
-        <input type="text" placeholder="obs..." value="${p.obs||''}"
-          onchange="guardarObs(${idx},this.value)"
-          style="flex:1;padding:4px 8px;border:1px solid ${p.obs?'#ff9500':'#d2d2d7'};border-radius:8px;font-size:11px;color:#1d1d1f;background:${p.obs?'#fff9f0':'#fff'};outline:none;min-width:60px;max-width:140px">
-        <button class="toggle-btn ${p.presente?'on':'off'}" onclick="togglePresente(${idx})" style="width:38px;height:22px" id="tog-${idx}"></button>
-      </div>`;
+  // Novedades del día
+  var conNovedad = personal.filter(function(p){return p.novedad||!p.presente;});
+  var novedadesHtml = '';
+  if(conNovedad.length){
+    novedadesHtml = '<div style="background:#fff9f0;border:1px solid #ff9500;border-radius:10px;padding:8px 10px;margin-bottom:8px">'+
+      '<div style="font-size:11px;font-weight:700;color:#ff9500;margin-bottom:4px">⚠️ Novedades del día</div>'+
+      conNovedad.map(function(p){
+        var txt = !p.presente ? '❌ Ausente' : novLabel(p.novedad);
+        return '<div style="font-size:11px;color:#1d1d1f;padding:2px 0">'+
+          '<b>'+p.nombre.split(' ')[0]+'</b>'+
+          ' <span style="color:#86868b">('+p.grupoHoy+')</span>'+
+          ' — '+txt+(p.novedadDetalle?' · <i>'+p.novedadDetalle+'</i>':'')+'</div>';
+      }).join('')+
+    '</div>';
+  }
+
+  var html = '<div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:12px;margin-bottom:10px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'+
+    '<div style="font-size:13px;font-weight:600">Total presentes</div>'+
+    '<div style="font-size:22px;font-weight:700;color:#34c759">'+totalPresentes+'<span style="font-size:13px;color:#86868b">/'+totalPersonal+'</span></div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:5px">'+resumenGrupos+'</div>'+
+    '</div>';
+
+  html += novedadesHtml;
+
+  grupos.forEach(function(g){
+    var miembros = personal.filter(function(p){return p.grupoHoy===g;});
+    var presentes = miembros.filter(function(p){return p.presente;}).length;
+    var color = GRUPOS_COLORES[g];
+
+    if(g==='ZF'){
+      var zfHoy = JSON.parse(localStorage.getItem('zf_'+getTodayKey())||'{"personas":0,"presente":false}');
+      html += '<div class="grupo-card">'+
+        '<div class="grupo-header" style="border-left:4px solid #ff3b30">'+
+          '<div><div class="grupo-nombre" style="color:#ff3b30">🔴 Equipo ZF</div>'+
+          '<div class="grupo-count">Colaboración externa</div></div>'+
+          '<button class="toggle-btn '+(zfHoy.presente?'on':'off')+'" onclick="toggleZF()" style="width:38px;height:22px"></button>'+
+        '</div>'+
+        (zfHoy.presente?'<div class="persona-row">'+
+          '<div class="persona-nombre" style="font-size:12px">Personas presentes</div>'+
+          '<div style="display:flex;align-items:center;gap:8px">'+
+          '<button onclick="cambiarZF(-1)" style="width:28px;height:28px;border-radius:50%;border:none;background:#ffd6d9;color:#d70015;font-size:16px;cursor:pointer">−</button>'+
+          '<span style="font-size:18px;font-weight:700;min-width:24px;text-align:center" id="zf-count">'+zfHoy.personas+'</span>'+
+          '<button onclick="cambiarZF(1)" style="width:28px;height:28px;border-radius:50%;border:none;background:#d4edda;color:#1c7c2c;font-size:16px;cursor:pointer">+</button>'+
+          '</div></div>':'')+'</div>';
+      return;
+    }
+
+    if(!miembros.length) return;
+    html += '<div class="grupo-card">'+
+      '<div class="grupo-header" style="border-left:4px solid '+color+'">'+
+        '<div><div class="grupo-nombre" style="color:'+color+'">'+GRUPOS_NOMBRES[g]+'</div>'+
+        '<div class="grupo-count">'+presentes+'/'+miembros.length+' presentes</div></div>'+
+      '</div>';
+
+    miembros.forEach(function(p){
+      var idx = personal.indexOf(p);
+      var novOpts = NOVEDADES.map(function(n){
+        return '<option value="'+n.v+'" '+(p.novedad===n.v?'selected':'')+'>'+n.label+'</option>';
+      }).join('');
+      var grupoOpts = ['C','G1','G2','G3','R'].map(function(gg){
+        return '<option value="'+gg+'" '+(p.grupoHoy===gg?'selected':'')+'>'+gg+'</option>';
+      }).join('');
+      var rowBg = !p.presente ? 'background:#fff5f5' : p.novedad ? 'background:#fff9f0' : '';
+      html += '<div class="persona-row" style="'+rowBg+';flex-wrap:wrap;gap:4px;padding:6px 8px">'+
+        '<div style="flex:1;min-width:100px;font-size:12px;font-weight:600">'+p.nombre.split(' ').slice(0,2).join(' ')+'</div>'+
+        // Grupo hoy
+        '<select onchange="gruposSetGrupoHoy('+idx+',this.value)" style="padding:3px 5px;border:1px solid #d2d2d7;border-radius:7px;font-size:11px;font-weight:600;color:'+color+'">'+grupoOpts+'</select>'+
+        // Novedad
+        '<select onchange="gruposSetNovedad('+idx+',this.value)" style="padding:3px 5px;border:1px solid '+(p.novedad?'#ff9500':'#d2d2d7')+';border-radius:7px;font-size:11px;background:'+(p.novedad?'#fff9f0':'#fff')+'">'+novOpts+'</select>'+
+        // Detalle novedad
+        '<input type="text" value="'+(p.novedadDetalle||'')+'" placeholder="detalle..." onchange="gruposSetDetalle('+idx+',this.value)"'+
+          ' style="flex:1;min-width:80px;padding:3px 7px;border:1px solid #d2d2d7;border-radius:7px;font-size:11px;outline:none">'+
+        // Toggle presente
+        '<button class="toggle-btn '+(p.presente?'on':'off')+'" onclick="togglePresente('+idx+')" style="width:38px;height:22px;flex-shrink:0"></button>'+
+      '</div>';
     });
-    html3 += '</div>';
+    html += '</div>';
   });
 
-  // Personas sin grupo asignado hoy (cambiaron a otro)
-  const sinGrupo = personal.filter(p=>!grupos.includes(p.grupoHoy));
-  
-  // ZF Card
-  const zfHoy = JSON.parse(localStorage.getItem('zf_'+getTodayKey())||'{"personas":0,"presente":false}');
-  html3 += `<div class="grupo-card">
-    <div class="grupo-header" style="border-left:4px solid #ff3b30">
-      <div>
-        <div class="grupo-nombre" style="color:#ff3b30">🔴 Equipo ZF</div>
-        <div class="grupo-count">Colaboración externa</div>
-      </div>
-      <button class="toggle-btn ${zfHoy.presente?'on':'off'}" onclick="toggleZF()" style="width:38px;height:22px"></button>
-    </div>
-    ${zfHoy.presente?`
-    <div class="persona-row">
-      <div class="persona-nombre" style="font-size:12px">Personas presentes</div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button onclick="cambiarZF(-1)" style="width:28px;height:28px;border-radius:50%;border:none;background:#ffd6d9;color:#d70015;font-size:16px;cursor:pointer">−</button>
-        <span style="font-size:18px;font-weight:700;min-width:24px;text-align:center" id="zf-count">${zfHoy.personas}</span>
-        <button onclick="cambiarZF(1)" style="width:28px;height:28px;border-radius:50%;border:none;background:#d4edda;color:#1c7c2c;font-size:16px;cursor:pointer">+</button>
-      </div>
-    </div>`:''}
-  </div>`;
+  html += '<div style="display:flex;gap:8px;margin-top:8px">'+
+    '<button onclick="guardarAsistencia()" style="flex:1;padding:12px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">💾 Guardar</button>'+
+    '<button onclick="exportarInformeMensual()" style="padding:12px 16px;background:#1d1d1f;color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer">📄 Informe</button>'+
+  '</div>';
 
-  html3 += `
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <button onclick="guardarAsistencia()" style="flex:1;padding:12px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">💾 Guardar asistencia</button>
-      <button onclick="exportarInformeMensual()" style="padding:12px 16px;background:#1d1d1f;color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer">📄 Informe mes</button>
-    </div>`;
-
-  panel.innerHTML = html3;
+  panel.innerHTML = html;
 }
 
+function gruposSetGrupoHoy(idx, val){
+  var p = getGruposHoy();
+  p[idx].grupoHoy = val;
+  saveGruposHoy(p);
+  renderGruposHoy();
+}
+function gruposSetNovedad(idx, val){
+  var p = getGruposHoy();
+  p[idx].novedad = val;
+  if(!val) p[idx].novedadDetalle='';
+  saveGruposHoy(p);
+  renderGruposHoy();
+}
+function gruposSetDetalle(idx, val){
+  var p = getGruposHoy();
+  p[idx].novedadDetalle = val.trim();
+  saveGruposHoy(p);
+}
 function guardarObs(idx, val){
-  const personal = getGruposHoy();
-  personal[idx].obs = val.trim();
-  saveGruposHoy(personal);
+  var p = getGruposHoy();
+  p[idx].obs = val.trim();
+  saveGruposHoy(p);
 }
-
 function togglePresente(idx){
-  const personal = getGruposHoy();
-  personal[idx].presente = !personal[idx].presente;
-  saveGruposHoy(personal);
+  var p = getGruposHoy();
+  p[idx].presente = !p[idx].presente;
+  if(!p[idx].presente && !p[idx].novedad) p[idx].novedad='';
+  saveGruposHoy(p);
   renderGruposHoy();
 }
-
 function cambiarGrupo(idx, nuevoGrupo){
-  const personal = getGruposHoy();
-  personal[idx].grupoHoy = nuevoGrupo;
-  saveGruposHoy(personal);
+  var p = getGruposHoy();
+  p[idx].grupoHoy = nuevoGrupo;
+  saveGruposHoy(p);
   renderGruposHoy();
 }
-
 function guardarAsistencia(){
-  const personal = getGruposHoy();
-  saveGruposHoy(personal);
-  showToast('✅ Asistencia guardada — '+personal.filter(p=>p.presente).length+' presentes');
+  var p = getGruposHoy();
+  saveGruposHoy(p);
+  PERSONAL_BASE = getPersonalBase();
+  showToast('✅ Asistencia guardada — '+p.filter(function(x){return x.presente;}).length+' presentes');
 }
+
+// ── ABM Personal ──────────────────────────────────────────
+function renderGruposABM(){
+  var base = getPersonalBase();
+  var grupos = ['C','G1','G2','G3','R'];
+  var html = '<div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:12px;margin-bottom:10px">'+
+    '<div style="font-size:13px;font-weight:600;margin-bottom:10px">👤 Agregar persona</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+    '<input id="abm-nombre" type="text" placeholder="Apellido Nombre" style="flex:2;min-width:140px;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none">'+
+    '<select id="abm-grupo" style="flex:1;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;background:#fff">'+
+    grupos.map(function(g){return '<option value="'+g+'">'+g+' — '+GRUPOS_NOMBRES[g]+'</option>';}).join('')+
+    '</select>'+
+    '<button onclick="abmAgregar()" style="padding:8px 14px;background:#34c759;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">+ Agregar</button>'+
+    '</div></div>';
+
+  grupos.forEach(function(g){
+    var miembros = base.filter(function(p){return p.grupo===g;});
+    if(!miembros.length) return;
+    html += '<div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;margin-bottom:8px;overflow:hidden">'+
+      '<div style="padding:8px 12px;background:'+GRUPOS_COLORES[g]+'12;border-bottom:1px solid #f0f0f0;font-size:12px;font-weight:700;color:'+GRUPOS_COLORES[g]+'">'+GRUPOS_NOMBRES[g]+'</div>';
+    miembros.forEach(function(p){
+      var bi = base.indexOf(p);
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid #f5f5f7">'+
+        '<div style="flex:1;font-size:12px">'+p.nombre+'</div>'+
+        '<select onchange="abmCambiarGrupoBase('+bi+',this.value)" style="padding:3px 6px;border:1px solid #d2d2d7;border-radius:6px;font-size:11px">'+
+        grupos.map(function(gg){return '<option value="'+gg+'" '+(p.grupo===gg?'selected':'')+'>'+gg+'</option>';}).join('')+
+        '</select>'+
+        '<button onclick="abmEliminar('+bi+')" style="padding:3px 8px;background:#ffd6d9;color:#d70015;border:none;border-radius:6px;font-size:11px;cursor:pointer">✕</button>'+
+      '</div>';
+    });
+    html += '</div>';
+  });
+
+  document.getElementById('grupos-abm-panel').innerHTML = html;
+}
+
+function abmAgregar(){
+  var nombre = (document.getElementById('abm-nombre').value||'').trim();
+  var grupo  = document.getElementById('abm-grupo').value;
+  if(!nombre){ showToast('⚠️ Ingresá el nombre'); return; }
+  var base = getPersonalBase();
+  if(base.find(function(p){return p.nombre.toLowerCase()===nombre.toLowerCase();})){
+    showToast('⚠️ Ya existe esa persona'); return;
+  }
+  base.push({nombre:nombre, grupo:grupo});
+  savePersonalBase(base);
+  PERSONAL_BASE = base;
+  document.getElementById('abm-nombre').value = '';
+  renderGruposABM();
+  showToast('✅ '+nombre+' agregado a '+grupo);
+}
+
+function abmEliminar(idx){
+  var base = getPersonalBase();
+  if(!confirm('¿Eliminar a '+base[idx].nombre+'?')) return;
+  base.splice(idx,1);
+  savePersonalBase(base);
+  PERSONAL_BASE = base;
+  renderGruposABM();
+  showToast('🗑️ Persona eliminada');
+}
+
+function abmCambiarGrupoBase(idx, nuevoGrupo){
+  var base = getPersonalBase();
+  base[idx].grupo = nuevoGrupo;
+  savePersonalBase(base);
+  PERSONAL_BASE = base;
+  showToast('✅ Grupo base actualizado');
+}
+
 
 function renderGruposHist(){
   const hist = JSON.parse(localStorage.getItem('grupos_hist')||'[]');
@@ -5593,116 +5913,96 @@ function renderGruposHist(){
 
 
 function exportarInformeMensual(){
-  const hist = JSON.parse(localStorage.getItem('grupos_hist')||'[]');
+  var hist = JSON.parse(localStorage.getItem('grupos_hist')||'[]');
   if(!hist.length){ showToast('Sin historial para exportar'); return; }
-
-  const wb = XLSX.utils.book_new();
-  const mes = new Date().toLocaleDateString('es-AR',{month:'long',year:'numeric'});
+  var base = getPersonalBase();
+  var wb = XLSX.utils.book_new();
+  var mes = new Date().toLocaleDateString('es-AR',{month:'long',year:'numeric'});
 
   // === HOJA 1: RESUMEN POR PERSONA ===
-  const resumen = {};
-  PERSONAL_BASE.forEach(p=>{
+  var resumen = {};
+  base.forEach(function(p){
     resumen[p.nombre] = {
-      nombre: p.nombre,
-      grupoBase: p.grupo,
-      diasPresente: 0,
-      diasAusente: 0,
-      observaciones: [],
-      cambiosGrupo: 0,
+      nombre:p.nombre, grupoBase:p.grupo,
+      diasPresente:0, diasAusente:0,
+      tarde:0, licMed:0, licPart:0, parte:0, suspens:0, vacac:0, otro:0,
+      novedades:[]
     };
   });
 
-  hist.forEach(h=>{
-    h.data.forEach(p=>{
+  hist.forEach(function(h){
+    h.data.forEach(function(p){
       if(!resumen[p.nombre]) return;
-      if(p.presente){
-        resumen[p.nombre].diasPresente++;
-        if(p.grupoHoy !== p.grupo) resumen[p.nombre].cambiosGrupo++;
-      } else {
-        resumen[p.nombre].diasAusente++;
+      var r = resumen[p.nombre];
+      if(p.presente){ r.diasPresente++; } else { r.diasAusente++; }
+      if(p.novedad){
+        r[p.novedad] = (r[p.novedad]||0) + 1;
+        r.novedades.push(h.fecha+': '+novLabel(p.novedad)+(p.novedadDetalle?' ('+p.novedadDetalle+')':''));
       }
-      if(p.obs) resumen[p.nombre].observaciones.push(h.fecha+': '+p.obs);
+      // compatibilidad campo obs viejo
+      if(!p.novedad && p.obs) r.novedades.push(h.fecha+': '+p.obs);
     });
   });
 
-  // Ponderación: presencia 60%, sin observaciones negativas 40%
-  const wsRes = [
-    [`INFORME MENSUAL DE ASISTENCIA Y PRODUCTIVIDAD — ${mes.toUpperCase()}`],
+  var grupos = ['C','G1','G2','G3','R'];
+  var wsRes = [
+    ['INFORME MENSUAL DE ASISTENCIA — '+mes.toUpperCase()],
     [],
-    ['NOMBRE','GRUPO','DÍAS PRESENTE','DÍAS AUSENTE','% ASISTENCIA','OBSERVACIONES','PONDERACIÓN'],
+    ['NOMBRE','GRUPO','PRES.','AUS.','% ASIST.','TARDE','LIC.MED','LIC.PART','PARTE','SUSPENS','VACAC','OTRO','NOVEDADES'],
   ];
-
-  const grupos = ['C','G1','G2','G3','R','ZF'];
-  grupos.forEach(g=>{
-    const miembros = Object.values(resumen).filter(p=>p.grupoBase===g);
+  grupos.forEach(function(g){
+    var miembros = Object.values(resumen).filter(function(p){return p.grupoBase===g;});
     if(!miembros.length) return;
-    wsRes.push([GRUPOS_NOMBRES[g],'','','','','','']);
-    miembros.forEach(p=>{
-      const totalDias = p.diasPresente + p.diasAusente;
-      const pctAsist = totalDias>0?Math.round((p.diasPresente/totalDias)*100):0;
-      const obsNeg = p.observaciones.filter(o=>
-        o.toLowerCase().includes('tarde')||
-        o.toLowerCase().includes('retir')||
-        o.toLowerCase().includes('sanc')||
-        o.toLowerCase().includes('falt')
-      ).length;
-      // Ponderación: 60% asistencia + 40% sin obs negativas
-      const pond = Math.round((pctAsist*0.6) + ((1-Math.min(obsNeg/5,1))*40));
+    wsRes.push([GRUPOS_NOMBRES[g]]);
+    miembros.forEach(function(p){
+      var total = p.diasPresente + p.diasAusente;
+      var pct = total>0 ? Math.round((p.diasPresente/total)*100)+'%' : '—';
       wsRes.push([
-        p.nombre,
-        p.grupoBase,
-        p.diasPresente,
-        p.diasAusente,
-        pctAsist+'%',
-        p.observaciones.join(' | ')||'Sin observaciones',
-        pond+'/100',
+        p.nombre, p.grupoBase, p.diasPresente, p.diasAusente, pct,
+        p.tarde||0, p.licMed||0, p.licPart||0, p.parte||0, p.suspens||0, p.vacac||0, p.otro||0,
+        p.novedades.join(' | ')||'Sin novedades'
       ]);
     });
     wsRes.push([]);
   });
-
-  const wsR = XLSX.utils.aoa_to_sheet(wsRes);
-  wsR['!cols'] = [{wch:28},{wch:6},{wch:13},{wch:13},{wch:12},{wch:50},{wch:12}];
+  var wsR = XLSX.utils.aoa_to_sheet(wsRes);
+  wsR['!cols'] = [{wch:28},{wch:6},{wch:6},{wch:6},{wch:8},{wch:7},{wch:8},{wch:9},{wch:7},{wch:9},{wch:7},{wch:6},{wch:60}];
   XLSX.utils.book_append_sheet(wb, wsR, 'Resumen Personal');
 
   // === HOJA 2: DETALLE DIARIO ===
-  const wsDet = [
-    ['DETALLE DIARIO DE ASISTENCIA'],
-    [],
-    ['FECHA', ...PERSONAL_BASE.map(p=>p.nombre.split(' ')[0]+' '+p.nombre.split(' ')[1]||'')],
-  ];
-
-  hist.slice(0,31).forEach(h=>{
-    const row = [h.fecha];
-    PERSONAL_BASE.forEach(p=>{
-      const found = h.data.find(d=>d.nombre===p.nombre);
-      if(!found) row.push('?');
-      else if(!found.presente) row.push('❌');
-      else if(found.obs) row.push('⚠️ '+found.obs);
-      else row.push('✅');
+  var wsDet = [['DETALLE DIARIO'],[], ['FECHA', ...base.map(function(p){return p.nombre.split(' ')[0];}) ]];
+  hist.slice(0,31).forEach(function(h){
+    var row = [h.fecha];
+    base.forEach(function(p){
+      var found = h.data.find(function(d){return d.nombre===p.nombre;});
+      if(!found)      row.push('?');
+      else if(!found.presente) row.push('❌ AUS'+(found.novedad?' ('+novLabel(found.novedad)+')':''));
+      else if(found.novedad)   row.push('⚠️ '+novLabel(found.novedad));
+      else                     row.push('✅');
     });
     wsDet.push(row);
   });
-
-  const wsD = XLSX.utils.aoa_to_sheet(wsDet);
+  var wsD = XLSX.utils.aoa_to_sheet(wsDet);
   XLSX.utils.book_append_sheet(wb, wsD, 'Detalle Diario');
 
-  // === HOJA 3: OBSERVACIONES ===
-  const wsObs = [
-    ['REGISTRO DE OBSERVACIONES'],
-    [],
-    ['FECHA','NOMBRE','GRUPO','OBSERVACIÓN'],
-  ];
-  hist.forEach(h=>{
-    h.data.forEach(p=>{
-      if(p.obs) wsObs.push([h.fecha, p.nombre, p.grupoHoy, p.obs]);
+  // === HOJA 3: NOVEDADES ===
+  var wsNov = [['REGISTRO DE NOVEDADES'],[], ['FECHA','NOMBRE','GRUPO HOY','TIPO','DETALLE']];
+  hist.forEach(function(h){
+    h.data.forEach(function(p){
+      if(!p.presente || p.novedad){
+        wsNov.push([
+          h.fecha, p.nombre, p.grupoHoy||p.grupo,
+          !p.presente ? 'AUSENTE' : novLabel(p.novedad),
+          p.novedadDetalle || p.obs || ''
+        ]);
+      }
     });
   });
-  const wsO = XLSX.utils.aoa_to_sheet(wsObs);
-  wsO['!cols'] = [{wch:12},{wch:28},{wch:6},{wch:50}];
-  XLSX.utils.book_append_sheet(wb, wsO, 'Observaciones');
+  var wsN = XLSX.utils.aoa_to_sheet(wsNov);
+  wsN['!cols'] = [{wch:12},{wch:28},{wch:8},{wch:18},{wch:40}];
+  XLSX.utils.book_append_sheet(wb, wsN, 'Novedades');
 
-  XLSX.writeFile(wb, `Informe_RRHH_${mes.replace(' ','_')}.xlsx`);
+  XLSX.writeFile(wb, 'Informe_RRHH_'+mes.replace(' ','_')+'.xlsx');
   showToast('✅ Informe mensual exportado');
 }
 
