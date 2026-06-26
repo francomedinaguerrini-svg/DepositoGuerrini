@@ -123,7 +123,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 .home-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px}
 .home-btn{background:#fff;border-radius:12px;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;border:none;box-shadow:0 1px 4px rgba(0,0,0,.08);transition:transform .1s,box-shadow .1s;width:100%}
 .home-btn:active{transform:scale(.95);box-shadow:0 0 0 rgba(0,0,0,0)}
-.home-btn-icon{font-size:24px;line-height:1}
+.home-btn-icon{width:36px;height:36px;display:flex;align-items:center;justify-content:center}
 .home-btn-label{font-size:11px;font-weight:600;color:#1d1d1f;text-align:center;line-height:1.2}
 .home-btn-sub{font-size:8px;color:#86868b;text-align:center}
 .home-btn.accent-blue{border-top:3px solid #0071e3}
@@ -548,95 +548,145 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 <!-- HOME SCREEN -->
 <div class="home-screen show" id="home-screen">
   <div class="home-header">
-    <div class="home-logo">📦 WMS Depósito</div>
-    <div class="home-sub">Halpern Neumaticos · Mendoza</div>
+    <div class="home-logo">WMS Depósito</div>
+    <div class="home-sub">Halpern Neumáticos · Mendoza</div>
     <div class="home-date" id="home-date"></div>
   </div>
 
   <div class="home-section-title" style="margin-top:12px">Operaciones diarias</div>
-  <div class="home-grid" style="grid-template-columns:repeat(5,1fr)">
+  <div class="home-grid" style="grid-template-columns:repeat(3,1fr)">
+
     <button class="home-btn accent-blue" onclick="goHome('stock')">
-      <div class="home-btn-icon">📦</div>
+      <div class="home-btn-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="3" y="8" width="22" height="16" rx="2" fill="#0071e3" opacity=".15"/><rect x="3" y="8" width="22" height="16" rx="2" stroke="#0071e3" stroke-width="1.8"/><path d="M9 8V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2" stroke="#0071e3" stroke-width="1.8" stroke-linecap="round"/><path d="M9 14h10M9 18h6" stroke="#0071e3" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
       <div class="home-btn-label">Stock</div>
       <div class="home-btn-sub">Consulta</div>
     </button>
-    <button class="home-btn accent-blue" onclick="goHome('pedidos')">
-      <div class="home-btn-icon">📋</div>
+
+    <button class="home-btn accent-orange" onclick="goHome('pedidos')">
+      <div class="home-btn-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="5" y="3" width="18" height="22" rx="2" fill="#ff9500" opacity=".15"/><rect x="5" y="3" width="18" height="22" rx="2" stroke="#ff9500" stroke-width="1.8"/><path d="M9 9h10M9 13h10M9 17h6" stroke="#ff9500" stroke-width="1.5" stroke-linecap="round"/><circle cx="21" cy="21" r="4" fill="#ff9500"/><path d="M19.5 21l1 1 2-2" stroke="#fff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
       <div class="home-btn-label">Pedidos</div>
       <div class="home-btn-sub">Despacho</div>
     </button>
-    <button class="home-btn accent-blue" onclick="goHome('cydesc')">
-      <div class="home-btn-icon">🚚</div>
-      <div class="home-btn-label">Carga/Desc.</div>
+
+    <button class="home-btn accent-green" onclick="goHome('cydesc')">
+      <div class="home-btn-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="13" width="18" height="10" rx="2" fill="#34c759" opacity=".15"/><rect x="2" y="13" width="18" height="10" rx="2" stroke="#34c759" stroke-width="1.8"/><path d="M20 17h3.5l2.5 3v3H20v-6Z" fill="#34c759" opacity=".15" stroke="#34c759" stroke-width="1.8" stroke-linejoin="round"/><circle cx="8" cy="24" r="2" fill="#34c759"/><circle cx="20" cy="24" r="2" fill="#34c759"/><path d="M6 13V8a2 2 0 0 1 2-2h8l4 4v3" stroke="#34c759" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="home-btn-label">Carga / Desc.</div>
       <div class="home-btn-sub">Movimientos</div>
     </button>
-    <button class="home-btn accent-purple" onclick="goHome('rot')">
-      <div class="home-btn-icon">🔥</div>
-      <div class="home-btn-label">Rotación</div>
-      <div class="home-btn-sub">Remitos + Usos</div>
-    </button>
-    <button class="home-btn accent-orange" onclick="goHome('mapa')" style="position:relative">
-      <div class="home-btn-icon">🗺️</div>
+
+    <button class="home-btn accent-orange" onclick="goHome('mapa')">
+      <div class="home-btn-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="3" y="5" width="5" height="18" rx="1" fill="#ff9500" opacity=".2" stroke="#ff9500" stroke-width="1.6"/><rect x="11" y="5" width="5" height="18" rx="1" fill="#ff9500" opacity=".2" stroke="#ff9500" stroke-width="1.6"/><rect x="19" y="5" width="5" height="18" rx="1" fill="#ff9500" opacity=".2" stroke="#ff9500" stroke-width="1.6"/><path d="M3 10h22M3 16h22" stroke="#ff9500" stroke-width="1.2" stroke-dasharray="2 2"/></svg>
+      </div>
       <div class="home-btn-label">Mapa Racks</div>
       <div class="home-btn-sub">448 posiciones</div>
     </button>
-    <button class="home-btn accent-gray" onclick="goHome('nave')" style="position:relative">
-      <div class="home-btn-icon">🏭</div>
+
+    <button class="home-btn accent-gray" onclick="goHome('nave')">
+      <div class="home-btn-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M2 22 L14 6 L26 22 Z" fill="#86868b" opacity=".15" stroke="#86868b" stroke-width="1.8" stroke-linejoin="round"/><rect x="8" y="14" width="4" height="8" rx="1" fill="#86868b" opacity=".4"/><rect x="16" y="14" width="4" height="8" rx="1" fill="#86868b" opacity=".4"/><path d="M2 22h24" stroke="#86868b" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </div>
       <div class="home-btn-label">Nave</div>
       <div class="home-btn-sub">10 bloques</div>
     </button>
+
+    <button class="home-btn accent-purple" onclick="goHome('rot')">
+      <div class="home-btn-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M6 20 C6 20 8 10 14 10 C20 10 22 20 22 20" stroke="#af52de" stroke-width="1.8" stroke-linecap="round" fill="none"/><circle cx="14" cy="10" r="3" fill="#af52de" opacity=".2" stroke="#af52de" stroke-width="1.6"/><path d="M5 16l1 4 4-1" stroke="#af52de" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M23 16l-1 4-4-1" stroke="#af52de" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="home-btn-label">Rotación</div>
+      <div class="home-btn-sub">Remitos + Usos</div>
+    </button>
+
   </div>
 
   <div class="home-section-title" style="margin-top:8px">Control & Análisis</div>
-  <div class="home-grid" style="grid-template-columns:repeat(5,1fr)">
+  <div class="home-grid" style="grid-template-columns:repeat(3,1fr)">
+
     <button class="home-btn accent-orange" onclick="goHome('repo')">
-      <div class="home-btn-icon">🔄</div>
+      <div class="home-btn-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="10" fill="#ff9500" opacity=".12" stroke="#ff9500" stroke-width="1.8"/><path d="M14 9v5l3 3" stroke="#ff9500" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 4.5A10 10 0 0 1 24 14" stroke="#ff9500" stroke-width="1.5" stroke-linecap="round"/><path d="M24 10v4h-4" stroke="#ff9500" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
       <div class="home-btn-label">Reposición</div>
       <div class="home-btn-sub">Alertas</div>
     </button>
+
     <button class="home-btn accent-green" onclick="goHome('dash')">
-      <div class="home-btn-icon">📊</div>
+      <div class="home-btn-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="3" y="16" width="5" height="8" rx="1" fill="#34c759" opacity=".3" stroke="#34c759" stroke-width="1.6"/><rect x="11" y="11" width="5" height="13" rx="1" fill="#34c759" opacity=".3" stroke="#34c759" stroke-width="1.6"/><rect x="19" y="6" width="5" height="18" rx="1" fill="#34c759" opacity=".3" stroke="#34c759" stroke-width="1.6"/><path d="M3 24h22" stroke="#34c759" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
       <div class="home-btn-label">Dashboard</div>
       <div class="home-btn-sub">Resumen</div>
     </button>
+
     <button class="home-btn accent-yellow" onclick="goHome('inv')">
-      <div class="home-btn-icon">🔢</div>
+      <div class="home-btn-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="4" width="20" height="20" rx="2" fill="#ffcc00" opacity=".15" stroke="#c9a000" stroke-width="1.8"/><path d="M9 10h10M9 14h10M9 18h5" stroke="#c9a000" stroke-width="1.5" stroke-linecap="round"/><circle cx="21" cy="19" r="4" fill="#ffcc00" stroke="#c9a000" stroke-width="1.4"/><path d="M19.5 19l1 1 2-2" stroke="#c9a000" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
       <div class="home-btn-label">Inventario</div>
       <div class="home-btn-sub">Conteo</div>
     </button>
+
     <button class="home-btn accent-red" onclick="goHome('dif')">
-      <div class="home-btn-icon">⚠️</div>
+      <div class="home-btn-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="10" fill="#d70015" opacity=".1" stroke="#d70015" stroke-width="1.8"/><path d="M14 9v6" stroke="#d70015" stroke-width="2" stroke-linecap="round"/><circle cx="14" cy="19" r="1.2" fill="#d70015"/></svg>
+      </div>
       <div class="home-btn-label">Diferencias</div>
       <div class="home-btn-sub">Despachos</div>
     </button>
+
     <button class="home-btn accent-teal" onclick="goHome('dot')">
-      <div class="home-btn-icon">📅</div>
+      <div class="home-btn-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="5" width="20" height="20" rx="2" fill="#00c7be" opacity=".12" stroke="#00c7be" stroke-width="1.8"/><path d="M4 10h20" stroke="#00c7be" stroke-width="1.5"/><path d="M9 3v4M19 3v4" stroke="#00c7be" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="16" r="1.5" fill="#00c7be"/><circle cx="14" cy="16" r="1.5" fill="#00c7be"/><circle cx="18" cy="16" r="1.5" fill="#00c7be"/><circle cx="10" cy="20" r="1.5" fill="#00c7be"/><circle cx="14" cy="20" r="1.5" fill="#00c7be"/></svg>
+      </div>
       <div class="home-btn-label">DOTs</div>
       <div class="home-btn-sub">Elaboración</div>
     </button>
+
+    <button class="home-btn accent-blue" onclick="goHome('termometro')">
+      <div class="home-btn-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="11" y="5" width="6" height="14" rx="3" fill="#0071e3" opacity=".15" stroke="#0071e3" stroke-width="1.8"/><circle cx="14" cy="20" r="4" fill="#0071e3" opacity=".2" stroke="#0071e3" stroke-width="1.8"/><rect x="13" y="10" width="2" height="8" rx="1" fill="#0071e3"/></svg>
+      </div>
+      <div class="home-btn-label">Termómetro</div>
+      <div class="home-btn-sub">Análisis</div>
+    </button>
+
   </div>
 
-  <!-- pall-home -->
-  <div class="home-section-title">Herramientas</div>
+  <div class="home-section-title" style="margin-top:8px">RRHH & Herramientas</div>
   <div class="home-grid" style="grid-template-columns:repeat(3,1fr)">
-    <button class="home-btn accent-teal" onclick="goHome('pall')">
-      <div class="home-btn-icon">📐</div>
-      <div class="home-btn-label">Palletizado</div>
-      <div class="home-btn-sub">Capac. por pallet</div>
-    </button>
-  </div>
-  <div class="home-section-title">RRHH & Productividad</div>
-  <div class="home-grid">
+
     <button class="home-btn accent-purple" onclick="goHome('grupos')">
-      <div class="home-btn-icon">👥</div>
+      <div class="home-btn-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="10" cy="10" r="4" fill="#af52de" opacity=".2" stroke="#af52de" stroke-width="1.6"/><circle cx="20" cy="10" r="3" fill="#af52de" opacity=".2" stroke="#af52de" stroke-width="1.4"/><path d="M3 23c0-4 3-6 7-6s7 2 7 6" stroke="#af52de" stroke-width="1.6" stroke-linecap="round"/><path d="M20 17c2.5.5 5 2 5 6" stroke="#af52de" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </div>
       <div class="home-btn-label">Grupos</div>
-      <div class="home-btn-sub">Asistencia diaria</div>
+      <div class="home-btn-sub">Asistencia</div>
     </button>
+
     <button class="home-btn accent-purple" onclick="goHome('prod')">
-      <div class="home-btn-icon">⚡</div>
+      <div class="home-btn-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M4 20 L9 13 L14 16 L20 8 L24 12" stroke="#af52de" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="24" cy="12" r="2" fill="#af52de"/><path d="M4 24h20" stroke="#af52de" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
       <div class="home-btn-label">Productividad</div>
-      <div class="home-btn-sub">Movimientos y tiempos</div>
+      <div class="home-btn-sub">Movimientos</div>
     </button>
+
+    <button class="home-btn accent-teal" onclick="goHome('pall')">
+      <div class="home-btn-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="5" y="14" width="18" height="4" rx="1" fill="#00c7be" opacity=".2" stroke="#00c7be" stroke-width="1.6"/><rect x="8" y="8" width="5" height="6" rx="1" fill="#00c7be" opacity=".2" stroke="#00c7be" stroke-width="1.4"/><rect x="15" y="8" width="5" height="6" rx="1" fill="#00c7be" opacity=".2" stroke="#00c7be" stroke-width="1.4"/><path d="M7 18v4M14 18v4M21 18v4" stroke="#00c7be" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <div class="home-btn-label">Palletizado</div>
+      <div class="home-btn-sub">Capacidad</div>
+    </button>
+
+  </div>
     <button class="home-btn accent-gray" onclick="toggleUpdate()">
       <div class="home-btn-icon">⬆️</div>
       <div class="home-btn-label">Actualizar</div>
@@ -3213,8 +3263,14 @@ function procesarPaste(){
     const dataArt = DATA.find(r=>r.art==art);
     const stock = dataArt ? dataArt.stock : Math.round(cleanNum(cols[11]||0));
 
+    // Capturar datos del rango (columnas que indican desde/hasta/descripción de rango)
+    const rangoDesc = String(cols[8]||cols[7]||'').trim(); // descripción rango si existe
+    const rangoLinea = { cant, rangoDesc };
+
     if(seen[art]){
       seen[art].cant += cant;
+      seen[art].rangos = seen[art].rangos || [];
+      seen[art].rangos.push(rangoLinea);
       return;
     }
 
@@ -3230,6 +3286,7 @@ function procesarPaste(){
       cant: cant,
       cliente: cliente,
       nroPed: nroPed,
+      rangos: [rangoLinea],
     };
     seen[art] = item;
     pedido.push(item);
@@ -3362,7 +3419,6 @@ function renderPedido(conRack, conBloque, sinUbic, todos){
 
     <div class="ped-actions">
       <button class="ped-btn-export" onclick="exportarPedido()">📥 Exportar Excel</button>
-      <button class="ped-btn-export" onclick="imprimirPedido()" style="background:#1d1d1f">🖨️ Imprimir</button>
       <button onclick="pedidoEnviarTransito()" style="flex:1;padding:11px;background:#ff9500;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">🟡 Enviar a tránsito</button>
       <button onclick="abrirConfirmacion()" style="flex:1;padding:11px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">✅ Despachar directo</button>
       <button class="ped-btn-clear" onclick="limpiarPedido()">🗑️</button>
@@ -3683,7 +3739,8 @@ function pedidoEnviarTransito(){
         stock: r.stock||0,
         posRack: r.posRack||'',
         bloque:  r.bloque||'',
-        tipo: r.posRack ? 'rack' : 'bloque'
+        tipo: r.posRack ? 'rack' : 'bloque',
+        rangos: r.rangos||[]
       };
     })
   };
@@ -3717,26 +3774,21 @@ function cydConfirmarSalidaDesdeTransito(id){
   tr.items.forEach(function(r){
     var cantReal = r.cantReal||r.cant;
 
-    // Descontar del rack_stock
     descontarRackPorPedido(r.art, cantReal);
 
-    // Descontar del stock general
     var da = DATA.find(function(d){return d.art===r.art;});
     if(da){
       da.stock = Math.max(0, (da.stock||0) - cantReal);
       da.pall  = Math.floor(da.stock / (da.max_pos||32));
-
-      // Alerta reposición si baja de 1 pallet
       if(da.stock < (da.max_pos||32) && da.bloque){
         repoSugerido.push({
           art:r.art, med:da.med, diseno:da.diseno, prov:da.prov,
           bloque:da.bloque, stockActual:da.stock, posRack:r.posRack||'',
-          fecha, hora, estado:'pendiente'
+          fecha:fecha, hora:hora, estado:'pendiente'
         });
       }
     }
 
-    // Registrar diferencia si cantReal ≠ cant original
     if(cantReal !== r.cant){
       diferencias.push({
         art:r.art, med:r.med, diseno:r.diseno, prov:r.prov,
@@ -3749,14 +3801,12 @@ function cydConfirmarSalidaDesdeTransito(id){
   saveDataStock();
   saveAsign();
 
-  // Guardar diferencias
   if(diferencias.length){
     var histDif = JSON.parse(localStorage.getItem('wms_dif')||'[]');
-    histDif.unshift({fecha, hora, destino:tr.destino||'', items:diferencias});
+    histDif.unshift({fecha:fecha, hora:hora, destino:tr.destino||'', items:diferencias});
     localStorage.setItem('wms_dif', JSON.stringify(histDif.slice(0,50)));
   }
 
-  // Guardar alertas repo
   if(repoSugerido.length){
     var histRepo = JSON.parse(localStorage.getItem('wms_repo_pendiente')||'[]');
     repoSugerido.forEach(function(r){
@@ -3765,21 +3815,130 @@ function cydConfirmarSalidaDesdeTransito(id){
     localStorage.setItem('wms_repo_pendiente', JSON.stringify(histRepo.slice(0,200)));
   }
 
-  // Marcar como confirmado
   tr.estado = 'confirmado';
   tr.fechaConfirmacion = fecha;
   tr.horaConfirmacion  = hora;
   transitoSave(lista);
 
-  // Re-evaluar rack — libera posiciones que quedaron vacías
   reevaluarRack();
   transitoBadge();
   cydRenderTransito();
+
+  // Generar planilla de despacho automáticamente
+  cydPlanillaDespacho(id);
 
   var msg = '✅ Despacho confirmado';
   if(diferencias.length)  msg += ' · '+diferencias.length+' diferencias';
   if(repoSugerido.length) msg += ' · ⚠️ '+repoSugerido.length+' arts. para reponer';
   showToast(msg);
+}
+
+// ── Planilla de DESPACHO — para el controlador, línea por línea como el pedido original
+function cydPlanillaDespacho(id){
+  var lista = transitoGetAll();
+  var tr = lista.find(function(t){return t.id===id;});
+  if(!tr) return;
+
+  var win = window.open('','_blank');
+  if(!win){ showToast('⚠️ Habilitá popups para imprimir la planilla'); return; }
+
+  var totalCant  = tr.items.reduce(function(s,r){return s+(r.cantReal||r.cant);},0);
+  var totalArts  = tr.items.length;
+
+  // Expandir rangos: por cada ítem, generar las filas de rango si existen
+  var rows = '';
+  var numFila = 0;
+  tr.items.forEach(function(r){
+    var cantReal = r.cantReal||r.cant;
+    var diff = cantReal - r.cant;
+    var ubic = r.posRack
+      ? '<span style="color:#0071e3;font-weight:700">'+r.posRack+'</span>'
+      : r.bloque
+      ? '<span style="color:#ff9500;font-weight:700">'+r.bloque+'</span>'
+      : '<span style="color:#d70015">—</span>';
+    var alertaBg = r.stock < r.cant ? 'background:#fff3cd' : (numFila%2?'background:#fafafa':'');
+
+    // Si tiene rangos múltiples, expandir una fila por rango
+    if(r.rangos && r.rangos.length > 1){
+      r.rangos.forEach(function(rg, ri){
+        var bgRg = ri===0 ? alertaBg : (numFila%2?'background:#f5f5f7':'background:#f0f7ff');
+        rows += '<tr style="'+bgRg+'">';
+        rows += '<td style="font-weight:700;color:'+(ri>0?'#86868b':'#1d1d1f')+'">'+r.art+'</td>';
+        rows += '<td style="white-space:nowrap'+(ri>0?';color:#86868b':'')+'">'+r.med+'</td>';
+        rows += '<td'+(ri>0?' style="color:#86868b"':'')+'>'+(r.diseno||'')+'</td>';
+        rows += '<td style="color:#86868b">'+(ri===0?(r.prov||''):'↳')+'</td>';
+        rows += '<td>'+(ri===0?ubic:'')+'</td>';
+        rows += '<td style="text-align:right;color:#86868b">'+(ri===0?(r.stock||0):'')+'</td>';
+        rows += '<td style="text-align:right;font-weight:700;color:#d70015">'+rg.cant+'</td>';
+        rows += '<td style="text-align:right;color:#86868b">'+(rg.rangoDesc||('Rng '+(ri+1)))+'</td>';
+        rows += '<td style="border:2px solid #bbb;min-width:60px">&nbsp;</td>';
+        rows += '</tr>';
+      });
+    } else {
+      rows += '<tr style="'+alertaBg+'">';
+      rows += '<td style="font-weight:700">'+r.art+'</td>';
+      rows += '<td style="white-space:nowrap">'+r.med+'</td>';
+      rows += '<td>'+(r.diseno||'')+'</td>';
+      rows += '<td style="color:#86868b">'+(r.prov||'')+'</td>';
+      rows += '<td>'+ubic+'</td>';
+      rows += '<td style="text-align:right;color:#86868b">'+(r.stock||0)+'</td>';
+      rows += '<td style="text-align:right;font-weight:700;color:#d70015">'+cantReal+'</td>';
+      rows += '<td style="text-align:right;color:#86868b">—</td>';
+      rows += '<td style="border:2px solid #bbb;min-width:60px">&nbsp;</td>';
+      rows += '</tr>';
+    }
+    numFila++;
+  });
+
+  // Fila totales
+  rows += '<tr style="background:#f0f0f0;font-weight:700;border-top:2px solid #1d1d1f">';
+  rows += '<td colspan="6">TOTAL — '+totalArts+' artículos</td>';
+  rows += '<td style="text-align:right;color:#d70015">'+totalCant+'</td>';
+  rows += '<td colspan="2"></td></tr>';
+
+  win.document.write(
+    '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
+    '<title>Despacho '+tr.nroContenedor+'</title>'+
+    '<style>'+
+    '@page{size:A4 landscape;margin:10mm}'+
+    'body{font-family:Arial,sans-serif;font-size:10px;margin:0;color:#1d1d1f}'+
+    'h2{font-size:14px;margin:0 0 3px;font-weight:700}'+
+    '.meta{display:flex;gap:20px;flex-wrap:wrap;font-size:10px;color:#555;margin-bottom:8px;border-bottom:2px solid #1d1d1f;padding-bottom:6px}'+
+    '.meta b{color:#1d1d1f}'+
+    '.badge{padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;background:#34c759;color:#fff}'+
+    'table{width:100%;border-collapse:collapse;font-size:9.5px}'+
+    'th{background:#1d1d1f;color:#fff;padding:5px 7px;text-align:left;font-size:9px;white-space:nowrap}'+
+    'td{padding:4px 7px;border-bottom:1px solid #e8e8e8;vertical-align:middle}'+
+    '.pie{margin-top:10px;font-size:8px;color:#aaa;border-top:1px solid #eee;padding-top:4px;display:flex;justify-content:space-between}'+
+    '</style></head><body>'+
+    '<h2>📦 Hoja de despacho — '+tr.tipoIcon+' '+(tr.destino||tr.tipoLabel)+'&nbsp;'+
+      (tr.estado==='confirmado'?'<span class="badge">✅ CONFIRMADO '+tr.fechaConfirmacion+'</span>':'')+
+    '</h2>'+
+    '<div class="meta">'+
+      '<span>Pedido: <b>'+tr.nroContenedor+'</b></span>'+
+      '<span>Destino: <b>'+(tr.destino||'—')+'</b></span>'+
+      '<span>TTE: <b>'+(tr.tte||'—')+'</b></span>'+
+      '<span>Fecha: <b>'+tr.fecha+' '+tr.hora+'</b></span>'+
+      '<span>Arts: <b>'+totalArts+'</b></span>'+
+      '<span>Unidades: <b>'+totalCant+'</b></span>'+
+    '</div>'+
+    '<table>'+
+      '<thead><tr>'+
+        '<th>Art.</th><th>Medida</th><th>Diseño</th><th>Proveedor</th>'+
+        '<th>Ubicación</th><th style="text-align:right">Stock</th>'+
+        '<th style="text-align:right">Cant.</th><th>Rango / Ref.</th>'+
+        '<th style="min-width:60px">Ctrl ✍</th>'+
+      '</tr></thead>'+
+      '<tbody>'+rows+'</tbody>'+
+    '</table>'+
+    '<div class="pie">'+
+      '<span>Azul = rack · Naranja = bloque · Amarillo = stock insuficiente</span>'+
+      '<span>Generado '+new Date().toLocaleString('es-AR')+' — WMS Halpern Depósito · '+tr.id+'</span>'+
+    '</div>'+
+    '<script>window.onload=function(){window.print();}<\/script>'+
+    '</body></html>'
+  );
+  win.document.close();
 }
 
 function cydEditarCantTransito(id, artIdx, delta){
@@ -3830,6 +3989,20 @@ function cydPlanillaPicking(id){
       : seccion==='bloque'
       ? '<b style="color:#ff9500">'+r.bloque+'</b>'
       : '<b style="color:#d70015">SIN UBIC.</b>';
+    // Detalle de rangos si hay más de uno (o siempre como referencia del pedido)
+    var rangosHtml = '';
+    if(r.rangos && r.rangos.length > 0){
+      var rangosConDesc = r.rangos.filter(function(rg){ return rg.rangoDesc; });
+      if(rangosConDesc.length > 1 || (r.rangos.length > 1)){
+        rangosHtml = '<tr style="background:#f8f8f8;border-top:none"><td colspan="9" style="padding:2px 8px 5px 24px;font-size:8.5px;color:#666">'+
+          r.rangos.map(function(rg,i){
+            return '<span style="display:inline-block;margin-right:12px">'+
+              (rg.rangoDesc ? '<b>'+rg.rangoDesc+'</b>: ' : 'Rango '+(i+1)+': ')+
+              '<b>'+rg.cant+'</b> u.</span>';
+          }).join('')+
+        '</td></tr>';
+      }
+    }
     return '<tr style="'+alerta+'">'+
       '<td style="font-weight:700">'+r.art+'</td>'+
       '<td style="white-space:nowrap">'+r.med+'</td>'+
@@ -3840,7 +4013,8 @@ function cydPlanillaPicking(id){
       '<td style="text-align:right;color:#86868b">'+( r.stock||0)+'</td>'+
       (diff!==0?'<td style="text-align:right;color:#d70015;font-weight:700">'+(diff>0?'+':'')+diff+'</td>':'<td style="text-align:right;color:#34c759">OK</td>')+
       '<td style="border:2px solid #bbb;min-width:80px">&nbsp;</td>'+
-      '</tr>';
+      '</tr>'+
+      rangosHtml;
   }
 
   var totalCant = tr.items.reduce(function(s,r){return s+(r.cantReal||r.cant);},0);
@@ -7731,12 +7905,17 @@ if('serviceWorker' in navigator){
 <div class="view" id="view-cydesc">
 <div style="padding:12px;max-width:900px;margin:0 auto;padding-bottom:120px">
 
-  <!-- Tabs -->
-  <div style="display:flex;gap:6px;margin-bottom:14px;background:#f5f5f7;border-radius:12px;padding:4px">
-    <button id="cyd-tab-carga" onclick="cydTab('carga')" style="flex:1;padding:9px;border:none;background:#fff;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;color:#1d1d1f;box-shadow:0 1px 3px rgba(0,0,0,.1)">📦 Carga</button>
-    <button id="cyd-tab-descarga" onclick="cydTab('descarga')" style="flex:1;padding:9px;border:none;background:transparent;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;color:#86868b">🚚 Descarga</button>
-    <button id="cyd-tab-transito" onclick="cydTab('transito')" style="flex:1;padding:9px;border:none;background:transparent;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;color:#86868b;position:relative">🟡 Tránsito<span id="cyd-transito-badge" style="display:none;position:absolute;top:4px;right:4px;background:#ff9500;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:16px;text-align:center"></span></button>
-    <button id="cyd-tab-historial" onclick="cydTab('historial')" style="flex:1;padding:9px;border:none;background:transparent;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;color:#86868b">📋 Historial</button>
+  <!-- Tab selector desplegable -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+    <select id="cyd-tab-select" onchange="cydTab(this.value)"
+      style="flex:1;padding:10px 12px;border:1px solid #d2d2d7;border-radius:10px;font-size:14px;font-weight:600;background:#fff;color:#1d1d1f;outline:none;appearance:none;-webkit-appearance:none;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2386868b' d='M6 8L1 3h10z'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;cursor:pointer">
+      <option value="carga">📦 Carga</option>
+      <option value="descarga">🚚 Descarga</option>
+      <option value="transito">🟡 Tránsito</option>
+      <option value="historial">📋 Historial</option>
+    </select>
+    <!-- Badge tránsito visible siempre -->
+    <span id="cyd-transito-badge" style="display:none;background:#ff9500;color:#fff;border-radius:12px;padding:3px 9px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0"></span>
   </div>
 
   <!-- Panel pegar -->
@@ -7767,22 +7946,26 @@ if('serviceWorker' in navigator){
   </div>
 
   <div id="cyd-panel-historial" style="display:none">
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-      <select id="cyd-hist-periodo" onchange="cydRenderHistorial()" style="padding:8px 10px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;background:#fff;outline:none">
+    <!-- Filtros -->
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+      <select id="cyd-hist-periodo" onchange="cydRenderHistorial()" style="flex:1;min-width:110px;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;background:#fff;outline:none">
         <option value="hoy">Hoy</option>
         <option value="semana">Esta semana</option>
         <option value="mes" selected>Este mes</option>
         <option value="todo">Todo</option>
       </select>
-      <select id="cyd-hist-tipo" onchange="cydRenderHistorial()" style="padding:8px 10px;border:.5px solid #d2d2d7;border-radius:8px;font-size:13px;background:#fff;outline:none">
-        <option value="todo">Cargas y Descargas</option>
-        <option value="carga">Solo Cargas</option>
-        <option value="descarga">Solo Descargas</option>
+      <select id="cyd-hist-tipo" onchange="cydRenderHistorial()" style="flex:1;min-width:140px;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;background:#fff;outline:none">
+        <option value="todo">Todos los movimientos</option>
+        <option value="carga">📦 Solo Cargas</option>
+        <option value="descarga">🚚 Solo Descargas</option>
+        <option value="salida">📋 Solo Despachos</option>
       </select>
-      <button onclick="cydExportar()" style="padding:8px 14px;background:#1d1d1f;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">📥 Exportar Excel</button>
+      <button onclick="cydExportar()" style="padding:8px 14px;background:#1d1d1f;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">📥 Exportar Excel</button>
     </div>
-    <div id="cyd-hist-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:14px"></div>
-    <div id="cyd-hist-lista"></div>
+    <!-- Stats -->
+    <div id="cyd-hist-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px"></div>
+    <!-- Lista -->
+    <div id="cyd-hist-lista" style="padding-bottom:80px"></div>
   </div>
 
 </div>
@@ -7821,8 +8004,12 @@ function transitoBadge(){
   var pend = transitoGetAll().filter(function(t){return t.estado==='transito';}).length;
   var b = document.getElementById('cyd-transito-badge');
   if(!b) return;
-  if(pend>0){ b.style.display='inline-block'; b.textContent=pend; }
-  else { b.style.display='none'; }
+  if(pend>0){
+    b.style.display='inline-block';
+    b.textContent = pend + ' pendiente'+(pend>1?'s':'');
+  } else {
+    b.style.display='none';
+  }
 }
 
 // Calcula posición sugerida para un artículo dado el stock ACTUAL (sin sumar el ingreso)
@@ -8217,6 +8404,7 @@ function cydRenderTransito(){
     html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
     if(esSalidaBtn){
       html += '<button onclick="cydPlanillaPicking(&quot;'+tr.id+'&quot;)" style="padding:6px 10px;background:#1d1d1f;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">🖨️ Picking</button>';
+      html += '<button onclick="cydPlanillaDespacho(&quot;'+tr.id+'&quot;)" style="padding:6px 10px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">📄 Despacho</button>';
       if(esPend){
         html += '<button onclick="cydConfirmarSalidaDesdeTransito(&quot;'+tr.id+'&quot;)" style="padding:6px 10px;background:#d70015;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">📤 Despachar</button>';
       }
@@ -8296,14 +8484,11 @@ function cydRenderTransito(){
 function cydTab(tab){
   ['carga','descarga','transito','historial'].forEach(function(t){
     var panel = document.getElementById('cyd-panel-'+t);
-    var btn   = document.getElementById('cyd-tab-'+t);
     if(panel) panel.style.display = t===tab ? '' : 'none';
-    if(btn){
-      btn.style.background  = t===tab ? '#fff' : 'transparent';
-      btn.style.color       = t===tab ? '#1d1d1f' : '#86868b';
-      btn.style.boxShadow   = t===tab ? '0 1px 3px rgba(0,0,0,.1)' : 'none';
-    }
   });
+  // Sincronizar el select
+  var sel = document.getElementById('cyd-tab-select');
+  if(sel && sel.value !== tab) sel.value = tab;
   if(tab==='historial') cydRenderHistorial();
   if(tab==='transito')  cydRenderTransito();
 }
@@ -8695,50 +8880,198 @@ function cydGetHist(tipo){
   try{ return JSON.parse(localStorage.getItem('wms_hist_'+tipo)||'[]'); }catch(e){return [];}
 }
 
+// Obtener despachos confirmados del tránsito como historial de salidas
+function cydGetHistSalidas(){
+  try{
+    return transitoGetAll()
+      .filter(function(t){ return t.flujo==='salida' && t.estado==='confirmado'; })
+      .map(function(t){
+        return {
+          id: t.id,
+          tipo: 'salida',
+          fecha: t.fechaConfirmacion||t.fecha,
+          hora: t.horaConfirmacion||t.hora,
+          fechaISO: t.fechaISO||'',
+          nroRem: t.nroContenedor||'',
+          cliente: t.destino||'',
+          tte: t.tte||'',
+          items: t.items.map(function(r){
+            return { art:r.art, med:r.med, diseno:r.diseno, prov:r.prov,
+                     cant:r.cantReal||r.cant, posRack:r.posRack||'', bloque:r.bloque||'' };
+          })
+        };
+      });
+  }catch(e){return [];}
+}
+
+function cydBorrarHistorial(tipo, idx){
+  if(!confirm('¿Borrar este movimiento del historial?')) return;
+  if(tipo==='salida'){
+    // Borrar de tránsito (marcar como borrado)
+    var lista = transitoGetAll();
+    var id = idx; // para salidas, idx es el id del tránsito
+    lista = lista.filter(function(t){ return t.id !== id; });
+    transitoSave(lista);
+  } else {
+    var hist = cydGetHist(tipo);
+    hist.splice(idx, 1);
+    localStorage.setItem('wms_hist_'+tipo, JSON.stringify(hist));
+  }
+  cydRenderHistorial();
+  showToast('🗑️ Movimiento borrado');
+}
+
+function cydToggleHistDetalle(id){
+  var el = document.getElementById('hist-detalle-'+id);
+  if(!el) return;
+  var abierto = el.style.display !== 'none';
+  el.style.display = abierto ? 'none' : 'block';
+  var arrow = document.getElementById('hist-arrow-'+id);
+  if(arrow) arrow.textContent = abierto ? '▼' : '▲';
+}
+
 function cydRenderHistorial(){
-  var periodo = (document.getElementById('cyd-hist-periodo')||{}).value||'mes';
+  var periodo    = (document.getElementById('cyd-hist-periodo')||{}).value||'mes';
   var filtroTipo = (document.getElementById('cyd-hist-tipo')||{}).value||'todo';
   var ahora = new Date();
 
   function enPeriodo(h){
     if(periodo==='todo') return true;
-    var d = new Date(h.fechaISO||h.fecha);
+    // Intentar fechaISO primero, luego fecha en formato es-AR
+    var iso = h.fechaISO;
+    var d;
+    if(iso){ d = new Date(iso+'T00:00:00'); }
+    else {
+      // formato dd/mm/yyyy
+      var p = (h.fecha||'').split('/');
+      d = p.length===3 ? new Date(p[2],p[1]-1,p[0]) : new Date(h.fecha);
+    }
     if(isNaN(d)) return true;
     if(periodo==='hoy') return d.toDateString()===ahora.toDateString();
     if(periodo==='semana'){ var s=new Date(ahora); s.setDate(s.getDate()-7); return d>=s; }
-    if(periodo==='mes'){ var m=new Date(ahora); m.setMonth(m.getMonth()-1); return d>=m; }
+    if(periodo==='mes'){    var m=new Date(ahora); m.setMonth(m.getMonth()-1); return d>=m; }
     return true;
   }
 
-  var cargas   = filtroTipo!=='descarga' ? cydGetHist('carga').filter(enPeriodo)   : [];
-  var descargas= filtroTipo!=='carga'    ? cydGetHist('descarga').filter(enPeriodo) : [];
+  var cargas    = (filtroTipo==='todo'||filtroTipo==='carga')    ? cydGetHist('carga').filter(enPeriodo)    : [];
+  var descargas = (filtroTipo==='todo'||filtroTipo==='descarga') ? cydGetHist('descarga').filter(enPeriodo) : [];
+  var salidas   = (filtroTipo==='todo'||filtroTipo==='salida')   ? cydGetHistSalidas().filter(enPeriodo)    : [];
 
   // Stats
-  var totalCargaU  = cargas.reduce(function(s,h){return s+h.items.reduce(function(ss,i){return ss+(i.cant||0);},0);},0);
-  var totalDescU   = descargas.reduce(function(s,h){return s+h.items.reduce(function(ss,i){return ss+(i.cant||0);},0);},0);
+  var totalCU = cargas.reduce(function(s,h){return s+h.items.reduce(function(ss,i){return ss+(i.cant||0);},0);},0);
+  var totalDU = descargas.reduce(function(s,h){return s+h.items.reduce(function(ss,i){return ss+(i.cant||0);},0);},0);
+  var totalSU = salidas.reduce(function(s,h){return s+h.items.reduce(function(ss,i){return ss+(i.cant||0);},0);},0);
+
   var statsEl = document.getElementById('cyd-hist-stats');
   if(statsEl) statsEl.innerHTML =
-    '<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:#86868b">Cargas</div><div style="font-size:20px;font-weight:700;color:#34c759">'+cargas.length+'</div><div style="font-size:11px;color:#86868b">'+totalCargaU+' un.</div></div>'+
-    '<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:#86868b">Descargas</div><div style="font-size:20px;font-weight:700;color:#d70015">'+descargas.length+'</div><div style="font-size:11px;color:#86868b">'+totalDescU+' un.</div></div>'+
-    '<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:#86868b">Movimientos</div><div style="font-size:20px;font-weight:700">'+(cargas.length+descargas.length)+'</div></div>';
+    '<div style="background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:10px;text-align:center">'+
+      '<div style="font-size:10px;color:#86868b">Cargas</div>'+
+      '<div style="font-size:22px;font-weight:700;color:#34c759">'+cargas.length+'</div>'+
+      '<div style="font-size:11px;color:#86868b">'+totalCU.toLocaleString('es-AR')+' un.</div></div>'+
+    '<div style="background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:10px;text-align:center">'+
+      '<div style="font-size:10px;color:#86868b">Descargas</div>'+
+      '<div style="font-size:22px;font-weight:700;color:#d70015">'+descargas.length+'</div>'+
+      '<div style="font-size:11px;color:#86868b">'+totalDU.toLocaleString('es-AR')+' un.</div></div>'+
+    '<div style="background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:10px;text-align:center">'+
+      '<div style="font-size:10px;color:#86868b">Despachos</div>'+
+      '<div style="font-size:22px;font-weight:700;color:#0071e3">'+salidas.length+'</div>'+
+      '<div style="font-size:11px;color:#86868b">'+totalSU.toLocaleString('es-AR')+' un.</div></div>'+
+    '<div style="background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:10px;text-align:center">'+
+      '<div style="font-size:10px;color:#86868b">Movimientos</div>'+
+      '<div style="font-size:22px;font-weight:700">'+(cargas.length+descargas.length+salidas.length)+'</div></div>';
 
-  // Lista
-  var todos = cargas.concat(descargas).sort(function(a,b){return (b.fechaISO||'')>(a.fechaISO||'')?1:-1;});
+  // Unir y ordenar: más reciente primero
+  function getISO(h){
+    if(h.fechaISO) return h.fechaISO;
+    var p = (h.fecha||'').split('/');
+    return p.length===3 ? p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0') : '';
+  }
+  var cargas2    = cargas.map(function(h,i){    return Object.assign({},h,{_tipo:'carga',    _idx:i}); });
+  var descargas2 = descargas.map(function(h,i){ return Object.assign({},h,{_tipo:'descarga', _idx:i}); });
+  var salidas2   = salidas.map(function(h){     return Object.assign({},h,{_tipo:'salida',   _idx:h.id}); });
+  var todos = cargas2.concat(descargas2).concat(salidas2)
+    .sort(function(a,b){ return getISO(b)>getISO(a)?1:-1; });
+
+  if(!todos.length){
+    document.getElementById('cyd-hist-lista').innerHTML =
+      '<div style="text-align:center;color:#86868b;padding:40px">Sin movimientos en el período</div>';
+    return;
+  }
+
   var html = '';
-  todos.forEach(function(h){
-    var esCarga = h.tipo==='carga';
-    var totalU2 = h.items.reduce(function(s,i){return s+(i.cant||0);},0);
-    html += '<div style="background:#fff;border-radius:10px;padding:10px;margin-bottom:8px;border-left:3px solid '+(esCarga?'#34c759':'#d70015')+'">';
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
-    html += '<div style="font-size:12px;font-weight:700">'+(esCarga?'📦 Carga':'🚚 Descarga')+(h.nroRem?' · '+h.nroRem:'')+'</div>';
-    html += '<div style="font-size:11px;color:#86868b">'+h.fecha+' · '+h.items.length+' arts · '+totalU2+' un.</div></div>';
-    if(h.cliente||h.tte) html += '<div style="font-size:11px;color:#86868b;margin-bottom:4px">'+(h.cliente||h.tte||'')+'</div>';
-    html += '<div style="font-size:10px;color:#86868b">'+h.items.slice(0,5).map(function(i){return i.art+' ('+i.cant+'u)';}).join(' · ')+(h.items.length>5?' +más...':'')+'</div>';
+  todos.forEach(function(h, ni){
+    var uid = h._tipo+'-'+ni;
+    var esCarga    = h._tipo==='carga';
+    var esSalida   = h._tipo==='salida';
+    var colorBorde = esCarga ? '#34c759' : esSalida ? '#0071e3' : '#d70015';
+    var icono      = esCarga ? '📦 Carga' : esSalida ? '📋 Despacho' : '🚚 Descarga';
+    var totalU = h.items.reduce(function(s,i){return s+(i.cant||0);},0);
+    var resumen = h.items.slice(0,4).map(function(i){
+      return '<span style="background:#f5f5f7;border-radius:4px;padding:1px 5px;margin-right:4px;font-size:10px">'+
+        i.art+' <b>'+i.cant+'u</b></span>';
+    }).join('')+(h.items.length>4?'<span style="font-size:10px;color:#86868b">+'+( h.items.length-4)+' más</span>':'');
+
+    html += '<div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;border-left:3px solid '+colorBorde+';margin-bottom:8px;overflow:hidden">';
+
+    // Cabecera clickeable
+    html += '<div onclick="cydToggleHistDetalle(&quot;'+uid+'&quot;)" style="padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start;gap:8px">';
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">';
+    html += '<span style="font-size:12px;font-weight:700">'+icono+(h.nroRem?' · '+h.nroRem:'')+'</span>';
+    if(h.cliente||h.tte) html += '<span style="font-size:10px;color:#86868b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(h.cliente||h.tte)+'</span>';
+    html += '</div>';
+    html += '<div style="margin-bottom:4px">'+resumen+'</div>';
+    html += '<div style="font-size:10px;color:#86868b">'+h.fecha+(h.hora?' · '+h.hora:'')+' &nbsp;·&nbsp; '+h.items.length+' arts · '+totalU.toLocaleString('es-AR')+' un.</div>';
+    html += '</div>';
+    html += '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">';
+    html += '<span id="hist-arrow-'+uid+'" style="font-size:12px;color:#86868b">▼</span>';
+    html += '<button onclick="event.stopPropagation();cydBorrarHistorial(&quot;'+h._tipo+'&quot;,&quot;'+(h._tipo==='salida'?h.id:h._idx)+'&quot;)" '+
+      'style="padding:4px 8px;background:#ffd6d9;color:#d70015;border:none;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer">🗑️</button>';
+    html += '</div>';
+    html += '</div>';
+
+    // Detalle expandible
+    html += '<div id="hist-detalle-'+uid+'" style="display:none;border-top:1px solid #f0f0f0">';
+    html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">';
+    html += '<tr style="background:#f5f5f7">';
+    html += '<th style="padding:5px 8px;text-align:left;font-weight:600;color:#86868b">Art</th>';
+    html += '<th style="padding:5px 8px;text-align:left;font-weight:600;color:#86868b">Medida</th>';
+    html += '<th style="padding:5px 8px;text-align:left;font-weight:600;color:#86868b">Diseño</th>';
+    html += '<th style="padding:5px 8px;text-align:left;font-weight:600;color:#86868b">Prov</th>';
+    if(esSalida){
+      html += '<th style="padding:5px 8px;text-align:left;font-weight:600;color:#86868b">Ubicación</th>';
+    }
+    html += '<th style="padding:5px 8px;text-align:right;font-weight:600;color:#86868b">Cant</th>';
+    html += '</tr>';
+    h.items.forEach(function(r, ri){
+      var bg = ri%2 ? 'background:#fafafa' : '';
+      html += '<tr style="'+bg+'">';
+      html += '<td style="padding:4px 8px;font-weight:600">'+r.art+'</td>';
+      html += '<td style="padding:4px 8px">'+r.med+'</td>';
+      html += '<td style="padding:4px 8px;color:#86868b">'+(r.diseno||'—')+'</td>';
+      html += '<td style="padding:4px 8px;color:#86868b">'+(r.prov||'—')+'</td>';
+      if(esSalida){
+        var ubic = r.posRack
+          ? '<span style="color:#0071e3;font-weight:600">'+r.posRack+'</span>'
+          : r.bloque ? '<span style="color:#ff9500">'+r.bloque+'</span>' : '—';
+        html += '<td style="padding:4px 8px">'+ubic+'</td>';
+      }
+      html += '<td style="padding:4px 8px;text-align:right;font-weight:700;color:'+colorBorde+'">'+r.cant+'</td>';
+      html += '</tr>';
+    });
+    // Fila total
+    html += '<tr style="background:#f0f0f0;font-weight:700;border-top:1px solid #ddd">';
+    html += '<td colspan="'+(esSalida?5:4)+'" style="padding:5px 8px;color:#86868b">TOTAL</td>';
+    html += '<td style="padding:5px 8px;text-align:right;color:'+colorBorde+'">'+totalU+'</td>';
+    html += '</tr>';
+    html += '</table></div>';
+    html += '</div>';
+
     html += '</div>';
   });
 
   var listaEl = document.getElementById('cyd-hist-lista');
-  if(listaEl) listaEl.innerHTML = html||'<div style="text-align:center;color:#86868b;padding:20px">Sin movimientos en el período</div>';
+  if(listaEl) listaEl.innerHTML = html;
 }
 
 // ─── EXPORTAR ──────────────────────────────────────────────
