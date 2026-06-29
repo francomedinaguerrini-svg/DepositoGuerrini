@@ -13,8 +13,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 header{background:#1d1d1f;color:#fff;padding:12px 16px;position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:10px}
 header h1{font-size:17px;font-weight:600;flex:1}
 header .tag{font-size:11px;background:#3a3a3c;padding:3px 8px;border-radius:10px;color:#a0a0a5;cursor:pointer;white-space:nowrap}
-.tabs{display:flex;background:#1d1d1f;padding:0 16px;gap:4px;border-top:1px solid #3a3a3c;overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
-.tab{padding:8px 16px;font-size:13px;color:#a0a0a5;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.tabs{display:none}
+.tab-bar{background:#1d1d1f;border-top:1px solid #3a3a3c}
+.tab-bar-row1{display:flex;align-items:center;gap:0;overflow-x:auto;scrollbar-width:none}
+.tab-bar-row1::-webkit-scrollbar{display:none}
+.tab-bar-row2{display:none;flex-wrap:wrap;gap:4px;padding:6px 12px;border-top:1px solid #3a3a3c;background:#111}
+.tab-bar-row2.open{display:flex}
+.tab{padding:8px 14px;font-size:13px;color:#a0a0a5;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;flex-shrink:0}
+.tab.active{color:#fff;border-bottom:2px solid #0071e3}
+.tab-more-btn{margin-left:auto;padding:8px 14px;font-size:13px;color:#a0a0a5;cursor:pointer;white-space:nowrap;flex-shrink:0;background:none;border:none;border-bottom:2px solid transparent}
+.tab-more-btn.open{color:#fff}
+.tab-row2-item{padding:7px 14px;font-size:13px;color:#a0a0a5;cursor:pointer;border-radius:8px;white-space:nowrap}
+.tab-row2-item:hover{background:#2a2a2c;color:#fff}
+.tab-row2-item.active{color:#0071e3;background:#0071e320}
 .tab.active{color:#fff;border-bottom:2px solid #0071e3}
 .view{display:none}.view.active{display:block}
 .update-bar{background:#fff;border-bottom:1px solid #e5e5ea;padding:10px 12px;display:none;flex-direction:column;gap:8px}
@@ -528,21 +539,26 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
   <span style="font-size:20px;cursor:pointer" onclick="toggleUpdate()">⬆️</span>
 </header>
 
-<div class="tabs">
-  <div class="tab active" onclick="switchTab('stock',this)">📦 Stock</div>
-  <div class="tab" onclick="switchTab('pedidos',this)">📋 Pedidos</div>
-  <div class="tab" onclick="switchTab('mapa',this)">🗺️ Mapa Racks</div>
-  <div class="tab" onclick="switchTab('repo',this)">🔄 Reposición</div>
-  <div class="tab" onclick="switchTab('nave',this)">🏭 Nave</div>
-  <div class="tab" onclick="switchTab('rot',this)">🔥 Rotación</div>
-  <div class="tab" onclick="switchTab('termometro',this)">🌡️ Termómetro</div>
-  <div class="tab" onclick="switchTab('dash',this)">📊 Dashboard</div>
-  <div class="tab" onclick="switchTab('inv',this)">🔢 Inventario</div>
-  <div class="tab" onclick="switchTab('dif',this)">📊 Diferencias</div>
-  <div class="tab" onclick="switchTab('grupos',this)">👥 Grupos</div>
-  <div class="tab" onclick="switchTab('dot',this)">📅 DOTs</div>
-  <div class="tab" onclick="switchTab('prod',this)">⚡ Productividad</div>
-  <div class="tab" onclick="switchTab('cydesc',this)">🚚 Carga/Desc.</div>
+<div class="tab-bar">
+  <div class="tab-bar-row1">
+    <div class="tab active" id="maintab-stock" onclick="switchTab('stock',this)">📦 Stock</div>
+    <div class="tab" id="maintab-pedidos" onclick="switchTab('pedidos',this)">📋 Pedidos</div>
+    <div class="tab" id="maintab-mapa" onclick="switchTab('mapa',this)">🗺️ Mapa Racks</div>
+    <div class="tab" id="maintab-cydesc" onclick="switchTab('cydesc',this)">🚚 Carga/Desc.</div>
+    <div class="tab" id="maintab-prod" onclick="switchTab('prod',this)">⚡ Productividad</div>
+    <button class="tab-more-btn" id="tab-more-btn" onclick="toggleTabMore()">▾ Más</button>
+  </div>
+  <div class="tab-bar-row2" id="tab-bar-row2">
+    <div class="tab-row2-item" id="row2tab-repo" onclick="switchTab('repo',this)">🔄 Reposición</div>
+    <div class="tab-row2-item" id="row2tab-nave" onclick="switchTab('nave',this)">🏭 Nave</div>
+    <div class="tab-row2-item" id="row2tab-rot" onclick="switchTab('rot',this)">🔥 Rotación</div>
+    <div class="tab-row2-item" id="row2tab-termometro" onclick="switchTab('termometro',this)">🌡️ Termómetro</div>
+    <div class="tab-row2-item" id="row2tab-dash" onclick="switchTab('dash',this)">📊 Dashboard</div>
+    <div class="tab-row2-item" id="row2tab-inv" onclick="switchTab('inv',this)">🔢 Inventario</div>
+    <div class="tab-row2-item" id="row2tab-dif" onclick="switchTab('dif',this)">📊 Diferencias</div>
+    <div class="tab-row2-item" id="row2tab-grupos" onclick="switchTab('grupos',this)">👥 Grupos</div>
+    <div class="tab-row2-item" id="row2tab-dot" onclick="switchTab('dot',this)">📅 DOTs</div>
+  </div>
 </div>
 
 
@@ -1034,58 +1050,13 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
       <div style="font-size:11px;font-weight:600;color:#86868b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Movimientos de hoy</div>
       <div id="prod-lista" style="margin-bottom:12px"></div>
 
-      <!-- Formulario — ABAJO -->
-      <div class="prod-form">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <div class="prod-form-title" style="margin-bottom:0">+ Registrar movimiento</div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:11px;color:#86868b">Fecha:</span>
-            <input type="date" id="prod-fecha-manual" 
-              style="padding:4px 8px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;color:#1d1d1f;background:#fff;outline:none"
-              onchange="checkFechaManual(this.value)">
-          </div>
-        </div>
-        <div class="prod-tipo-row">
-          <button class="prod-tipo-btn carga active" id="ptb-carga" onclick="setProdTipo('carga',this)">📥 Carga</button>
-          <button class="prod-tipo-btn descarga" id="ptb-descarga" onclick="setProdTipo('descarga',this)">📤 Descarga</button>
-          <button class="prod-tipo-btn chasis" id="ptb-chasis" onclick="setProdTipo('chasis',this)">🚗 Chasis</button>
-        </div>
-        <div class="prod-grupo-row" id="prod-grupos-btns"></div>
-        <div class="prod-input-row">
-          <div>
-            <div class="prod-label">Dársena</div>
-            <input type="text" id="prod-darsena" class="prod-input" placeholder="Ej: D1">
-          </div>
-          <div>
-            <div class="prod-label">Destino / Origen</div>
-            <input type="text" id="prod-destino-mov" class="prod-input" placeholder="Cliente / Proveedor">
-          </div>
-        </div>
-        <div class="prod-input-row">
-          <div>
-            <div class="prod-label">Unidades</div>
-            <input type="number" id="prod-unidades" class="prod-input" placeholder="0">
-          </div>
-          <div>
-            <div class="prod-label">Semis / Pedidos</div>
-            <input type="number" id="prod-semis" class="prod-input" placeholder="1">
-          </div>
-        </div>
-        <div class="prod-input-row">
-          <div>
-            <div class="prod-label">Hora inicio</div>
-            <input type="time" id="prod-inicio" class="prod-input">
-          </div>
-          <div>
-            <div class="prod-label">Hora fin</div>
-            <input type="time" id="prod-fin" class="prod-input">
-          </div>
-        </div>
-        <div>
-          <div class="prod-label">Observaciones</div>
-          <input type="text" id="prod-obs" class="prod-input" placeholder="Opcional...">
-        </div>
-        <button class="prod-save-btn" onclick="guardarMovimientoFecha()" style="margin-top:8px">💾 Guardar movimiento</button>
+      <div id="prod-grupos-btns" style="display:none"></div>
+      <!-- Selector de fecha para ver histórico -->
+      <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+        <span style="font-size:11px;color:#86868b">Ver fecha:</span>
+        <input type="date" id="prod-fecha-manual"
+          style="padding:4px 8px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;color:#1d1d1f;background:#fff;outline:none"
+          onchange="checkFechaManual(this.value)">
       </div>
     </div>
 
@@ -1577,11 +1548,40 @@ function renderDash(){
   }
 }
 
+// Tabs fila 1 (visibles siempre)
+const _tabsFila1 = ['stock','pedidos','mapa','cydesc','prod'];
+
+function toggleTabMore(){
+  var row2 = document.getElementById('tab-bar-row2');
+  var btn  = document.getElementById('tab-more-btn');
+  if(!row2) return;
+  var open = row2.classList.toggle('open');
+  btn.classList.toggle('open', open);
+  btn.textContent = open ? '▴ Menos' : '▾ Más';
+}
+
 function switchTab(name,btn){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  // Limpiar activos en fila 1
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  // Limpiar activos en fila 2
+  document.querySelectorAll('.tab-row2-item').forEach(t=>t.classList.remove('active'));
+
   document.getElementById('view-'+name).classList.add('active');
-  btn.classList.add('active');
+
+  // Marcar activo donde corresponde
+  if(_tabsFila1.includes(name)){
+    btn.classList.add('active');
+    // Cerrar fila 2 si estaba abierta
+    var row2 = document.getElementById('tab-bar-row2');
+    var moreBtn = document.getElementById('tab-more-btn');
+    if(row2){ row2.classList.remove('open'); }
+    if(moreBtn){ moreBtn.classList.remove('open'); moreBtn.textContent='▾ Más'; }
+  } else {
+    btn.classList.add('active');
+    // Mantener fila 2 abierta hasta que el user la cierre
+  }
+
   if(name==='mapa') renderMapa();
   if(name==='dash') renderDash();
   if(name==='nave') renderNave();
@@ -3776,9 +3776,114 @@ function cydConfirmarSalidaDesdeTransito(id){
   var lista = transitoGetAll();
   var tr = lista.find(function(t){return t.id===id;});
   if(!tr){ showToast('❌ Tránsito no encontrado'); return; }
-  if(!confirm('¿Confirmar despacho de '+tr.tipoIcon+' '+tr.tipoLabel+
-    (tr.destino?' → '+tr.destino:'')+
-    ' — '+tr.items.length+' arts? Esto descuenta el stock real.')) return;
+
+  // Armar opciones de grupos presentes hoy
+  var personal = getGruposHoy();
+  var gruposHoy = [];
+  personal.filter(function(p){return p.presente;}).forEach(function(p){
+    if(gruposHoy.indexOf(p.grupoHoy)<0) gruposHoy.push(p.grupoHoy);
+  });
+  if(!gruposHoy.length) gruposHoy = ['G1','G2','G3'];
+
+  var totalUnEstimado = tr.items.reduce(function(s,r){return s+(r.cantReal||r.cant);},0);
+
+  var grupoOpts = gruposHoy.map(function(g){
+    return '<button type="button" onclick="cydDespachoSelGrupo(this,\''+g+'\')" id="desp-gbtn-'+g+'" '+
+      'style="padding:7px 12px;border:1.5px solid #d2d2d7;border-radius:8px;background:#fff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">'+
+      (GRUPOS_NOMBRES[g]||g)+'</button>';
+  }).join('');
+
+  var modalHtml =
+    '<div id="cyd-modal-despacho-op" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box">'+
+    '<div style="background:#fff;border-radius:16px;padding:20px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.35);max-height:90vh;overflow-y:auto">'+
+    '<div style="font-size:15px;font-weight:700;margin-bottom:4px">📤 Confirmar despacho</div>'+
+    '<div style="font-size:12px;color:#86868b;margin-bottom:14px">'+tr.tipoIcon+' '+(tr.tipoLabel||'')+(tr.destino?' → '+tr.destino:'')+ ' · '+tr.items.length+' arts · ~'+totalUnEstimado.toLocaleString('es-AR')+' un.</div>'+
+
+    '<div style="font-size:11px;font-weight:700;color:#86868b;letter-spacing:.4px;margin-bottom:6px">EQUIPO DE CARGA</div>'+
+    '<div id="desp-grupos-btns" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'+grupoOpts+'</div>'+
+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'+
+      '<div>'+
+        '<div style="font-size:11px;color:#86868b;margin-bottom:3px">Controlador</div>'+
+        '<input id="desp-controlador" type="text" placeholder="Nombre controlador..." style="width:100%;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">'+
+      '</div>'+
+      '<div>'+
+        '<div style="font-size:11px;color:#86868b;margin-bottom:3px">Patente camión</div>'+
+        '<input id="desp-patente" type="text" placeholder="ABC 123 / AB 123 CD" style="width:100%;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">'+
+      '</div>'+
+    '</div>'+
+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'+
+      '<div>'+
+        '<div style="font-size:11px;color:#86868b;margin-bottom:3px">Inicio</div>'+
+        '<input id="desp-inicio" type="time" style="width:100%;padding:8px 6px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">'+
+      '</div>'+
+      '<div>'+
+        '<div style="font-size:11px;color:#86868b;margin-bottom:3px">Fin</div>'+
+        '<input id="desp-fin" type="time" style="width:100%;padding:8px 6px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">'+
+      '</div>'+
+      '<div>'+
+        '<div style="font-size:11px;color:#86868b;margin-bottom:3px">Dársena</div>'+
+        '<input id="desp-darsena" type="text" placeholder="Nro..." style="width:100%;padding:8px 6px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">'+
+      '</div>'+
+    '</div>'+
+
+    '<div style="margin-bottom:12px">'+
+      '<div style="font-size:11px;color:#86868b;margin-bottom:3px">Observaciones</div>'+
+      '<textarea id="desp-obs" placeholder="Diferencias, demoras, novedades..." rows="2" style="width:100%;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;resize:none;box-sizing:border-box"></textarea>'+
+    '</div>'+
+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="document.getElementById(\'cyd-modal-despacho-op\').remove()" style="flex:1;padding:10px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>'+
+      '<button onclick="cydEjecutarDespacho(\''+id+'\')" style="flex:2;padding:10px;background:#d70015;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">✅ Confirmar despacho</button>'+
+    '</div>'+
+    '</div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  // Preseleccionar hora actual
+  var ahora = new Date();
+  var hh = ahora.getHours().toString().padStart(2,'0');
+  var mm = ahora.getMinutes().toString().padStart(2,'0');
+  var inicioEl = document.getElementById('desp-inicio');
+  if(inicioEl) inicioEl.value = hh+':'+mm;
+
+  // Preseleccionar primer grupo
+  window._despGrupoSel = gruposHoy[0]||'G1';
+  cydDespachoSelGrupo(document.getElementById('desp-gbtn-'+window._despGrupoSel), window._despGrupoSel);
+}
+
+function cydDespachoSelGrupo(btn, g){
+  window._despGrupoSel = g;
+  var btns = document.getElementById('desp-grupos-btns');
+  if(btns) btns.querySelectorAll('button').forEach(function(b){
+    b.style.background='#fff'; b.style.borderColor='#d2d2d7'; b.style.color='#1d1d1f';
+  });
+  if(btn){ btn.style.background=GRUPOS_COLORES[g]||'#0071e3'; btn.style.borderColor=GRUPOS_COLORES[g]||'#0071e3'; btn.style.color='#fff'; }
+}
+
+function cydEjecutarDespacho(id){
+  var lista = transitoGetAll();
+  var tr = lista.find(function(t){return t.id===id;});
+  if(!tr){ showToast('❌ Tránsito no encontrado'); return; }
+
+  var grupoSel    = window._despGrupoSel || 'G1';
+  var controlador = (document.getElementById('desp-controlador')||{}).value||'';
+  var patente     = (document.getElementById('desp-patente')||{}).value||'';
+  var inicio      = (document.getElementById('desp-inicio')||{}).value||'';
+  var fin         = (document.getElementById('desp-fin')||{}).value||'';
+  var darsena     = (document.getElementById('desp-darsena')||{}).value||'';
+  var obs         = (document.getElementById('desp-obs')||{}).value||'';
+
+  var durMin = 0;
+  if(inicio && fin){
+    var ih=parseInt(inicio.split(':')[0]||0), im=parseInt(inicio.split(':')[1]||0);
+    var fh=parseInt(fin.split(':')[0]||0),   fm=parseInt(fin.split(':')[1]||0);
+    durMin = (fh*60+fm)-(ih*60+im);
+    if(durMin<0) durMin=0;
+  }
+
+  document.getElementById('cyd-modal-despacho-op').remove();
 
   var fecha = new Date().toLocaleDateString('es-AR');
   var hora  = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
@@ -3842,7 +3947,36 @@ function cydConfirmarSalidaDesdeTransito(id){
   cydPlanillaDespacho(id);
 
   var totalUnD = tr.items.reduce(function(s,r){return s+(r.cantReal||r.cant);},0);
-  registrarMovProd('despacho', totalUnD, tr.destino||tr.tipoLabel);
+
+  // Registrar en productividad con datos operativos completos
+  try {
+    var mov = {
+      fecha: fecha, hora: hora,
+      tipo: 'despacho',
+      grupo: grupoSel,
+      controlador: controlador,
+      patente: patente,
+      unidades: totalUnD,
+      semis: 1,
+      destino: tr.destino||tr.tipoLabel||'',
+      darsena: darsena,
+      inicio: inicio,
+      fin: fin,
+      durMin: durMin,
+      obs: obs,
+      auto: false,
+      transitoId: id
+    };
+    var dayKey = getProdKey();
+    var movsDia = JSON.parse(localStorage.getItem(dayKey)||'[]');
+    movsDia.push(mov);
+    localStorage.setItem(dayKey, JSON.stringify(movsDia));
+    var mes = new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+    var histKey = 'prod_hist_'+mes;
+    var hist = JSON.parse(localStorage.getItem(histKey)||'[]');
+    hist.push(mov);
+    localStorage.setItem(histKey, JSON.stringify(hist));
+  } catch(e){ console.warn('registrarMovProd error', e); }
 
   var msg = '✅ Despacho confirmado';
   if(diferencias.length)  msg += ' · '+diferencias.length+' diferencias';
@@ -6284,20 +6418,31 @@ function renderProdLista(){
   const el = document.getElementById('prod-lista');
   if(!el) return;
   if(!movs.length){ el.innerHTML='<div class="empty">Sin movimientos hoy</div>'; return; }
-  const coloresTipo = {carga:'#34c759',descarga:'#ff9500',chasis:'#af52de'};
-  el.innerHTML = movs.map((m,i)=>`
-    <div class="mov-card">
-      <span class="mov-tipo ${m.tipo}">${m.tipo==='carga'?'📥 CARGA':m.tipo==='descarga'?'📤 DESCARGA':m.tipo==='despacho'?'📋 DESPACHO':'🚗 CHASIS'}${m.auto?' <span style="font-size:8px;opacity:.6">auto</span>':''}</span>
+  el.innerHTML = movs.map((m,i)=>{
+    var tipoLabel = m.tipo==='carga'?'📥 CARGA':m.tipo==='descarga'?'📤 DESCARGA':m.tipo==='despacho'?'📋 DESPACHO':'🚗 CHASIS';
+    var autoTag = m.auto?' <span style="font-size:8px;opacity:.6">auto</span>':'';
+    var subInfo = [];
+    subInfo.push((GRUPOS_NOMBRES[m.grupo]||m.grupo||'—'));
+    if(m.controlador) subInfo.push('Ctrl: '+m.controlador);
+    if(m.patente) subInfo.push('🚛 '+m.patente);
+    if(m.inicio) subInfo.push(m.inicio+(m.fin?' → '+m.fin:''));
+    var subStr = subInfo.join(' · ');
+    var durStr = m.durMin>0?m.durMin+'min':'';
+    var obsStr = m.obs?'<div style="font-size:10px;color:#86868b;margin-top:2px;font-style:italic">'+m.obs+'</div>':'';
+    return `<div class="mov-card">
+      <span class="mov-tipo ${m.tipo}">${tipoLabel}${autoTag}</span>
       <div class="mov-info">
-        <div class="mov-title">${m.destino||'Sin destino'} ${m.darsena?'· D:'+m.darsena:''}</div>
-        <div class="mov-sub" style="color:${GRUPOS_COLORES[m.grupo]||'#86868b'}">${m.grupo} · ${m.semis} semi${m.semis>1?'s':''} · ${m.inicio}${m.fin?' → '+m.fin:''}</div>
+        <div class="mov-title">${m.destino||'Sin destino'}${m.darsena?' · D:'+m.darsena:''}</div>
+        <div class="mov-sub" style="color:${GRUPOS_COLORES[m.grupo]||'#86868b'}">${subStr}</div>
+        ${obsStr}
       </div>
       <div class="mov-stats">
         <div class="mov-unid">${m.unidades.toLocaleString('es-AR')}</div>
-        <div class="mov-time">${m.durMin>0?m.durMin+'min':''}</div>
+        <div class="mov-time">${durStr}</div>
       </div>
       <button onclick="eliminarMov(${movs.length-1-i})" style="background:none;border:none;color:#d2d2d7;font-size:16px;cursor:pointer;flex-shrink:0">✕</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function eliminarMov(idx){
@@ -8603,7 +8748,14 @@ function cydExportarPlanilla(id){
   if(!tr) return;
 
   var esCarga = tr.flujo !== 'descarga';
+
+  // Pedir muelle, responsable y equipo antes de abrir la ventana
+  var muelle = (prompt('Muelle de descarga:', '') || '').trim();
+  var responsable = (prompt('Responsable de guardado:', '') || '').trim();
+  var equipo = (prompt('Equipo de descarga:', '') || '').trim();
+
   var win = window.open('','_blank');
+  if(!win){ showToast('⚠️ Habilitá popups para imprimir'); return; }
 
   var rows = tr.items.map(function(r){
     // Calcular sugerencia en tiempo real para garantizar datos frescos
@@ -8611,17 +8763,6 @@ function cydExportarPlanilla(id){
     if(esCarga){
       sug = transitoPosicionSugerida(r.art, r.cant);
     } else {
-      // Para descarga: mostrar dónde estaba (rack/bloque actual)
-      var da = DATA.find(function(d){return d.art===r.art;});
-      var enRack = [];
-      Object.entries(ASIGN).forEach(function(e){
-        var v=e[1]; if(!v) return;
-        if(v.art==r.art) enRack.push(e[0]);
-        if(v.compartidos&&v.compartidos.some(function(c){return c.art==r.art;})) enRack.push(e[0]);
-      });
-      var mp = da?da.max_pos||32:32;
-      var nuevoStock = (r.stockActual||0) + r.cant;
-      var pallNuevo = (nuevoStock/mp).toFixed(1);
       sug = transitoPosicionSugerida(r.art, r.cant);
     }
 
@@ -8629,19 +8770,29 @@ function cydExportarPlanilla(id){
     var cantStr = '+'+r.cant;
     var cantColor = '#34c759';
     var destColor = sug.tipo==='rack' ? '#0071e3' : '#ff9500';
-    var pallActual = r.stockActual>0 ? (r.stockActual/(r.max_pos||32)).toFixed(1) : '0';
+    var rango = (typeof RANGOS !== 'undefined' && RANGOS[String(r.art)]) ? RANGOS[String(r.art)] : '—';
+    var dot = (function(){
+      try{
+        var dots = JSON.parse(localStorage.getItem('wms_dots')||'{}');
+        var artDots = dots[String(r.art)];
+        if(!artDots||!artDots.length) return '—';
+        return artDots.map(function(d){return d.anio||d;}).join(' / ');
+      }catch(e){return '—';}
+    })();
 
     return '<tr>'+
       '<td style="font-weight:700">'+r.art+'</td>'+
       '<td style="white-space:nowrap">'+r.med+'</td>'+
-      '<td>'+( r.diseno||'')+'</td>'+
-      '<td style="color:#555">'+( r.prov||'')+'</td>'+
-      '<td style="text-align:right">'+r.stockActual+'</td>'+
+      '<td>'+(r.diseno||'')+'</td>'+
+      '<td style="color:#555">'+(r.prov||'')+'</td>'+
+      '<td style="text-align:center;font-weight:700;color:#0071e3">'+rango+'</td>'+
+      '<td style="text-align:center;color:#555">'+dot+'</td>'+
+      '<td style="text-align:right">'+(r.stockActual||0)+'</td>'+
       '<td style="text-align:right;font-weight:700;color:'+cantColor+'">'+cantStr+'</td>'+
       '<td style="text-align:right;font-weight:700">'+stockNuevo+'</td>'+
-      '<td style="text-align:right">'+( sug.pallets||'—')+'</td>'+
-      '<td style="font-weight:700;color:'+destColor+'">'+( sug.detalle||'—')+'</td>'+
-      '<td style="border:2px solid #bbb;min-width:90px">&nbsp;</td>'+
+      '<td style="text-align:right">'+(sug.pallets||'—')+'</td>'+
+      '<td style="font-weight:700;color:'+destColor+'">'+(sug.detalle||'—')+'</td>'+
+      '<td style="border:2px solid #bbb;min-width:80px">&nbsp;</td>'+
       '</tr>';
   }).join('');
 
@@ -8654,8 +8805,13 @@ function cydExportarPlanilla(id){
     '@page{size:A4 landscape;margin:10mm}'+
     'body{font-family:Arial,sans-serif;font-size:10px;margin:0;color:#1d1d1f}'+
     'h2{font-size:13px;margin:0 0 3px;font-weight:700}'+
-    '.meta{display:flex;gap:20px;flex-wrap:wrap;font-size:10px;color:#555;margin-bottom:10px;border-bottom:1px solid #ddd;padding-bottom:6px}'+
+    '.meta{display:flex;gap:20px;flex-wrap:wrap;font-size:10px;color:#555;margin-bottom:6px;border-bottom:1px solid #ddd;padding-bottom:6px}'+
     '.meta b{color:#1d1d1f}'+
+    '.firmas{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin:10px 0 8px;font-size:9.5px}'+
+    '.firma-box{border:1px solid #ccc;border-radius:6px;padding:6px 10px}'+
+    '.firma-label{font-size:8.5px;color:#86868b;margin-bottom:2px}'+
+    '.firma-val{font-weight:700;font-size:11px}'+
+    '.firma-line{border-top:1px solid #bbb;margin-top:14px;padding-top:3px;font-size:8px;color:#999;text-align:center}'+
     'table{width:100%;border-collapse:collapse;font-size:9.5px}'+
     'th{background:#1d1d1f;color:#fff;padding:4px 6px;text-align:left;font-size:9px;white-space:nowrap;border-right:1px solid #444}'+
     'td{padding:3px 6px;border-bottom:1px solid #e8e8e8;vertical-align:middle;border-right:1px solid #f0f0f0}'+
@@ -8674,17 +8830,36 @@ function cydExportarPlanilla(id){
       '<span>Unidades: <b>'+totalCant+'</b></span>'+
       '<span style="margin-left:auto;color:#bbb">ID: '+tr.id+'</span>'+
     '</div>'+
+    '<div class="firmas">'+
+      '<div class="firma-box">'+
+        '<div class="firma-label">Muelle de descarga</div>'+
+        '<div class="firma-val">'+(muelle||'&nbsp;')+'</div>'+
+        '<div class="firma-line">Muelle</div>'+
+      '</div>'+
+      '<div class="firma-box">'+
+        '<div class="firma-label">Responsable de guardado</div>'+
+        '<div class="firma-val">'+(responsable||'&nbsp;')+'</div>'+
+        '<div class="firma-line">Firma responsable</div>'+
+      '</div>'+
+      '<div class="firma-box">'+
+        '<div class="firma-label">Equipo de descarga</div>'+
+        '<div class="firma-val">'+(equipo||'&nbsp;')+'</div>'+
+        '<div class="firma-line">Firma equipo</div>'+
+      '</div>'+
+    '</div>'+
     '<table><thead><tr>'+
       '<th>Art</th><th>Medida</th><th>Diseño</th><th>Prov</th>'+
+      '<th style="text-align:center">Rango</th>'+
+      '<th style="text-align:center">DOT</th>'+
       '<th style="text-align:right">Stock act.</th>'+
       '<th style="text-align:right">Entra</th>'+
       '<th style="text-align:right">Stock nuevo</th>'+
       '<th style="text-align:right">Pallets</th>'+
       '<th>Destino sugerido</th>'+
-      '<th style="min-width:100px">Posición física ✍</th>'+
+      '<th style="min-width:80px">Posición física ✍</th>'+
     '</tr></thead><tbody>'+rows+'</tbody>'+
     '<tfoot><tr>'+
-      '<td colspan="4">TOTAL</td>'+
+      '<td colspan="6">TOTAL</td>'+
       '<td></td>'+
       '<td style="text-align:right;color:#34c759">+'+totalCant+'</td>'+
       '<td colspan="4"></td>'+
@@ -9054,6 +9229,7 @@ function cydParseDescarga(texto){
 
     items.push({
       art, med, prov:provF, desc, cant,
+      diseno: da?da.diseno:'',
       stockActual: da?da.stock:(stock||0),
       bloque: da?da.bloque:(bloque||''),
       racks, pallet,
