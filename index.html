@@ -553,7 +553,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     <div class="tab-row2-item" id="row2tab-nave" onclick="switchTab('nave',this)">🏭 Nave</div>
     <div class="tab-row2-item" id="row2tab-rot" onclick="switchTab('rot',this)">🔥 Rotación</div>
     <div class="tab-row2-item" id="row2tab-termometro" onclick="switchTab('termometro',this)">🌡️ Termómetro</div>
-    <div class="tab-row2-item" id="row2tab-dash" onclick="switchTab('dash',this)">📊 Dashboard</div>
+    <div class="tab-row2-item" id="row2tab-dash" onclick="switchTab('dash',this)">📊 KPIs</div>
     <div class="tab-row2-item" id="row2tab-inv" onclick="switchTab('inv',this)">🔢 Inventario</div>
     <div class="tab-row2-item" id="row2tab-dif" onclick="switchTab('dif',this)">📊 Diferencias</div>
     <div class="tab-row2-item" id="row2tab-grupos" onclick="switchTab('grupos',this)">👥 Grupos</div>
@@ -638,7 +638,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
       <div class="home-btn-icon">
         <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="3" y="16" width="5" height="8" rx="1" fill="#34c759" opacity=".3" stroke="#34c759" stroke-width="1.6"/><rect x="11" y="11" width="5" height="13" rx="1" fill="#34c759" opacity=".3" stroke="#34c759" stroke-width="1.6"/><rect x="19" y="6" width="5" height="18" rx="1" fill="#34c759" opacity=".3" stroke="#34c759" stroke-width="1.6"/><path d="M3 24h22" stroke="#34c759" stroke-width="1.5" stroke-linecap="round"/></svg>
       </div>
-      <div class="home-btn-label">Dashboard</div>
+      <div class="home-btn-label">KPIs</div>
       <div class="home-btn-sub">Resumen</div>
     </button>
 
@@ -5829,7 +5829,8 @@ function generarInforme(){
 </div>
 
 <div class="nav-submenu" id="sub-dash">
-  <div class="nav-sub-item" id="sub-dash-item" onclick="navTo('dash')"><span class="nav-sub-icon">📊</span><span class="nav-sub-label">Dashboard</span></div>
+  <div class="nav-sub-item" id="sub-repo-dash" onclick="navTo('repo')"><span class="nav-sub-icon">🔄</span><span class="nav-sub-label">Reposición</span></div>
+  <div class="nav-sub-item" id="sub-dash-item" onclick="navTo('dash')"><span class="nav-sub-icon">📊</span><span class="nav-sub-label">KPIs</span></div>
 </div>
 
 
@@ -7310,7 +7311,7 @@ let _pwaUnlocked = true;
 function showPwd(view){
   const nombres = {
     stock:'📦 Stock', pedidos:'📋 Pedidos', repo:'🔄 Reposición',
-    dot:'📅 DOTs', dash:'📊 Dashboard', inv:'🔢 Inventario',
+    dot:'📅 DOTs', dash:'📊 KPIs', inv:'🔢 Inventario',
     dif:'⚠️ Diferencias', grupos:'👥 Grupos', prod:'⚡ Productividad'
   };
   document.getElementById('pwd-module-name').textContent = nombres[view]||view;
@@ -8805,7 +8806,8 @@ if('serviceWorker' in navigator){
 </div>
 
 <div class="nav-submenu" id="sub-dash">
-  <div class="nav-sub-item" id="sub-dash-item" onclick="navTo('dash')"><span class="nav-sub-icon">📊</span><span class="nav-sub-label">Dashboard</span></div>
+  <div class="nav-sub-item" id="sub-repo-dash2" onclick="navTo('repo')"><span class="nav-sub-icon">🔄</span><span class="nav-sub-label">Reposición</span></div>
+  <div class="nav-sub-item" id="sub-dash-item2" onclick="navTo('dash')"><span class="nav-sub-icon">📊</span><span class="nav-sub-label">KPIs</span></div>
 </div>
 
 
