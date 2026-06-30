@@ -993,13 +993,29 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
   <div class="repo-wrap">
     <div class="repo-header">
       <span style="font-size:13px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px">🔄 Reposición Diaria</span>
-      <button onclick="exportarReposicion()" style="padding:7px 12px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">📥 Exportar</button>
+      <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+        <span id="repo-hist-stats" style="font-size:11px;color:#86868b"></span>
+        <button onclick="abrirHistorialRepo()" style="padding:7px 12px;background:#fff;color:#0071e3;border:1px solid #0071e3;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">🕒 Historial</button>
+        <button onclick="exportarReposicion()" style="padding:7px 12px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">📥 Exportar</button>
+      </div>
     </div>
     <div id="repo-content">
       <div class="empty">Cargando...</div>
     </div>
   </div>
 </div>
+
+<!-- HISTORIAL REPOSICION (modal simple) -->
+<div id="repo-hist-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;max-width:560px;width:92%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:14px 18px;border-bottom:1px solid #e5e5ea;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:15px;font-weight:700">🕒 Historial de reposiciones</span>
+      <button onclick="document.getElementById('repo-hist-modal').style.display='none'" style="background:none;border:none;font-size:18px;cursor:pointer;color:#86868b">✕</button>
+    </div>
+    <div id="repo-hist-list" style="overflow-y:auto;padding:10px 18px"></div>
+  </div>
+</div>
+
 
 <!-- GRUPOS -->
 <div class="view" id="view-grupos">
@@ -1277,6 +1293,13 @@ if(_asignGuardado && Object.keys(_asignGuardado).some(function(k){return /^B\d/.
 // Arrancar vacío si no hay ASIGN guardado — el usuario aplica el motor cuando quiera
 let ASIGN = _asignGuardado || {};
 
+// Recalcula cond ('bajo stock' / 'sobrestock') en base a rotación vs pallets en stock.
+// Si rota más pallets/mes de los que hay en stock -> bajo stock. Si no -> sobrestock.
+function recalcularCond(art){
+  if(!art) return;
+  art.cond = (art.rot_pall_mes||0) > (art.pall||0) ? 'bajo stock' : 'sobrestock';
+}
+
 // Aplicar rotación real al arrancar
 (function(){
   // 1. Base embebida — actualiza rot, rot6 Y rot_sem
@@ -1288,6 +1311,7 @@ let ASIGN = _asignGuardado || {};
       r.rot6    = rv.r6;
       r.rot_sem = Math.round((rv.r12 / 4.33) * 100) / 100;
       r.pall    = Math.floor((r.stock||0) / (r.max_pos||32));
+      recalcularCond(r);
       applied++;
     }
   });
@@ -1303,6 +1327,7 @@ let ASIGN = _asignGuardado || {};
           r.rot6    = rotData[r.art].rot6  || r.rot6;
           r.rot_sem = Math.round((rotData[r.art].rot12 / 4.33) * 100) / 100;
           r.pall    = Math.floor((r.stock||0) / (r.max_pos||32));
+          recalcularCond(r);
         }
       });
     }
@@ -1767,6 +1792,7 @@ var _DATA_BASE = {};
     if(movs[r.art] !== undefined){
       r.stock = Math.max(0, (r.stock||0) + movs[r.art]);
       r.pall = Math.floor(r.stock / (r.max_pos||32));
+      recalcularCond(r);
     }
   });
 })();
@@ -2125,8 +2151,9 @@ function renderMapa(){
       for(let m=1;m<=f.modulos;m++){
         const posId=`${f.id}-N${n}-P${String(m).padStart(2,'0')}`;
         const asig=ASIGN[posId];
-        const art=asig?DATA.find(r=>r.art==asig.art):null;
-        const unid=asig?asig.unidades:0;
+        const unid=asig?(asig.unidades||0):0;
+        // Si quedó en 0, tratarla como vacía visualmente (aunque siga en ASIGN para Reposición)
+        const art=(asig&&unid>0)?DATA.find(r=>r.art==asig.art):null;
         const maxU=art?art.max_pos:0;
         const cls=celldaColor(unid,maxU);
         const pct=maxU?Math.round((unid/maxU)*100):0;
@@ -2679,41 +2706,165 @@ function generarMotorAsignacion(){
 // Luego re-ejecuta el motor para re-asignar posiciones liberadas.
 // ───────────────────────────────────────────────────────────────
 function descontarRackPorPedido(art, cant){
-  var rackSt = loadRackStock();
   var descontado = 0;
 
-  // Buscar posiciones del artículo (principal o compartido)
-  Object.entries(rackSt).forEach(function(e){
-    var posId=e[0], rs=e[1];
-    if(descontado >= cant) return;
-    if(!rs) return;
+  console.log('[descontarRackPorPedido] art recibido:', art, typeof art, '| cant:', cant, typeof cant);
 
-    if(rs.art == art){
-      var desc = Math.min(cant - descontado, rs.stock||0);
-      rs.stock = Math.max(0, (rs.stock||0) - desc);
+  // Operar directamente sobre ASIGN (fuente de verdad), no sobre rackStock
+  // Ordenar posiciones: menor cantidad primero (vaciar las mas chicas antes)
+  var posDelArt = Object.entries(ASIGN).filter(function(e){
+    var v = e[1];
+    if(!v) return false;
+    if(v.art == art) return true;
+    if(v.compartidos && v.compartidos.some(function(c){return c.art==art;})) return true;
+    return false;
+  });
+
+  console.log('[descontarRackPorPedido] posiciones encontradas para el art:', posDelArt.length, posDelArt.map(function(e){return [e[0], e[1].art, typeof e[1].art];}));
+
+  posDelArt = posDelArt.sort(function(a, b){
+    var ua = a[1].art==art ? (a[1].unidades||0) : ((a[1].compartidos||[]).find(function(c){return c.art==art;})||{unidades:0}).unidades;
+    var ub = b[1].art==art ? (b[1].unidades||0) : ((b[1].compartidos||[]).find(function(c){return c.art==art;})||{unidades:0}).unidades;
+    return ua - ub;
+  });
+
+  posDelArt.forEach(function(e){
+    if(descontado >= cant) return;
+    var posId = e[0], v = ASIGN[posId];
+    if(!v) return;
+
+    if(v.art == art){
+      var desc = Math.min(cant - descontado, v.unidades||0);
+      v.unidades = Math.max(0, (v.unidades||0) - desc);
       descontado += desc;
-      // Si quedó vacío → posición libre → re-barrido
-      if(rs.stock <= 0) delete rackSt[posId];
-    } else if(rs.compartidos){
-      rs.compartidos.forEach(function(c){
-        if(descontado >= cant) return;
-        if(c.art != art) return;
+      // Posicion queda en ASIGN con unidades=0 para que Reposicion la muestre
+    } else if(v.compartidos){
+      v.compartidos.forEach(function(c){
+        if(descontado >= cant || c.art != art) return;
         var desc = Math.min(cant - descontado, c.unidades||0);
         c.unidades = Math.max(0, (c.unidades||0) - desc);
         descontado += desc;
       });
-      rs.compartidos = rs.compartidos.filter(function(c){return (c.unidades||0)>0;});
     }
   });
 
-  saveRackStock(rackSt);
+  console.log('[descontarRackPorPedido] total descontado:', descontado, '/ cant pedida:', cant);
 
-  // Reevaluar rack incrementalmente al salir un pedido
   if(descontado > 0){
-    reevaluarRack();
+    saveAsign();
   }
 
   return descontado;
+}
+
+// Inversa de descontarRackPorPedido — repone unidades cuando se ajusta una diferencia
+// (ej: se reservó más de lo que se despachó realmente). Prioriza la posición original
+// si se pasa posIdPreferida, si no, cualquier posición existente con ese art.
+function reponerRackPorAjuste(art, cant, posIdPreferida){
+  if(cant<=0) return 0;
+  var repuesto = 0;
+
+  if(posIdPreferida && ASIGN[posIdPreferida] && ASIGN[posIdPreferida].art==art){
+    ASIGN[posIdPreferida].unidades = (ASIGN[posIdPreferida].unidades||0) + cant;
+    repuesto = cant;
+  } else {
+    var pos = Object.entries(ASIGN).find(function(e){ return e[1] && e[1].art==art; });
+    if(pos){
+      ASIGN[pos[0]].unidades = (ASIGN[pos[0]].unidades||0) + cant;
+      repuesto = cant;
+    }
+  }
+
+  if(repuesto>0) saveAsign();
+  return repuesto;
+}
+
+// Confirma una reposición de la lista diaria: mueve unidades de verdad
+// (desde otra posición de rack, o "trae" del bloque) y refresca la lista.
+function registrarHistorialRepo(a, cantidad, tipo, origen){
+  var hist = JSON.parse(localStorage.getItem('wms_repo_historial')||'[]');
+  var ahora = new Date();
+  hist.unshift({
+    fechaISO: ahora.toISOString(),
+    fecha: ahora.toLocaleDateString('es-AR'),
+    hora: ahora.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),
+    art: a.art.art, med: a.art.med, diseno: a.art.diseno, prov: a.art.prov,
+    pos: a.pos, cantidad: cantidad, tipo: tipo, origen: origen||''
+  });
+  localStorage.setItem('wms_repo_historial', JSON.stringify(hist.slice(0,1000)));
+}
+
+function getRepoHistorialStats(){
+  var hist = JSON.parse(localStorage.getItem('wms_repo_historial')||'[]');
+  var hoy = new Date().toLocaleDateString('es-AR');
+  var ahora = new Date();
+  var mesActual = ahora.getMonth(), anioActual = ahora.getFullYear();
+  var hoyCount = 0, mesCount = 0;
+  hist.forEach(function(h){
+    if(h.fecha===hoy) hoyCount++;
+    var d = new Date(h.fechaISO);
+    if(d.getMonth()===mesActual && d.getFullYear()===anioActual) mesCount++;
+  });
+  return {hoy:hoyCount, mes:mesCount, total:hist.length};
+}
+
+function actualizarStatsHistorialRepo(){
+  var el = document.getElementById('repo-hist-stats');
+  if(!el) return;
+  var s = getRepoHistorialStats();
+  el.textContent = '✅ Hoy: '+s.hoy+' · Este mes: '+s.mes;
+}
+
+function abrirHistorialRepo(){
+  var hist = JSON.parse(localStorage.getItem('wms_repo_historial')||'[]');
+  var el = document.getElementById('repo-hist-list');
+  if(!hist.length){
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:#86868b;font-size:13px">Todavía no confirmaste ninguna reposición</div>';
+  } else {
+    el.innerHTML = hist.slice(0,200).map(function(h){
+      return '<div style="padding:10px 0;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">'
+        +'<div>'
+          +'<div style="font-size:13px;font-weight:600">'+h.med+' — '+h.diseno+'</div>'
+          +'<div style="font-size:11px;color:#86868b">'+h.prov+' · '+h.pos+(h.origen?' ← '+h.origen:'')+'</div>'
+        +'</div>'
+        +'<div style="text-align:right">'
+          +'<div style="font-size:13px;font-weight:700;color:#34c759">+'+h.cantidad+' un.</div>'
+          +'<div style="font-size:10px;color:#86868b">'+h.fecha+' '+h.hora+'</div>'
+        +'</div>'
+      +'</div>';
+    }).join('');
+  }
+  document.getElementById('repo-hist-modal').style.display = 'flex';
+}
+
+function confirmarRepoDiaria(idx){
+  const a = (window._repoAlertas||[])[idx];
+  if(!a){ showToast('❌ No encontré esa alerta, refrescá la lista'); return; }
+
+  if(a.reservaPos){
+    // Bajar reserva: mover de una posición de rack a otra
+    const disponible = (ASIGN[a.reservaPos] && ASIGN[a.reservaPos].unidades) || 0;
+    const mover = Math.min(disponible, a.maxU - a.unidActual);
+    if(mover <= 0){ showToast('❌ No hay unidades para mover en '+a.reservaPos); return; }
+    ASIGN[a.reservaPos].unidades -= mover;
+    if(!ASIGN[a.pos]) ASIGN[a.pos] = {art:a.art.art, unidades:0};
+    ASIGN[a.pos].unidades = (ASIGN[a.pos].unidades||0) + mover;
+    registrarHistorialRepo(a, mover, 'reserva', a.reservaPos);
+    showToast('✅ Movidas '+mover+' un. de '+a.reservaPos+' a '+a.pos);
+  } else if(a.accionBloque){
+    // Traer del bloque: sumar a la posición de rack
+    if(!ASIGN[a.pos]) ASIGN[a.pos] = {art:a.art.art, unidades:0};
+    ASIGN[a.pos].unidades = (ASIGN[a.pos].unidades||0) + a.accionBloque.traer;
+    registrarHistorialRepo(a, a.accionBloque.traer, 'bloque', 'bloque '+a.accionBloque.bloque);
+    showToast('✅ Repuestas '+a.accionBloque.traer+' un. en '+a.pos+' desde bloque '+a.accionBloque.bloque);
+  } else {
+    showToast('❌ Esta posición no tiene una acción definida para confirmar');
+    return;
+  }
+
+  saveAsign();
+  renderMapa();
+  renderReposicion(); // recalcula la lista — esta posición ya no debería aparecer como crítica
 }
 
 function confirmarReposicion(posId, cantTraida){
@@ -2799,14 +2950,16 @@ function reevaluarRack(){
     }
   });
 
-  // PASO 2: liberar posiciones con rack_stock = 0 (pedidos despachados)
+  // PASO 2: sincronizar unidades de ASIGN con rackStock (sin borrar posiciones vacías)
   var rackSt = loadRackStock();
   Object.keys(ASIGN).forEach(function(posId){
     var rs = rackSt[posId];
-    if(rs && (rs.stock||0) <= 0){
-      delete ASIGN[posId];
-      liberadas++;
+    if(!ASIGN[posId]) return;
+    if(rs !== undefined){
+      // Actualizar unidades desde rackStock
+      ASIGN[posId].unidades = rs.stock || 0;
     }
+    // No borrar: posición vacía queda en ASIGN con unidades=0 para que Reposición la vea
   });
 
   if(liberadas === 0 && Object.keys(ASIGN).length >= 380){
@@ -3058,12 +3211,16 @@ function renderAlertas(){
 
   alertas.sort((a,b) => (b.stockDisp - a.stockDisp));
 
-  if(!alertas.length){ box.innerHTML=''; renderCandidatosEnNave(); return; }
+  // Sacamos los casos "Reponer" de acá — eso ya lo cubre el módulo de Reposición Diaria.
+  // Este panel queda solo para "Liberar": posiciones vacías cuyo artículo ya no
+  // califica para rack, así el motor (Reevaluar) puede reasignarlas a otro artículo.
+  const alertasLiberar = alertas.filter(a => !a.sigueCalificando);
 
-  const filas = alertas.map(a => {
-    const color = a.sigueCalificando ? '#856404' : '#86868b';
-    const bg    = a.sigueCalificando ? '#fff3cd' : '#f5f5f7';
-    const label = a.sigueCalificando ? 'Reponer' : 'Ya no califica';
+  if(!alertasLiberar.length){ box.innerHTML=''; renderCandidatosEnNave(); return; }
+
+  const filas = alertasLiberar.map(a => {
+    const color = '#86868b';
+    const bg    = '#f5f5f7';
     return `<div style="background:${bg};border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;gap:8px;align-items:center">
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:700;color:${color}">${a.pos}</div>
@@ -3073,19 +3230,19 @@ function renderAlertas(){
         </div>
       </div>
       <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:14px;font-weight:700;color:${color}">${a.sigueCalificando ? 'Traer '+a.traer+' un.' : '🔄 Liberar'}</div>
-        <div style="font-size:10px;color:#86868b">${a.sigueCalificando ? 'de bloque ' + a.bloque : 'Barrer con datos nuevos'}</div>
+        <div style="font-size:14px;font-weight:700;color:${color}">🔄 Liberar</div>
+        <div style="font-size:10px;color:#86868b">Barrer con datos nuevos</div>
       </div>
     </div>`;
   }).join('');
 
   box.innerHTML = `<div style="background:#fff3cd;border:1px solid #ff9500;border-radius:10px;padding:10px;margin-bottom:10px">
     <div style="font-size:13px;font-weight:700;color:#856404;margin-bottom:8px">
-      📦 ${alertas.length} posición${alertas.length>1?'es':''} vacías en rack
+      📦 ${alertasLiberar.length} posición${alertasLiberar.length>1?'es':''} vacías en rack
     </div>
     ${filas}
     <div style="font-size:10px;color:#86868b;margin-top:6px;border-top:1px solid #ffe082;padding-top:6px">
-      Criterio: artículo agotado en rack · reponer si sigue siendo baja rot. · liberar si ya no califica
+      Criterio: artículo agotado en rack y ya no califica para baja rotación → liberar para reasignar
     </div>
   </div>`;
 
@@ -3332,10 +3489,18 @@ function procesarPedido(pedido){
     item.cond = dataArt?dataArt.cond:'';
 
     // Buscar posición en rack — N1 primero, luego N2, N3, N4
-    const posRackN1 = Object.entries(ASIGN).find(([pos,v])=>pos.includes('-N1-')&&v&&v.art==item.art);
-    const posRackN2 = Object.entries(ASIGN).find(([pos,v])=>pos.includes('-N2-')&&v&&v.art==item.art);
-    const posRackN3 = Object.entries(ASIGN).find(([pos,v])=>pos.includes('-N3-')&&v&&v.art==item.art);
-    const posRackN4 = Object.entries(ASIGN).find(([pos,v])=>pos.includes('-N4-')&&v&&v.art==item.art);
+    // Dentro de cada nivel, preferir la posición con MENOS unidades (vaciar las mas chicas antes)
+    function posMenorStockEnNivel(nivel){
+      var candidatas = Object.entries(ASIGN).filter(function(e){
+        var pos=e[0], v=e[1];
+        return pos.includes('-'+nivel+'-') && v && v.art==item.art && (v.unidades||0) > 0;
+      }).sort(function(a,b){ return (a[1].unidades||0) - (b[1].unidades||0); });
+      return candidatas[0];
+    }
+    const posRackN1 = posMenorStockEnNivel('N1');
+    const posRackN2 = posMenorStockEnNivel('N2');
+    const posRackN3 = posMenorStockEnNivel('N3');
+    const posRackN4 = posMenorStockEnNivel('N4');
     const posRack = posRackN1||posRackN2||posRackN3||posRackN4;
     item.posRack = posRack?posRack[0]:'';
 
@@ -3426,7 +3591,6 @@ function renderPedido(conRack, conBloque, sinUbic, todos){
     <div class="ped-actions">
       <button class="ped-btn-export" onclick="exportarPedido()">📥 Exportar Excel</button>
       <button onclick="pedidoEnviarTransito()" style="flex:1;padding:11px;background:#ff9500;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">🟡 Enviar a tránsito</button>
-      <button onclick="abrirConfirmacion()" style="flex:1;padding:11px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">✅ Despachar directo</button>
       <button class="ped-btn-clear" onclick="limpiarPedido()">🗑️</button>
     </div>
   `;
@@ -3733,10 +3897,54 @@ function pedidoEnviarTransito(){
   }
 
   var ahora = new Date();
+  var repoSugerido = [];
+
+  // Descontar stock real (rack + DATA) al momento de enviar a tránsito
+  todos.forEach(function(item){
+    descontarRackPorPedido(item.art, item.cant);
+
+    var dataArt = DATA.find(function(r){ return r.art===item.art; });
+    if(dataArt){
+      dataArt.stock = Math.max(0, (dataArt.stock||0) - item.cant);
+      dataArt.pall = Math.floor(dataArt.stock / (dataArt.max_pos||32));
+      recalcularCond(dataArt);
+      saveDataStock();
+
+      var minStock = dataArt.max_pos || 32;
+      if(dataArt.stock < minStock && dataArt.bloque){
+        repoSugerido.push({
+          art: dataArt.art,
+          med: dataArt.med,
+          diseno: dataArt.diseno,
+          prov: dataArt.prov,
+          bloque: dataArt.bloque,
+          stockActual: dataArt.stock,
+          posRack: item.posRack||'',
+        });
+      }
+    }
+  });
+  saveAsign();
+
+  if(repoSugerido.length){
+    var histRepo = JSON.parse(localStorage.getItem('wms_repo_pendiente')||'[]');
+    repoSugerido.forEach(function(r){
+      if(!histRepo.find(function(x){return x.art===r.art;})){
+        histRepo.unshift(Object.assign({}, r, {
+          fecha: ahora.toLocaleDateString('es-AR'),
+          hora: ahora.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),
+          estado: 'pendiente'
+        }));
+      }
+    });
+    localStorage.setItem('wms_repo_pendiente', JSON.stringify(histRepo.slice(0,200)));
+  }
+
   var transito = {
     id: 'TS-'+ahora.getTime(),
     flujo: 'salida',
     tipo: 'PEDIDO',
+    descontado: true, // el stock/rack ya se descontó acá, al enviar a tránsito
     tipoLabel: modo==='chasis'?'Chasis':'Pedido cliente',
     tipoIcon: modo==='chasis'?'🚗':'📋',
     tte: tte,
@@ -3893,16 +4101,49 @@ function cydEjecutarDespacho(id){
   tr.items.forEach(function(r){
     var cantReal = r.cantReal||r.cant;
 
-    descontarRackPorPedido(r.art, cantReal);
+    if(!tr.descontado){
+      // Flujo viejo: nunca se descontó, descontar todo ahora con la cantidad real
+      descontarRackPorPedido(r.art, cantReal);
 
-    var da = DATA.find(function(d){return d.art===r.art;});
-    if(da){
-      da.stock = Math.max(0, (da.stock||0) - cantReal);
-      da.pall  = Math.floor(da.stock / (da.max_pos||32));
-      if(da.stock < (da.max_pos||32) && da.bloque){
+      var da = DATA.find(function(d){return d.art===r.art;});
+      if(da){
+        da.stock = Math.max(0, (da.stock||0) - cantReal);
+        da.pall  = Math.floor(da.stock / (da.max_pos||32));
+        recalcularCond(da);
+        if(da.stock < (da.max_pos||32) && da.bloque){
+          repoSugerido.push({
+            art:r.art, med:da.med, diseno:da.diseno, prov:da.prov,
+            bloque:da.bloque, stockActual:da.stock, posRack:r.posRack||'',
+            fecha:fecha, hora:hora, estado:'pendiente'
+          });
+        }
+      }
+    } else if(cantReal !== r.cant){
+      // Ya se había descontado r.cant al enviar a tránsito.
+      // Ajustar SOLO la diferencia contra lo realmente despachado.
+      var diff = cantReal - r.cant; // positivo: se llevó más → descontar de más
+      var da2 = DATA.find(function(d){return d.art===r.art;});
+
+      if(diff > 0){
+        descontarRackPorPedido(r.art, diff);
+        if(da2){
+          da2.stock = Math.max(0, (da2.stock||0) - diff);
+          da2.pall  = Math.floor(da2.stock / (da2.max_pos||32));
+          recalcularCond(da2);
+        }
+      } else if(diff < 0){
+        reponerRackPorAjuste(r.art, -diff, r.posRack);
+        if(da2){
+          da2.stock = (da2.stock||0) + (-diff);
+          da2.pall  = Math.floor(da2.stock / (da2.max_pos||32));
+          recalcularCond(da2);
+        }
+      }
+
+      if(da2 && da2.stock < (da2.max_pos||32) && da2.bloque){
         repoSugerido.push({
-          art:r.art, med:da.med, diseno:da.diseno, prov:da.prov,
-          bloque:da.bloque, stockActual:da.stock, posRack:r.posRack||'',
+          art:r.art, med:da2.med, diseno:da2.diseno, prov:da2.prov,
+          bloque:da2.bloque, stockActual:da2.stock, posRack:r.posRack||'',
           fecha:fecha, hora:hora, estado:'pendiente'
         });
       }
@@ -3939,7 +4180,9 @@ function cydEjecutarDespacho(id){
   tr.horaConfirmacion  = hora;
   transitoSave(lista);
 
-  reevaluarRack();
+  // NOTA: ya no se llama a reevaluarRack() acá — la posición liberada queda
+  // gris/vacía en el mapa hasta que el usuario apriete "Reevaluar" manualmente.
+  renderMapa();
   transitoBadge();
   cydRenderTransito();
 
@@ -4279,6 +4522,7 @@ function confirmarDespacho(){
     if(dataArt){
       dataArt.stock = Math.max(0, (dataArt.stock||0) - item.cantReal);
       dataArt.pall = Math.floor(dataArt.stock / (dataArt.max_pos||32));
+      recalcularCond(dataArt);
       saveDataStock();
 
       // TRIGGER REPOSICIÓN: si el stock bajó a menos de 1 pallet → sugerir reponer
@@ -4877,12 +5121,42 @@ function getAlertasReposicion(){
   });
 }
 
-function renderReposicion(){
-  const alertas = [];
+function _repoCalcTraer(art, unidActual, maxU){
+  // Calcula cuánto traer del bloque y desde dónde
+  // Criterio: completar hasta 1 semana de rotación (rot_sem * max_pos)
+  // Si no tiene rot, traer para llenar la posición
+  var rot = art.rot_sem||0;
+  var meta = rot>0 ? Math.min(maxU, Math.ceil(rot * maxU)) : maxU;
+  var traer = Math.max(0, meta - unidActual);
 
-  // Recorrer todas las posiciones N1
+  // Verificar que el art califica para reposición desde bloque
+  var excluido = /\d+\.5/.test(art.med||'') ||
+                 art.prov==='SPEEDWAY' ||
+                 ['TT','TL','TLSB'].indexOf((art.uso||'').trim())>=0 ||
+                 ['AT51','AT52','MT51'].indexOf((art.diseno||'').trim())>=0;
+  var bloqueOk = art.bloque && !['2N/3N','2S/2N','1N','1S'].some(b=>art.bloque.includes(b));
+  var hayStock = (art.stock||0) > unidActual; // hay más en bloque que lo que ya está en rack
+
+  if(excluido || !bloqueOk || !hayStock) return null;
+  if(traer<=0) return null;
+
+  // No traer más de lo que hay disponible en bloque
+  var stockBloque = Math.max(0, (art.stock||0) - unidActual);
+  traer = Math.min(traer, stockBloque);
+  if(traer<=0) return null;
+
+  return {traer, bloque: art.bloque, stockBloque};
+}
+
+function renderReposicion(){
+  let alertas = [];
+  actualizarStatsHistorialRepo();
+
+  // Recorrer TODAS las posiciones de rack (todos los niveles)
   Object.entries(ASIGN).forEach(([pos,v])=>{
-    if(!pos.includes('-N1-')||!v) return;
+    if(!v||!v.art) return;
+    // Solo posiciones de rack (tienen -N1-, -N2-, -N3- o -N4-)
+    if(!/-(N1|N2|N3|N4)-/.test(pos)) return;
     const art = DATA.find(r=>r.art==v.art);
     if(!art) return;
 
@@ -4891,15 +5165,21 @@ function renderReposicion(){
     const maxU = art.max_pos||0;
     const pctOcup = maxU>0?Math.round((unidActual/maxU)*100):100;
 
-    // Buscar reserva en N2, N3, N4
-    const frenteId = pos.split('-N1-')[0];
+    // Buscar otra posición del mismo art con stock > 0 (reserva en cualquier nivel)
+    const frenteId = pos.replace(/-(N1|N2|N3|N4)-P\d+$/, '');
+    const nivelActual = (pos.match(/-(N\d)-/) || [])[1] || '';
     let reservaPos = null, reservaNivel = null;
-    for(const nivel of ['N2','N3','N4']){
+    for(const nivel of ['N1','N2','N3','N4']){
+      if(nivel === nivelActual) continue;
       const posReserva = Object.keys(ASIGN).find(p=>
-        p.startsWith(frenteId+'-'+nivel+'-') && ASIGN[p] && ASIGN[p].art==v.art
+        p.startsWith(frenteId+'-'+nivel+'-') && ASIGN[p] &&
+        ASIGN[p].art==v.art && (ASIGN[p].unidades||0) > 0
       );
       if(posReserva){ reservaPos=posReserva; reservaNivel=nivel; break; }
     }
+
+    // Calcular acción de reposición desde bloque
+    const accionBloque = _repoCalcTraer(art, unidActual, maxU);
 
     // Crítico: 0 unidades o bajo mínimo semanal
     const esCritico = unidActual === 0 || (minU>0 && unidActual < minU);
@@ -4910,16 +5190,46 @@ function renderReposicion(){
       alertas.push({
         pos, art, unidActual, minU, maxU, pctOcup,
         reservaPos, reservaNivel,
+        accionBloque,
         esCritico, esAdvertencia,
       });
     }
   });
 
-  // Ordenar: críticos primero, luego por rotación
+  // También: posiciones de ASIGN vacías (unidades=0) que el motor asignó pero no tienen stock en rack
+  // Estas son las que quedaron vacías por pedidos — alta prioridad de reposición
+  Object.entries(ASIGN).forEach(([pos,v])=>{
+    if(!v||!v.art) return;
+    if(!/-(N1|N2|N3|N4)-/.test(pos)) return;
+    // Ya fue incluida arriba
+    if(alertas.some(a=>a.pos===pos)) return;
+    const art = DATA.find(r=>r.art==v.art);
+    if(!art) return;
+    const unidActual = v.unidades||0;
+    if(unidActual > 0) return; // solo las vacías no capturadas
+    const maxU = art.max_pos||0;
+    const accionBloque = _repoCalcTraer(art, 0, maxU);
+    if(accionBloque){
+      alertas.push({
+        pos, art, unidActual:0, minU:v.min_u||0, maxU,
+        pctOcup:0, reservaPos:null, reservaNivel:null,
+        accionBloque, esCritico:true, esAdvertencia:false,
+      });
+    }
+  });
+
+  // Ordenar: críticos primero, luego por rotación descendente
   alertas.sort((a,b)=>{
     if(a.esCritico !== b.esCritico) return a.esCritico?-1:1;
     return b.art.rot - a.art.rot;
   });
+
+  // Limitar a un listado abordable en 1 hora de turno (máx. 15 posiciones, las más prioritarias)
+  const LIMITE_REPO_DIARIA = 15;
+  const totalDisponibles = alertas.length;
+  alertas = alertas.slice(0, LIMITE_REPO_DIARIA);
+
+  window._repoAlertas = alertas;
 
   const el = document.getElementById('repo-content');
   if(!alertas.length){
@@ -4929,19 +5239,22 @@ function renderReposicion(){
 
   const criticos = alertas.filter(a=>a.esCritico).length;
   const advertencias = alertas.filter(a=>a.esAdvertencia).length;
+  const conAccion = alertas.filter(a=>a.accionBloque).length;
 
   el.innerHTML = `
     <div class="repo-stat-row">
       <div class="repo-stat"><div class="repo-stat-val" style="color:#d70015">${criticos}</div><div class="repo-stat-lbl">Críticos</div></div>
       <div class="repo-stat"><div class="repo-stat-val" style="color:#ff9500">${advertencias}</div><div class="repo-stat-lbl">Advertencias</div></div>
-      <div class="repo-stat"><div class="repo-stat-val">${alertas.length}</div><div class="repo-stat-lbl">Total</div></div>
+      <div class="repo-stat"><div class="repo-stat-val">${alertas.length}</div><div class="repo-stat-lbl">Mostrando${totalDisponibles>alertas.length?' (de '+totalDisponibles+')':''}</div></div>
+      <div class="repo-stat"><div class="repo-stat-val" style="color:#0071e3">${conAccion}</div><div class="repo-stat-lbl">Con acción bloque</div></div>
     </div>
-    ${alertas.map(a=>`
+    ${totalDisponibles>alertas.length?`<div style="text-align:center;font-size:11px;color:#86868b;margin-bottom:10px">Mostrando las ${alertas.length} posiciones más prioritarias para resolver en 1 hora · quedan ${totalDisponibles-alertas.length} para mañana</div>`:''}
+    ${alertas.map((a,i)=>`
       <div class="repo-card ${a.esCritico?'critico':'advertencia'}">
         <div class="repo-row">
           <div class="repo-info">
             <div class="repo-med">${a.art.med} — ${a.art.diseno}</div>
-            <div class="repo-sub">${a.art.prov} · rot: ${a.art.rot}/mes</div>
+            <div class="repo-sub">${a.art.prov} · rot: ${(a.art.rot_sem||0).toFixed(2)}/sem</div>
             <span class="repo-pos">${a.pos}</span>
           </div>
           <div class="repo-accion">
@@ -4952,13 +5265,21 @@ function renderReposicion(){
         </div>
         ${a.reservaPos?`
         <div style="background:#f0f7ff;padding:8px 12px;display:flex;align-items:center;gap:8px;border-top:1px solid #e5e5ea">
-          <span style="font-size:11px;color:#86868b">Reserva disponible:</span>
+          <span style="font-size:11px;color:#86868b">↓ Bajar reserva:</span>
           <span style="font-size:11px;font-weight:700;color:#0071e3">${a.reservaPos}</span>
-          <span style="font-size:11px;color:#86868b">→ bajar a</span>
+          <span style="font-size:11px;color:#86868b">→</span>
           <span style="font-size:11px;font-weight:700;color:#34c759">${a.pos}</span>
+          <button onclick="confirmarRepoDiaria(${i})" style="margin-left:auto;padding:5px 12px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">✅ OK, ya lo hice</button>
+        </div>`:a.accionBloque?`
+        <div style="background:#e8f5e9;padding:8px 12px;border-top:1px solid #e5e5ea;display:flex;align-items:center;gap:8px">
+          <span style="font-size:12px;font-weight:700;color:#1b5e20">📦 TRAER DEL BLOQUE:</span>
+          <span style="font-size:12px;font-weight:800;color:#1b5e20">${a.accionBloque.traer} un.</span>
+          <span style="font-size:11px;color:#2e7d32">desde bloque ${a.accionBloque.bloque}</span>
+          <span style="font-size:10px;color:#66bb6a">stock disp: ${a.accionBloque.stockBloque}</span>
+          <button onclick="confirmarRepoDiaria(${i})" style="margin-left:auto;padding:5px 12px;background:#34c759;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">✅ OK, ya lo hice</button>
         </div>`:`
         <div style="background:#fff9f0;padding:8px 12px;border-top:1px solid #e5e5ea">
-          <span style="font-size:11px;color:#856404">⚠️ Sin reserva en rack — buscar en bloques: ${a.art.bloque||'sin bloque'}</span>
+          <span style="font-size:11px;color:#856404">⚠️ Sin stock en bloque — bloque: ${a.art.bloque||'sin bloque'}</span>
         </div>`}
       </div>`).join('')}
   `;
@@ -5065,33 +5386,86 @@ function exportarReposicion(){
   const fecha = new Date().toLocaleDateString('es-AR');
   const wb = XLSX.utils.book_new();
 
+  // ── Hoja 1: Planilla operativa para el richero ──
   const wsData = [
-    ['REPORTE DE REPOSICIÓN — '+fecha],
-    ['Sugerencia activa:', document.getElementById('sug-activa-badge')?.textContent||''],
+    ['PLANILLA DE REPOSICIÓN — '+fecha],
+    ['Generado automáticamente desde WMS Halpern Depósito'],
     [],
-    ['URGENCIA','POSICIÓN N1','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','UNID. ACTUAL','MÁXIMO','% LLENO','MÍNIMO SEM.','RESERVA','BLOQUE'],
-    ...window._repoAlertas.map(a=>[
-      a.esCritico?'CRÍTICO':'ADVERTENCIA',
-      a.pos,
-      a.art.art,
-      a.art.med,
-      a.art.diseno,
-      a.art.prov,
-      a.unidActual,
-      a.maxU,
-      a.pctOcup+'%',
-      a.minU,
-      a.reservaPos||'Sin reserva',
-      a.art.bloque||'',
-    ])
+    ['URGENCIA','POSICIÓN RACK','ART','MEDIDA','DISEÑO','PROV','ACTUAL','MÁX','%','ACCIÓN','TRAER (un.)','DESDE BLOQUE','RESERVA RACK','ROT/SEM'],
+    ...window._repoAlertas.map(a=>{
+      let accion = '';
+      let traerUn = '';
+      let desdeBloque = '';
+      if(a.reservaPos){
+        accion = 'BAJAR RESERVA: '+a.reservaPos+' → '+a.pos;
+        traerUn = '';
+        desdeBloque = 'RACK '+a.reservaPos;
+      } else if(a.accionBloque){
+        accion = 'TRAER DE BLOQUE';
+        traerUn = a.accionBloque.traer;
+        desdeBloque = a.accionBloque.bloque;
+      } else {
+        accion = 'SIN STOCK DISPONIBLE';
+      }
+      return [
+        a.esCritico?'🔴 CRÍTICO':'🟠 ADVERTENCIA',
+        a.pos,
+        a.art.art,
+        a.art.med,
+        a.art.diseno,
+        a.art.prov,
+        a.unidActual,
+        a.maxU,
+        a.pctOcup+'%',
+        accion,
+        traerUn,
+        desdeBloque,
+        a.reservaPos||'—',
+        (a.art.rot_sem||0).toFixed(2),
+      ];
+    })
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [{wch:12},{wch:16},{wch:8},{wch:14},{wch:10},{wch:12},{wch:10},{wch:8},{wch:8},{wch:10},{wch:16},{wch:10}];
+  ws['!cols'] = [{wch:14},{wch:14},{wch:7},{wch:14},{wch:10},{wch:10},{wch:8},{wch:6},{wch:5},{wch:30},{wch:10},{wch:12},{wch:14},{wch:8}];
   ws['!pageSetup'] = {orientation:'landscape'};
+
+  // Estilo fila de cabecera (fila 4, índice 3)
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for(let C=range.s.c; C<=range.e.c; C++){
+    const addr = XLSX.utils.encode_cell({r:3,c:C});
+    if(!ws[addr]) continue;
+    ws[addr].s = {font:{bold:true},fill:{fgColor:{rgb:'1E3A5F'}},font:{color:{rgb:'FFFFFF'},bold:true}};
+  }
+
   XLSX.utils.book_append_sheet(wb, ws, 'Reposición');
+
+  // ── Hoja 2: Solo las acciones con traer del bloque (para el richero en papel) ──
+  const conAccion = window._repoAlertas.filter(a=>a.accionBloque||a.reservaPos);
+  if(conAccion.length){
+    const ws2Data = [
+      ['ACCIONES DE REPOSICIÓN — '+fecha],
+      ['Solo items con acción pendiente'],
+      [],
+      ['POSICIÓN','MEDIDA','DISEÑO','PROV','TRAER (un.)','DESDE','ACTUAL','MÁX'],
+      ...conAccion.map(a=>[
+        a.pos,
+        a.art.med,
+        a.art.diseno,
+        a.art.prov,
+        a.accionBloque ? a.accionBloque.traer : '— bajar reserva',
+        a.accionBloque ? a.accionBloque.bloque : a.reservaPos,
+        a.unidActual,
+        a.maxU,
+      ])
+    ];
+    const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
+    ws2['!cols'] = [{wch:14},{wch:14},{wch:10},{wch:10},{wch:10},{wch:12},{wch:8},{wch:6}];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Acciones');
+  }
+
   XLSX.writeFile(wb, 'Reposicion_'+fecha.replace(/\//g,'-')+'.xlsx');
-  showToast('✅ Reporte exportado');
+  showToast('✅ Planilla exportada — '+window._repoAlertas.length+' items');
 }
 
 
@@ -7228,6 +7602,7 @@ function aplicarRotacionReal(){
       r.rot6    = _rotData[r.art].rot6;           // rotación mensual 6m
       r.rot_sem = Math.round((_rotData[r.art].rot12 / 4.33) * 100) / 100; // semanal = mensual/4.33
       r.pall    = Math.floor((r.stock||0) / (r.max_pos||32)); // recalcular pallets
+      recalcularCond(r);
       updated++;
     }
   });
@@ -8506,46 +8881,69 @@ function transitoPosicionSugerida(artId, cantEntrada){
             detalle:'Bloque '+( da.bloque||'—'), pallets: pallFuturo.toFixed(1)};
   }
 
-  // ── PASO 1: buscar en ASIGN (motor ya corrió) ──
-  // Si el artículo tiene posición exacta asignada, usarla directamente
+  // ── PASO 1: buscar en ASIGN posiciones asignadas para este artículo ──
   var posAsign = [];
   Object.entries(ASIGN).forEach(function(e){
     var posId=e[0], v=e[1];
     if(!v) return;
-    if(v.art==artId) posAsign.push(posId);
+    if(v.art==artId) posAsign.push({id:posId, unidades:v.unidades||0, vacia:(v.unidades||0)===0});
     if(v.compartidos && v.compartidos.some(function(c){return c.art==artId;}))
-      posAsign.push(posId);
+      posAsign.push({id:posId, unidades:0, vacia:true});
   });
 
   if(posAsign.length){
-    // Ordenar N1 primero (más accesible)
+    // Priorizar posiciones vacías primero (quedaron vacías por pedidos del día)
     posAsign.sort(function(a,b){
-      var na = parseInt((a.split('-')[1]||'N4').replace('N',''))||4;
-      var nb = parseInt((b.split('-')[1]||'N4').replace('N',''))||4;
+      if(a.vacia && !b.vacia) return -1;
+      if(!a.vacia && b.vacia) return 1;
+      // Después N1 primero (más accesible)
+      var na = parseInt((a.id.split('-')[1]||'N4').replace('N',''))||4;
+      var nb = parseInt((b.id.split('-')[1]||'N4').replace('N',''))||4;
       return na - nb;
     });
-    var posStr = posAsign.join(', ');
+    var mejorPos = posAsign[0];
+    var vaciaLabel = mejorPos.vacia ? ' ← POSICIÓN VACÍA (prioridad)' : '';
+    var posStr = posAsign.map(function(p){return p.id+(p.vacia?'★':'');}).join(', ');
     return {
       tipo:    'rack',
       pos:     posStr,
-      detalle: 'Rack: '+posStr,
+      detalle: 'Rack: '+posStr+vaciaLabel,
       pallets: pallFuturo.toFixed(1),
-      exacto:  true
+      exacto:  true,
+      posVacia: mejorPos.vacia,
     };
   }
 
-  // ── PASO 2: motor no corrió — buscar primera posición libre del nivel correcto ──
+  // ── PASO 2: buscar posición vacía existente en ASIGN para cualquier art ──
+  // Una posición "vacía" es la que tiene unidades=0 — quedó libre por pedidos
   if(pallFuturo >= 1 && rot < 5.5){
     var nivelIdeal = rot<=0?4: rot<1.25?3: rot<2.5?2:1;
-    var nivelLabel = 'N'+nivelIdeal;
 
-    // Posiciones ocupadas en ASIGN (para no sugerir una ya tomada)
+    // Primero: buscar posiciones en ASIGN con unidades=0 del nivel correcto
+    var posVaciasEnRack = [];
+    Object.entries(ASIGN).forEach(function(e){
+      var posId=e[0], v=e[1];
+      if(!v||!v.art) return; // posición libre (nunca asignada) — no es "vacía por pedidos"
+      if((v.unidades||0) > 0) return; // tiene stock, no vacía
+      var nivel = parseInt((posId.split('-')[1]||'N4').replace('N',''))||4;
+      if(nivel===nivelIdeal) posVaciasEnRack.push(posId);
+    });
+
+    if(posVaciasEnRack.length){
+      return {
+        tipo:    'rack',
+        pos:     posVaciasEnRack[0],
+        detalle: 'Rack: '+posVaciasEnRack[0]+' ← VACÍA POR PEDIDO (reutilizar)',
+        pallets: pallFuturo.toFixed(1),
+        exacto:  false,
+        posVacia: true,
+      };
+    }
+
+    // ── PASO 3: buscar primera posición libre genérica ──
     var ocupadas = new Set(Object.keys(ASIGN));
-
-    // Buscar primera posición libre del nivel ideal en orden de frentes
     var sugerida = null;
     var ordenNiveles = [nivelIdeal, nivelIdeal===4?3:4, 2, 1];
-    // eliminar duplicados manteniendo orden
     ordenNiveles = ordenNiveles.filter(function(v,i,a){return a.indexOf(v)===i;});
 
     for(var ni=0; ni<ordenNiveles.length && !sugerida; ni++){
@@ -8569,7 +8967,8 @@ function transitoPosicionSugerida(artId, cantEntrada){
         pos:     sugerida,
         detalle: 'Rack: '+sugerida+' (sugerido)',
         pallets: pallFuturo.toFixed(1),
-        exacto:  false
+        exacto:  false,
+        posVacia: false,
       };
     }
 
@@ -8577,7 +8976,7 @@ function transitoPosicionSugerida(artId, cantEntrada){
     return {
       tipo:    'rack_lleno',
       pos:     da.bloque||'—',
-      detalle: 'Rack '+nivelLabel+' lleno → Bloque '+(da.bloque||'—'),
+      detalle: 'Rack N'+nivelIdeal+' lleno → Bloque '+(da.bloque||'—'),
       pallets: pallFuturo.toFixed(1),
       exacto:  false
     };
@@ -8683,6 +9082,7 @@ function cydConfirmarDesdeTransito(id){
     if(da){
       da.stock = (da.stock||0) + r.cant;
       da.pall  = Math.floor(da.stock / (da.max_pos||32));
+      recalcularCond(da);
     }
     // Actualizar rack_stock en todas las posiciones asignadas a este artículo
     Object.keys(ASIGN).forEach(function(posId){
@@ -9352,6 +9752,7 @@ function cydConfirmar(tipo){
       if(da){
         da.stock = (da.stock||0) + r.cant;
         da.pall  = Math.floor(da.stock / (da.max_pos||32));
+        recalcularCond(da);
       }
     });
     saveDataStock();
@@ -9379,6 +9780,7 @@ function cydConfirmar(tipo){
       if(da){
         da.stock = (da.stock||0) + r.cant;
         da.pall  = Math.floor(da.stock / (da.max_pos||32));
+        recalcularCond(da);
       }
     });
     saveDataStock();
