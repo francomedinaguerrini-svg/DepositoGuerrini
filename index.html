@@ -1071,11 +1071,13 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 
       <div id="prod-grupos-btns" style="display:none"></div>
       <!-- Selector de fecha para ver histórico -->
-      <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+      <div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">
         <span style="font-size:11px;color:#86868b">Ver fecha:</span>
         <input type="date" id="prod-fecha-manual"
           style="padding:4px 8px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;color:#1d1d1f;background:#fff;outline:none"
           onchange="checkFechaManual(this.value)">
+        <button onclick="migrarMovsDia()" title="Fusionar movimientos del día si faltan entradas (fix zero-padding)"
+          style="padding:4px 10px;background:#ff9500;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">🔧 Recuperar hoy</button>
       </div>
     </div>
 
@@ -6560,12 +6562,14 @@ function registrarMovProd(tipo, unidades, detalle){
       auto: true            // marca que fue generado automáticamente
     };
 
+    // Usar getProdKey() que siempre genera clave zero-padded (DD-MM-YYYY)
     var dayKey = getProdKey();
-    var movsDia = JSON.parse(localStorage.getItem(dayKey)||'[]');
+    var movsDia = _leerMovsConFallback('prod_', new Date()); // leer con fallback por compat
     movsDia.push(mov);
     localStorage.setItem(dayKey, JSON.stringify(movsDia));
 
-    var mes = new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+    var mes = _fechaKeyDDMMYYYY().slice(3); // MM-YYYY → reemplazar - por _
+    mes = mes.replace('-','_');
     var histKey = 'prod_hist_'+mes;
     var hist = JSON.parse(localStorage.getItem(histKey)||'[]');
     hist.push(mov);
@@ -6611,9 +6615,9 @@ function saveMovimiento(mov){
   const movs = getMovimientos();
   movs.push(mov);
   localStorage.setItem(getProdKey(), JSON.stringify(movs));
-  // Save to monthly history
-  const mes = new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
-  const histKey = 'prod_hist_'+mes;
+  // Save to monthly history — usar _fechaKeyDDMMYYYY para consistencia
+  const mesRaw = _fechaKeyDDMMYYYY().slice(3).replace('-','_'); // MM_YYYY
+  const histKey = 'prod_hist_'+mesRaw;
   const hist = JSON.parse(localStorage.getItem(histKey)||'[]');
   hist.push(mov);
   localStorage.setItem(histKey, JSON.stringify(hist));
@@ -6625,6 +6629,52 @@ let _prodFechaManual = null;
 function checkFechaManual(val){
   _prodFechaManual = val || null;
   // Update lista to show movements for selected date
+  renderProdLista();
+  renderProdResumen();
+}
+
+function migrarMovsDia(){
+  // Fusiona movimientos guardados con clave sin ceros (bug viejo)
+  // hacia la clave con ceros (formato actual), para el día actual.
+  var hoy = new Date();
+  var dd   = String(hoy.getDate()).padStart(2,'0');
+  var mm   = String(hoy.getMonth()+1).padStart(2,'0');
+  var yyyy = hoy.getFullYear();
+  var keyNueva = 'prod_'+dd+'-'+mm+'-'+yyyy;
+  var keyVieja = 'prod_'+hoy.getDate()+'-'+(hoy.getMonth()+1)+'-'+yyyy;
+
+  if(keyVieja === keyNueva){
+    showToast('✅ Sin diferencias — el día de hoy no tiene cero en mes/día');
+    return;
+  }
+  var rawVieja = localStorage.getItem(keyVieja);
+  if(!rawVieja){
+    showToast('✅ Sin datos en clave vieja — nada que migrar');
+    return;
+  }
+  var movsViejos = JSON.parse(rawVieja);
+  if(!movsViejos.length){
+    showToast('✅ Clave vieja vacía — nada que migrar');
+    return;
+  }
+  var movsNuevos = JSON.parse(localStorage.getItem(keyNueva)||'[]');
+  // Deduplicar: comparar tipo+destino+unidades+hora
+  var existentes = new Set(movsNuevos.map(function(m){ return m.tipo+'|'+m.destino+'|'+m.unidades+'|'+m.hora; }));
+  var agregados = 0;
+  movsViejos.forEach(function(m){
+    var sig = m.tipo+'|'+m.destino+'|'+m.unidades+'|'+m.hora;
+    if(!existentes.has(sig)){
+      movsNuevos.push(m);
+      existentes.add(sig);
+      agregados++;
+    }
+  });
+  if(!agregados){
+    showToast('✅ Todos los movimientos ya estaban en la clave actual');
+    return;
+  }
+  localStorage.setItem(keyNueva, JSON.stringify(movsNuevos));
+  showToast('✅ '+agregados+' movimiento(s) recuperado(s) correctamente');
   renderProdLista();
   renderProdResumen();
 }
