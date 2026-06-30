@@ -999,6 +999,9 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
         <button onclick="exportarReposicion()" style="padding:7px 12px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">📥 Exportar</button>
       </div>
     </div>
+    <div style="padding:0 0 10px 0">
+      <input id="repo-search" type="text" placeholder="🔍 Buscar por posición o nivel (ej: 5S-N4-P06 o N2)..." oninput="renderReposicion()" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none">
+    </div>
     <div id="repo-content">
       <div class="empty">Cargando...</div>
     </div>
@@ -4178,6 +4181,7 @@ function cydEjecutarDespacho(id){
   tr.estado = 'confirmado';
   tr.fechaConfirmacion = fecha;
   tr.horaConfirmacion  = hora;
+  tr.fechaISO = new Date().toISOString().split('T')[0]; // re-sellar con fecha de CONFIRMACIÓN, no de creación
   transitoSave(lista);
 
   // NOTA: ya no se llama a reevaluarRack() acá — la posición liberada queda
@@ -5224,16 +5228,31 @@ function renderReposicion(){
     return b.art.rot - a.art.rot;
   });
 
-  // Limitar a un listado abordable en 1 hora de turno (máx. 15 posiciones, las más prioritarias)
-  const LIMITE_REPO_DIARIA = 15;
-  const totalDisponibles = alertas.length;
-  alertas = alertas.slice(0, LIMITE_REPO_DIARIA);
+  // Búsqueda por posición o nivel — si hay texto, se busca en TODO el universo de alertas (sin límite de 15)
+  const searchEl = document.getElementById('repo-search');
+  const searchQuery = (searchEl ? searchEl.value : '').trim().toLowerCase();
+  let totalDisponibles = alertas.length;
+  let limitado = false;
+  if(searchQuery){
+    alertas = alertas.filter(a =>
+      a.pos.toLowerCase().includes(searchQuery) ||
+      (a.art.med+' '+a.art.diseno).toLowerCase().includes(searchQuery)
+    );
+    totalDisponibles = alertas.length;
+  } else {
+    // Limitar a un listado abordable en 1 hora de turno (máx. 15 posiciones, las más prioritarias)
+    const LIMITE_REPO_DIARIA = 15;
+    limitado = alertas.length > LIMITE_REPO_DIARIA;
+    alertas = alertas.slice(0, LIMITE_REPO_DIARIA);
+  }
 
   window._repoAlertas = alertas;
 
   const el = document.getElementById('repo-content');
   if(!alertas.length){
-    el.innerHTML='<div style="text-align:center;padding:40px;color:#34c759;font-size:14px">✅ Sin posiciones para reponer hoy</div>';
+    el.innerHTML = searchQuery
+      ? '<div style="text-align:center;padding:40px;color:#86868b;font-size:14px">🔍 Sin resultados para "'+searchEl.value+'"</div>'
+      : '<div style="text-align:center;padding:40px;color:#34c759;font-size:14px">✅ Sin posiciones para reponer hoy</div>';
     return;
   }
 
@@ -5248,7 +5267,8 @@ function renderReposicion(){
       <div class="repo-stat"><div class="repo-stat-val">${alertas.length}</div><div class="repo-stat-lbl">Mostrando${totalDisponibles>alertas.length?' (de '+totalDisponibles+')':''}</div></div>
       <div class="repo-stat"><div class="repo-stat-val" style="color:#0071e3">${conAccion}</div><div class="repo-stat-lbl">Con acción bloque</div></div>
     </div>
-    ${totalDisponibles>alertas.length?`<div style="text-align:center;font-size:11px;color:#86868b;margin-bottom:10px">Mostrando las ${alertas.length} posiciones más prioritarias para resolver en 1 hora · quedan ${totalDisponibles-alertas.length} para mañana</div>`:''}
+    ${limitado?`<div style="text-align:center;font-size:11px;color:#86868b;margin-bottom:10px">Mostrando las ${alertas.length} posiciones más prioritarias para resolver en 1 hora · quedan ${totalDisponibles-alertas.length} para mañana</div>`:''}
+    ${searchQuery?`<div style="text-align:center;font-size:11px;color:#0071e3;margin-bottom:10px">🔍 ${alertas.length} resultado(s) para "${searchEl.value}"</div>`:''}
     ${alertas.map((a,i)=>`
       <div class="repo-card ${a.esCritico?'critico':'advertencia'}">
         <div class="repo-row">
@@ -9812,17 +9832,28 @@ function cydGetHist(tipo){
 }
 
 // Obtener despachos confirmados del tránsito como historial de salidas
+function _esARaISO(fechaStr){
+  // Convierte 'd/m/yyyy' (toLocaleDateString es-AR) a 'yyyy-mm-dd'
+  if(!fechaStr) return '';
+  var p = fechaStr.split('/');
+  if(p.length!==3) return '';
+  var dd = ('0'+p[0]).slice(-2), mm = ('0'+p[1]).slice(-2), yyyy = p[2];
+  return yyyy+'-'+mm+'-'+dd;
+}
+
 function cydGetHistSalidas(){
   try{
     return transitoGetAll()
       .filter(function(t){ return t.flujo==='salida' && t.estado==='confirmado'; })
       .map(function(t){
+        var fechaMostrada = t.fechaConfirmacion||t.fecha;
         return {
           id: t.id,
           tipo: 'salida',
-          fecha: t.fechaConfirmacion||t.fecha,
+          fecha: fechaMostrada,
           hora: t.horaConfirmacion||t.hora,
-          fechaISO: t.fechaISO||'',
+          // Si hay fechaConfirmacion, esa manda sobre el fechaISO viejo (que es de cuando se CREÓ el tránsito)
+          fechaISO: t.fechaConfirmacion ? (_esARaISO(t.fechaConfirmacion)||t.fechaISO||'') : (t.fechaISO||''),
           nroRem: t.nroContenedor||'',
           cliente: t.destino||'',
           tte: t.tte||'',
@@ -9868,19 +9899,22 @@ function cydRenderHistorial(){
 
   function enPeriodo(h){
     if(periodo==='todo') return true;
-    // Intentar fechaISO primero, luego fecha en formato es-AR
-    var iso = h.fechaISO;
-    var d;
-    if(iso){ d = new Date(iso+'T00:00:00'); }
-    else {
-      // formato dd/mm/yyyy
-      var p = (h.fecha||'').split('/');
-      d = p.length===3 ? new Date(p[2],p[1]-1,p[0]) : new Date(h.fecha);
+    // Extraer año/mes/día como ENTEROS, sin pasar por new Date(string) que es ambiguo/frágil
+    var y, m, d;
+    if(h.fechaISO && /^\d{4}-\d{2}-\d{2}/.test(h.fechaISO)){
+      y = +h.fechaISO.slice(0,4); m = +h.fechaISO.slice(5,7); d = +h.fechaISO.slice(8,10);
+    } else {
+      var p = (h.fecha||'').split('/'); // formato es-AR: d/m/yyyy
+      if(p.length!==3) return true;
+      d = parseInt(p[0],10); m = parseInt(p[1],10); y = parseInt(p[2],10);
     }
-    if(isNaN(d)) return true;
-    if(periodo==='hoy') return d.toDateString()===ahora.toDateString();
-    if(periodo==='semana'){ var s=new Date(ahora); s.setDate(s.getDate()-7); return d>=s; }
-    if(periodo==='mes'){    var m=new Date(ahora); m.setMonth(m.getMonth()-1); return d>=m; }
+    if(!y || !m || !d) return true;
+    var fechaObj = new Date(y, m-1, d);
+    if(isNaN(fechaObj)) return true;
+    var hoyObj = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+    if(periodo==='hoy') return fechaObj.getTime()===hoyObj.getTime();
+    if(periodo==='semana'){ var s=new Date(hoyObj); s.setDate(s.getDate()-7); return fechaObj>=s; }
+    if(periodo==='mes'){    var mm=new Date(hoyObj); mm.setMonth(mm.getMonth()-1); return fechaObj>=mm; }
     return true;
   }
 
