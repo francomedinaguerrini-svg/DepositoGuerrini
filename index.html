@@ -5940,12 +5940,20 @@ const GRUPOS_COLORES = {C:'#86868b', G1:'#0071e3', G2:'#34c759', G3:'#ff9500', R
 const GRUPOS_NOMBRES = {C:'Controladores', G1:'Grupo 1', G2:'Grupo 2', G3:'Grupo 3', R:'Chasis', ZF:'Equipo ZF'};
 
 function getTodayKey(){
-  return 'grupos_'+new Date().toLocaleDateString('es-AR').replace(/\//g,'-');
+  return 'grupos_'+_fechaKeyDDMMYYYY();
 }
 
 function getGruposHoy(){
   var key = getTodayKeyFecha();
   var saved = localStorage.getItem(key);
+  if(!saved){
+    // Compat: datos guardados antes del fix de zero-padding en la clave de fecha
+    var m = key.match(/^grupos_(\d{2})-(\d{2})-(\d{4})$/);
+    if(m){
+      var keyVieja = 'grupos_'+(+m[1])+'-'+(+m[2])+'-'+m[3];
+      if(keyVieja !== key) saved = localStorage.getItem(keyVieja);
+    }
+  }
   if(saved) return JSON.parse(saved);
   var base = getPersonalBase();
   return base.map(function(p){ return {nombre:p.nombre,grupo:p.grupo,grupoHoy:p.grupo,presente:true,novedad:'',novedadDetalle:''}; });
@@ -6564,12 +6572,38 @@ function registrarMovProd(tipo, unidades, detalle){
   } catch(e){ console.warn('registrarMovProd error', e); }
 }
 
+function _fechaKeyDDMMYYYY(d){
+  d = d || new Date();
+  var dd = String(d.getDate()).padStart(2,'0');
+  var mm = String(d.getMonth()+1).padStart(2,'0');
+  var yyyy = d.getFullYear();
+  return dd+'-'+mm+'-'+yyyy;
+}
+
 function getProdKey(){
-  return 'prod_'+new Date().toLocaleDateString('es-AR').replace(/\//g,'-');
+  return 'prod_'+_fechaKeyDDMMYYYY();
+}
+
+function _leerMovsConFallback(prefix, fechaObj){
+  // Lee con la clave nueva (siempre con ceros). Si no hay nada, prueba la clave vieja
+  // (sin ceros en día/mes) para no perder movimientos ya guardados antes del fix.
+  var dd  = String(fechaObj.getDate()).padStart(2,'0');
+  var mm  = String(fechaObj.getMonth()+1).padStart(2,'0');
+  var yyyy = fechaObj.getFullYear();
+  var keyNueva = prefix+dd+'-'+mm+'-'+yyyy;
+  var raw = localStorage.getItem(keyNueva);
+  if(raw) return JSON.parse(raw);
+
+  var keyVieja = prefix+fechaObj.getDate()+'-'+(fechaObj.getMonth()+1)+'-'+yyyy;
+  if(keyVieja !== keyNueva){
+    raw = localStorage.getItem(keyVieja);
+    if(raw) return JSON.parse(raw);
+  }
+  return [];
 }
 
 function getMovimientos(){
-  return JSON.parse(localStorage.getItem(getProdKey())||'[]');
+  return _leerMovsConFallback('prod_', new Date());
 }
 
 function saveMovimiento(mov){
@@ -6602,8 +6636,12 @@ function getProdKeyFecha(fecha){
 }
 
 function getMovimientosFecha(){
-  const key = _prodFechaManual ? getProdKeyFecha(_prodFechaManual) : getProdKey();
-  return JSON.parse(localStorage.getItem(key)||'[]');
+  if(_prodFechaManual){
+    const parts = _prodFechaManual.split('-'); // yyyy-mm-dd del input date
+    const fechaObj = new Date(+parts[0], +parts[1]-1, +parts[2]);
+    return _leerMovsConFallback('prod_', fechaObj);
+  }
+  return getMovimientos();
 }
 
 // Override guardarMovimiento to use manual date
@@ -7940,7 +7978,8 @@ function confirmarColaPedido(idx){
     nroPed: p.nroPed,
   };
 
-  const dayKey = 'prod_'+p.fecha.replace(/\//g,'-');
+  const _pf = p.fecha.split('/'); // d/m/yyyy (puede venir sin ceros)
+  const dayKey = _pf.length===3 ? 'prod_'+_fechaKeyDDMMYYYY(new Date(+_pf[2], +_pf[1]-1, +_pf[0])) : 'prod_'+p.fecha.replace(/\//g,'-');
   const movsDia = JSON.parse(localStorage.getItem(dayKey)||'[]');
   movsDia.push(mov);
   localStorage.setItem(dayKey, JSON.stringify(movsDia));
