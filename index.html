@@ -1125,6 +1125,10 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
       <div style="font-size:11px;font-weight:600;color:#86868b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Movimientos de hoy</div>
       <div id="prod-lista" style="margin-bottom:12px"></div>
 
+      <!-- Huecos sin actividad -->
+      <div style="font-size:11px;font-weight:600;color:#86868b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">🕳️ Huecos sin actividad (08:15 → 17:30)</div>
+      <div id="prod-huecos" style="margin-bottom:12px"></div>
+
       <!-- Selector de fecha para ver histórico -->
       <div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">
         <span style="font-size:11px;color:#86868b">Ver fecha:</span>
@@ -5996,7 +6000,7 @@ var PERSONAL_BASE = getPersonalBase();
 
 const GRUPOS_COLORES = {C:'#86868b', G1:'#0071e3', G2:'#34c759', G3:'#ff9500', R:'#af52de', ZF:'#ff3b30'};
 const GRUPOS_NOMBRES = {C:'Controladores', G1:'Grupo 1', G2:'Grupo 2', G3:'Grupo 3', R:'Chasis', ZF:'Equipo ZF'};
-const JORNADA_MIN = 570; // jornada laboral: 9,5 horas
+const JORNADA_MIN = 525; // jornada neta de trabajo: 9,5 hs (570 min) menos desayuno/almuerzo
 
 function getTodayKey(){
   return 'grupos_'+_fechaKeyDDMMYYYY();
@@ -6686,6 +6690,7 @@ function checkFechaManual(val){
   _prodFechaManual = val || null;
   // Update lista to show movements for selected date
   renderProdLista();
+  renderHuecosDia();
   renderProdResumen();
 }
 
@@ -6732,6 +6737,7 @@ function migrarMovsDia(){
   localStorage.setItem(keyNueva, JSON.stringify(movsNuevos));
   showToast('✅ '+agregados+' movimiento(s) recuperado(s) correctamente');
   renderProdLista();
+  renderHuecosDia();
   renderProdResumen();
 }
 
@@ -6826,6 +6832,7 @@ function guardarMovimientoFecha(){
 
   renderProdResumen();
   renderProdLista();
+  renderHuecosDia();
   const fechaLabel = _prodFechaManual ? ' ('+fechaMov+')' : '';
   showToast('✅ Movimiento registrado'+fechaLabel);
 }
@@ -6872,6 +6879,7 @@ function renderProductividad(){
 
   renderProdResumen();
   renderProdLista();
+  renderHuecosDia();
 }
 
 function setProdTipo(tipo, btn){
@@ -6935,6 +6943,7 @@ function guardarMovimiento(){
 
   renderProdResumen();
   renderProdLista();
+  renderHuecosDia();
   showToast('✅ Movimiento registrado');
 }
 
@@ -6950,6 +6959,103 @@ function renderProdResumen(){
     <div class="prod-res-card"><div class="prod-res-val">${totalSemis}</div><div class="prod-res-lbl">Semis / Pedidos</div></div>
     <div class="prod-res-card"><div class="prod-res-val">${totalDurMin>0?Math.round(totalDurMin/60)+'h '+totalDurMin%60+'m':'—'}</div><div class="prod-res-lbl">Tiempo total</div></div>
   `;
+}
+
+// ── HUECOS DEL DÍA (tramos sin actividad registrada) ──
+const JORNADA_INICIO_MIN = 8*60+15;  // 08:15 — arranque real (después de entrar 8:00)
+const JORNADA_FIN_MIN    = 17*60+30; // 17:30 — salida
+
+function _hhmmAMin(hhmm){
+  if(!hhmm) return null;
+  const [h,m] = hhmm.split(':').map(Number);
+  return h*60+m;
+}
+function _minAHhmm(min){
+  const h = Math.floor(min/60), m = min%60;
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+}
+
+function calcularHuecosGrupo(movs, grupo, finLimite){
+  finLimite = finLimite==null ? JORNADA_FIN_MIN : finLimite;
+  // Intervalos [inicio,fin] en minutos, del grupo, con horario cargado
+  const intervalos = movs
+    .filter(m=>m.grupo===grupo && m.inicio && m.fin)
+    .map(m=>{
+      let a = _hhmmAMin(m.inicio), b = _hhmmAMin(m.fin);
+      if(a==null||b==null) return null;
+      if(b<a) return null; // horario inválido, se ignora
+      a = Math.max(a, JORNADA_INICIO_MIN);
+      b = Math.min(b, finLimite);
+      if(b<=a) return null;
+      return [a,b];
+    })
+    .filter(Boolean)
+    .sort((x,y)=>x[0]-y[0]);
+
+  // Fusionar solapados/adyacentes
+  const fusion = [];
+  intervalos.forEach(iv=>{
+    if(fusion.length && iv[0] <= fusion[fusion.length-1][1]){
+      fusion[fusion.length-1][1] = Math.max(fusion[fusion.length-1][1], iv[1]);
+    } else {
+      fusion.push(iv.slice());
+    }
+  });
+
+  // Huecos entre jornada e intervalos
+  const huecos = [];
+  let cursor = JORNADA_INICIO_MIN;
+  if(cursor >= finLimite) return []; // la jornada todavía no arrancó
+  fusion.forEach(iv=>{
+    if(iv[0] > cursor) huecos.push({inicio:cursor, fin:iv[0], dur:iv[0]-cursor});
+    cursor = Math.max(cursor, iv[1]);
+  });
+  if(cursor < finLimite) huecos.push({inicio:cursor, fin:finLimite, dur:finLimite-cursor});
+
+  return huecos.filter(h=>h.dur >= 5); // ignorar huecos triviales de redondeo
+}
+
+function renderHuecosDia(){
+  const el = document.getElementById('prod-huecos');
+  if(!el) return;
+  const movs = getMovimientosFecha();
+  const personal = getGruposHoy();
+  const gruposHoy = [...new Set(personal.filter(p=>p.presente).map(p=>p.grupoHoy))];
+
+  // Si estamos viendo el día de HOY, no calcular huecos más allá de la hora actual
+  // (las horas que todavía no pasaron no pueden ser "tiempo muerto")
+  const esHoy = !_prodFechaManual;
+  let finLimite = JORNADA_FIN_MIN;
+  if(esHoy){
+    const ahora = new Date();
+    const nowMin = ahora.getHours()*60 + ahora.getMinutes();
+    finLimite = Math.min(JORNADA_FIN_MIN, nowMin);
+  }
+
+  if(!gruposHoy.length){ el.innerHTML = '<div class="empty">Sin grupos presentes para calcular huecos</div>'; return; }
+
+  const notaHoy = esHoy ? `<div style="font-size:10px;color:#86868b;margin-bottom:8px">Calculado hasta la hora actual (${_minAHhmm(finLimite)}) — lo que falta del día todavía no cuenta</div>` : '';
+
+  el.innerHTML = notaHoy + gruposHoy.map(g=>{
+    const huecos = calcularHuecosGrupo(movs, g, finLimite);
+    const color = GRUPOS_COLORES[g]||'#86868b';
+    if(!huecos.length){
+      return `<div style="background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:10px 12px;margin-bottom:6px">
+        <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:2px">${GRUPOS_NOMBRES[g]||g}</div>
+        <div style="font-size:11px;color:#34c759">✅ Sin huecos — cubierto de ${_minAHhmm(JORNADA_INICIO_MIN)} a ${_minAHhmm(finLimite)}</div>
+      </div>`;
+    }
+    return `<div style="background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:10px 12px;margin-bottom:6px">
+      <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:6px">${GRUPOS_NOMBRES[g]||g}</div>
+      ${huecos.map(h=>{
+        const badge = h.dur>=40 && h.dur<=70 ? '🍽️ posible almuerzo' : h.dur>=10 && h.dur<40 ? '☕ posible descanso' : '❓ sin explicar';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-top:1px solid #f5f5f7">
+          <span style="font-size:11px;color:#1d1d1f">${_minAHhmm(h.inicio)} → ${_minAHhmm(h.fin)}</span>
+          <span style="font-size:11px;color:#86868b">${badge} · <b>${h.dur}min</b></span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
 }
 
 function renderProdLista(){
@@ -6990,6 +7096,7 @@ function eliminarMov(idx){
   localStorage.setItem(getProdKey(), JSON.stringify(movs));
   renderProdResumen();
   renderProdLista();
+  renderHuecosDia();
 }
 
 // ═══════════════════════════════════════════════════
@@ -7143,7 +7250,7 @@ function exportarProductividad(){
   const unidPorCabezaMesEx = personaDiasMesEx>0 ? Math.round(totalUnidEx/personaDiasMesEx) : 0;
 
   const wsCab = [
-    ['PRODUCTIVIDAD POR PERSONA Y TIEMPOS MUERTOS — JORNADA 9,5 HS (570 MIN)'],
+    ['PRODUCTIVIDAD POR PERSONA Y TIEMPOS MUERTOS — JORNADA NETA 525 MIN (9,5h - almuerzo/desayuno)'],
     [],
     ['UNIDADES/PERSONA DEL MES (independiente del grupo)', unidPorCabezaMesEx],
     ['PERSONA-DÍAS TRABAJADOS', personaDiasMesEx],
@@ -8329,7 +8436,7 @@ function renderResumenProd(){
         <span style="font-size:13px;font-weight:700">${unid.toLocaleString('es-AR')} un.</span>
       </div>`).join('')}
 
-    <div style="font-size:11px;font-weight:600;color:#86868b;margin:14px 0 6px;text-transform:uppercase">⚡ Por persona & tiempos muertos <span style="font-weight:400;text-transform:none;color:#b0b0b5">(jornada 9,5h)</span></div>
+    <div style="font-size:11px;font-weight:600;color:#86868b;margin:14px 0 6px;text-transform:uppercase">⚡ Por persona & tiempos muertos <span style="font-weight:400;text-transform:none;color:#b0b0b5">(jornada neta 525min)</span></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
       <div class="prod-res-card"><div class="prod-res-val" style="color:#ff9500">${unidPorCabezaMes.toLocaleString('es-AR')}</div><div style="font-size:10px;color:#86868b">Un./persona (mes, indep. de grupo)</div></div>
       <div class="prod-res-card"><div class="prod-res-val">${personaDiasMes}</div><div style="font-size:10px;color:#86868b">Persona-días trabajados</div></div>
