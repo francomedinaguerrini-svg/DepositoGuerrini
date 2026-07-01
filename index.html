@@ -5996,6 +5996,7 @@ var PERSONAL_BASE = getPersonalBase();
 
 const GRUPOS_COLORES = {C:'#86868b', G1:'#0071e3', G2:'#34c759', G3:'#ff9500', R:'#af52de', ZF:'#ff3b30'};
 const GRUPOS_NOMBRES = {C:'Controladores', G1:'Grupo 1', G2:'Grupo 2', G3:'Grupo 3', R:'Chasis', ZF:'Equipo ZF'};
+const JORNADA_MIN = 570; // jornada laboral: 9,5 horas
 
 function getTodayKey(){
   return 'grupos_'+_fechaKeyDDMMYYYY();
@@ -6116,7 +6117,7 @@ function renderGruposKPI(){
   html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">';
   html += _kpiCard('Unidades hoy','#0071e3', totalUnidDia.toLocaleString('es-AR'), 'total');
   html += _kpiCard('Personas presentes','#34c759', totalPres, 'personas');
-  html += _kpiCard('Unid/cabeza hoy','#ff9500', unidPorCabezaDia, 'promedio');
+  html += _kpiCard('Unid/persona hoy','#ff9500', unidPorCabezaDia, 'promedio');
   html += '</div>';
 
   // Ranking por grupo — HOY
@@ -6133,7 +6134,7 @@ function renderGruposKPI(){
     html += '<div style="margin-bottom:8px">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">';
     html += '<span style="font-size:12px;font-weight:700;color:'+color+'">'+GRUPOS_NOMBRES[g]+'</span>';
-    html += '<span style="font-size:11px;color:#86868b">'+pres+' pers. · <b style="color:'+color+'">'+u.toLocaleString('es-AR')+'</b> un. · <b>'+upc+'</b>/cabeza</span>';
+    html += '<span style="font-size:11px;color:#86868b">'+pres+' pers. · <b style="color:'+color+'">'+u.toLocaleString('es-AR')+'</b> un. · <b>'+upc+'</b>/persona</span>';
     html += '</div>';
     html += '<div style="background:#f5f5f7;border-radius:6px;height:8px;overflow:hidden">';
     html += '<div style="width:'+pct+'%;height:100%;background:'+color+';border-radius:6px;transition:width .4s"></div>';
@@ -6143,7 +6144,7 @@ function renderGruposKPI(){
 
   // Ranking por grupo — MES
   html += '<div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:12px;margin-bottom:10px">';
-  html += '<div style="font-size:12px;font-weight:700;color:#86868b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Mes — Promedio unidades/cabeza/día</div>';
+  html += '<div style="font-size:12px;font-weight:700;color:#86868b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Mes — Promedio unidades/persona/día</div>';
   var rankMes = grupos
     .map(function(g){ return {g:g, prom:promCabeza(g), total:mesGrupo[g].unid, dias:mesGrupo[g].dias}; })
     .filter(function(x){return x.total>0;})
@@ -7122,6 +7123,44 @@ function exportarProductividad(){
   wsDia.push(['TOTAL',...grupos.map(g=>hist.filter(m=>m.grupo===g).reduce((s,m)=>s+m.unidades,0))]);
   const wsDR = XLSX.utils.aoa_to_sheet(wsDia);
   XLSX.utils.book_append_sheet(wb, wsDR, 'Por Día');
+
+  // === HOJA 4: POR PERSONA / TIEMPOS MUERTOS ===
+  const histGruposMesEx = JSON.parse(localStorage.getItem('grupos_hist')||'[]').filter(h=>{
+    const p = h.fecha.split('/');
+    return p.length===3 && (p[1]+'_'+p[2])===mesKey;
+  });
+  let personaDiasMesEx = 0;
+  const diasPorGrupoEx = {};
+  grupos.forEach(g=>{ diasPorGrupoEx[g]=0; });
+  histGruposMesEx.forEach(h=>{
+    const presentes = h.data.filter(p=>p.presente);
+    personaDiasMesEx += presentes.length;
+    grupos.forEach(g=>{
+      if(presentes.some(p=>(p.grupoHoy||p.grupo)===g)) diasPorGrupoEx[g]++;
+    });
+  });
+  const totalUnidEx = hist.reduce((s,m)=>s+m.unidades,0);
+  const unidPorCabezaMesEx = personaDiasMesEx>0 ? Math.round(totalUnidEx/personaDiasMesEx) : 0;
+
+  const wsCab = [
+    ['PRODUCTIVIDAD POR PERSONA Y TIEMPOS MUERTOS — JORNADA 9,5 HS (570 MIN)'],
+    [],
+    ['UNIDADES/PERSONA DEL MES (independiente del grupo)', unidPorCabezaMesEx],
+    ['PERSONA-DÍAS TRABAJADOS', personaDiasMesEx],
+    [],
+    ['GRUPO','DÍAS TRABAJADOS','TIEMPO REGISTRADO TOTAL (min)','TIEMPO PROM/DÍA (min)','TIEMPO MUERTO PROM/DÍA (min)'],
+  ];
+  grupos.forEach(g=>{
+    const diasG = diasPorGrupoEx[g];
+    if(!diasG) return;
+    const tiempoTotalG = hist.filter(m=>m.grupo===g).reduce((s,m)=>s+(m.durMin||0),0);
+    const tiempoPromG  = Math.round(tiempoTotalG/diasG);
+    const muertoG      = Math.max(0, Math.round(JORNADA_MIN - tiempoPromG));
+    wsCab.push([g, diasG, tiempoTotalG, tiempoPromG, muertoG]);
+  });
+  const wsC = XLSX.utils.aoa_to_sheet(wsCab);
+  wsC['!cols'] = [{wch:8},{wch:16},{wch:24},{wch:18},{wch:22}];
+  XLSX.utils.book_append_sheet(wb, wsC, 'Por Persona');
 
   XLSX.writeFile(wb, `Productividad_${mes.replace(' ','_')}.xlsx`);
   showToast('✅ Informe exportado');
@@ -8236,6 +8275,31 @@ function renderResumenProd(){
   const porTipo = {};
   hist.forEach(m=>{ porTipo[m.tipo]=(porTipo[m.tipo]||0)+m.unidades; });
 
+  // ── Por cabeza (independiente del grupo) & Tiempos muertos ──
+  const histGruposMes = JSON.parse(localStorage.getItem('grupos_hist')||'[]').filter(h=>{
+    const p = h.fecha.split('/'); // dd/mm/yyyy
+    return p.length===3 && (p[1]+'_'+p[2])===mes;
+  });
+  let personaDiasMes = 0;
+  const diasPorGrupo = {};
+  grupos.forEach(g=>{ diasPorGrupo[g]=0; });
+  histGruposMes.forEach(h=>{
+    const presentes = h.data.filter(p=>p.presente);
+    personaDiasMes += presentes.length;
+    grupos.forEach(g=>{
+      if(presentes.some(p=>(p.grupoHoy||p.grupo)===g)) diasPorGrupo[g]++;
+    });
+  });
+  const unidPorCabezaMes = personaDiasMes>0 ? Math.round(totalUnid/personaDiasMes) : 0;
+
+  const muertoPorGrupo = {};
+  grupos.forEach(g=>{
+    const diasG = diasPorGrupo[g];
+    if(!diasG){ muertoPorGrupo[g]=null; return; }
+    const tiempoProm = porGrupo[g].tiempo / diasG;
+    muertoPorGrupo[g] = Math.max(0, Math.round(JORNADA_MIN - tiempoProm));
+  });
+
   el.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
       <div class="prod-res-card"><div class="prod-res-val" style="color:#0071e3">${totalUnid.toLocaleString('es-AR')}</div><div style="font-size:10px;color:#86868b">Unidades del mes</div></div>
@@ -8264,6 +8328,20 @@ function renderResumenProd(){
         <span style="font-size:12px;font-weight:500">${tipo==='carga'?'📥 Carga':tipo==='descarga'?'📤 Descarga':tipo==='despacho'?'📋 Despacho':tipo==='pedidos'?'📝 Pedidos':tipo==='orden'?'🧹 Orden/Limpieza':tipo==='stock'?'📦 Stock':'🚗 Chasis'}</span>
         <span style="font-size:13px;font-weight:700">${unid.toLocaleString('es-AR')} un.</span>
       </div>`).join('')}
+
+    <div style="font-size:11px;font-weight:600;color:#86868b;margin:14px 0 6px;text-transform:uppercase">⚡ Por persona & tiempos muertos <span style="font-weight:400;text-transform:none;color:#b0b0b5">(jornada 9,5h)</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+      <div class="prod-res-card"><div class="prod-res-val" style="color:#ff9500">${unidPorCabezaMes.toLocaleString('es-AR')}</div><div style="font-size:10px;color:#86868b">Un./persona (mes, indep. de grupo)</div></div>
+      <div class="prod-res-card"><div class="prod-res-val">${personaDiasMes}</div><div style="font-size:10px;color:#86868b">Persona-días trabajados</div></div>
+    </div>
+    ${grupos.filter(g=>diasPorGrupo[g]>0).map(g=>{
+      const m = muertoPorGrupo[g];
+      const color = m>90?'#d70015':m>30?'#ff9500':'#34c759';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 12px;background:#fff;border-radius:8px;border:1px solid #e5e5ea;margin-bottom:4px">
+        <span style="font-size:12px;font-weight:600;color:${GRUPOS_COLORES[g]||'#86868b'}">${GRUPOS_NOMBRES[g]||g}</span>
+        <span style="font-size:11px;color:#86868b"><b style="color:${color}">${m}min</b> muertos/día prom. · ${diasPorGrupo[g]} días</span>
+      </div>`;
+    }).join('')}
   `;
 }
 
@@ -9466,9 +9544,10 @@ function cydEjecutarRecepcion(id){
   // Registrar en productividad con datos operativos completos (grupo, dársena, inicio/fin, durMin)
   try {
     var hora = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+    var tipoMov = tr.flujo === 'descarga' ? 'descarga' : 'carga'; // respeta el módulo de origen (Carga o Descarga)
     var mov = {
       fecha: fecha, hora: hora,
-      tipo: 'carga',
+      tipo: tipoMov,
       grupo: grupoSel,
       unidades: totalUn,
       semis: 1,
