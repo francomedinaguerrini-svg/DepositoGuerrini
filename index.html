@@ -820,6 +820,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
         <button onclick="aplicarSugerencia()" style="flex:1;padding:11px;background:#ff9500;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">📉 Aplicar Rotación Baja</button>
         <button onclick="reevaluarRack()" style="flex:1;padding:11px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer" title="Reevaluar posiciones libres y candidatos en nave">🔄 Reevaluar</button>
         <button onclick="imprimirMapa()" style="padding:11px 14px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:13px;cursor:pointer" title="Exportar mapa">📥</button>
+        <button onclick="descargarListadoRotacion()" style="padding:11px 14px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:13px;cursor:pointer" title="Bajar listado ordenado por rotación para chequear el motor">📊</button>
         <button onclick="limpiarMapa()" style="padding:11px 14px;background:#ffd6d9;color:#d70015;border:none;border-radius:10px;font-size:13px;cursor:pointer">🗑️</button>
       </div>
     </div>
@@ -1715,6 +1716,18 @@ function getUbicaciones(artId){
   const dataArt = DATA.find(r=>r.art==artId);
   const bloque = dataArt?dataArt.bloque:'';
 
+  // Unidades reales en rack: posición propia + lo que tiene como compartido en otras posiciones
+  let unidEnRack = posRacks.reduce((s,[pos,v])=>s+(v.unidades||0), 0);
+  Object.values(ASIGN).forEach(v=>{
+    if(!v) return;
+    (v.compartidos||[]).forEach(c=>{
+      if(c.art==artId) unidEnRack += c.unidades||0;
+    });
+  });
+  const stockTotal = dataArt?(dataArt.stock||0):0;
+  const fueraDeRack = Math.max(0, stockTotal - unidEnRack);
+  const mp = dataArt?(dataArt.max_pos||32):32;
+
   if(!posRacks.length && !bloque) return '<div style="font-size:12px;color:#d2d2d7;padding:4px 0">Sin ubicación asignada</div>';
 
   let html3 = '<div style="display:flex;flex-direction:column;gap:5px">';
@@ -1733,14 +1746,15 @@ function getUbicaciones(artId){
     </div>`;
   });
 
-  // Bloque
-  if(bloque){
+  // Bloque — solo si efectivamente queda stock fuera del rack
+  if(bloque && fueraDeRack > 0){
+    const pallFuera = Math.floor(fueraDeRack / mp);
     html3 += `<div style="display:flex;align-items:center;justify-content:space-between;background:#fff3cd;border-radius:8px;padding:7px 10px">
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:11px;font-weight:700;color:#856404;background:#f5c842;padding:2px 8px;border-radius:6px">BLQ</span>
         <span style="font-size:13px;font-weight:700;color:#1d1d1f">${bloque}</span>
       </div>
-      <span style="font-size:14px;font-weight:700;color:#856404">${dataArt.pall||0} <span style="font-size:10px;font-weight:400;color:#86868b">pall.</span></span>
+      <span style="font-size:14px;font-weight:700;color:#856404">${fueraDeRack} un. <span style="font-size:10px;font-weight:400;color:#86868b">(${pallFuera} pall.)</span></span>
     </div>`;
   }
 
@@ -2222,8 +2236,9 @@ function renderMapa(){
         const cls=celldaColor(unid,maxU);
         const pct=maxU?Math.round((unid/maxU)*100):0;
         const label=art?art.diseno.substring(0,5):'';
-        html+=`<div class="celda ${cls}" onclick="clickCelda('${posId}')" title="${posId}${art?' · '+art.med+' '+art.diseno:''}">
-          ${label}
+        const pend=asig&&asig.pendienteSacar;
+        html+=`<div class="celda ${cls}" style="${pend?'outline:2px solid #d70015;outline-offset:-2px;position:relative':''}" onclick="clickCelda('${posId}')" title="${posId}${art?' · '+art.med+' '+art.diseno:''}${pend?' · 🚨 PENDIENTE DE SACAR: '+(asig.pendienteSacarMotivo||''):''}">
+          ${label}${pend?'<span style="position:absolute;top:1px;right:2px;font-size:9px">🚨</span>':''}
           ${art?`<div class="barra"><div class="barra-fill" style="width:${pct}%"></div></div>`:''}
         </div>`;
       }
@@ -2233,6 +2248,7 @@ function renderMapa(){
   });
   container.innerHTML=html;
   renderAlertas();
+  renderPendientesSacar();
   renderCobertura();
 }
 
@@ -2459,15 +2475,16 @@ function saveRackStock(rs){ localStorage.setItem('wms_rack_stock', JSON.stringif
 // PASO 1 — BARRIDO
 // Detecta artículos candidatos al rack:
 //   • Excluye: camión (.5), agrícola (TT/TL), Speedway
-//   • Filtra: rot_sem < 0.5 Y pall 1-4
-//   • Prioriza: zona más caliente primero (sacar lentos de B→C→D)
-//   • Dentro de zona: menor rot primero (los más muertos al rack)
+//   • Filtra: rot_sem < 5.5 Y pall 1-5
+//   • Ordena: rotación mensual (rot_pall_mes) ascendente — el más
+//     bajo primero. Empate de rotación → desempata por zona más
+//     caliente primero (sacar lentos de B→A→C→D)
 // ───────────────────────────────────────────────────────────────
 function barridoCandidatosRack(){
   var EXCLUIR_PROV = ['SPEEDWAY'];
   var EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
   var ROT_MAX  = 5.5;  // rot_sem máxima para entrar al rack
-  var PALL_MAX = 6;   // máximo 6 pallets
+  var PALL_MAX = 5;   // máximo 5 pallets
 
   // Bloques 1 y 2 son la zona física del rack — no se mueven
   var BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
@@ -2479,10 +2496,10 @@ function barridoCandidatosRack(){
     if(/\d+\.5/.test(r.med||''))                    return false; // camión
     if(EXCLUIR_PROV.indexOf(r.prov)>=0)             return false; // Speedway
     if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0)  return false; // agrícola
-    if(EXCLUIR_DISENO.indexOf((r.diseno||'').trim())>=0) return false; // AT51/AT52/MT51
+    if(EXCLUIR_DISENO.indexOf((r.diseno||'').trim())>=0 && r.prov==='KUMHO') return false; // AT51/AT52/MT51 solo KUMHO
     if((r.stock||0) <= 0)                           return false; // sin stock
+    if((r.rot_sem||0) >= ROT_MAX)                   return false; // rotación demasiado alta
     if((r.pall||0) > PALL_MAX)                      return false; // > 5 pallets → bloque
-    if((r.pall||0) < 1)                             return false; // menos de 1 pallet
     if(r.bloque){
       var bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
       if(bs.some(function(b){ return BLOQUES_RACK.indexOf(b.trim())>=0; })) return false;
@@ -2490,22 +2507,11 @@ function barridoCandidatosRack(){
     return true;
   }
 
-  // GRUPO 1: rot = 0 (muertos totales) — máxima prioridad
-  var grupo1 = DATA.filter(function(r){
-    if(!pasaFiltroBase(r)) return false;
-    return (r.rot_sem||0) === 0;
-  });
+  // Candidatos: todos los que pasan el filtro base (rot=0 incluidos)
+  var candidatos = DATA.filter(pasaFiltroBase);
 
-  // GRUPO 2: rot baja pero existe (0 < rot < ROT_MAX)
-  var grupo2 = DATA.filter(function(r){
-    if(!pasaFiltroBase(r)) return false;
-    return (r.rot_sem||0) > 0 && (r.rot_sem||0) < ROT_MAX;
-  });
-
-  // Candidatos: grupo 1 primero, luego grupo 2
-  var candidatos = grupo1.concat(grupo2);
-
-  // Prioridad de zona: B (3-5) > A piso (1-2) > C (6-8) > D (9-10) > sin zona
+  // Zona (solo para desempate, ya no para prioridad principal)
+  // B (3-5) > A piso (1-2) > C (6-8) > D (9-10) > sin zona
   var ZB = ['4N','4S','4S PICKING','5N','5S'];
   var ZA = ['2N/3N','2S/2N'];
   var ZC = ['6N','6S','7N','7S','8S'];
@@ -2526,9 +2532,9 @@ function barridoCandidatosRack(){
   }
 
   candidatos.sort(function(a,b){
-    var zA=zonaUrgencia(a), zB=zonaUrgencia(b);
-    if(zA!==zB) return zA-zB;               // zona más urgente primero
-    return (a.rot_sem||0)-(b.rot_sem||0);   // empate: más muerto primero → N4
+    var ra = a.rot_pall_mes||0, rb = b.rot_pall_mes||0;
+    if(ra !== rb) return ra - rb;           // 1° rotación mensual ascendente
+    return zonaUrgencia(a) - zonaUrgencia(b); // 2° empate: zona más caliente primero
   });
 
   return candidatos;
@@ -2970,17 +2976,36 @@ function setSugerencia(nombre, btn){
   }
 }
 
+function motivoNoCalifica(art, EXCLUIR_PROV, EXCLUIR_USO, EXCLUIR_DIS2, BLOQUES_RACK, ROT_MAX, PALL_MAX){
+  if(!art) return 'Artículo no encontrado en DATA';
+  if(/\d+\.5/.test(art.med||'')) return 'Camión (.5)';
+  if(EXCLUIR_PROV.indexOf(art.prov)>=0) return 'Proveedor Speedway';
+  if(EXCLUIR_USO.indexOf((art.uso||'').trim())>=0) return 'Uso agrícola';
+  if(EXCLUIR_DIS2.indexOf((art.diseno||'').trim())>=0 && art.prov==='KUMHO') return 'Diseño excluido (KUMHO)';
+  if((art.stock||0) <= 0) return 'Sin stock';
+  if((art.rot_sem||0) >= ROT_MAX) return 'Rotación alta (≥'+ROT_MAX+'/sem)';
+  if((art.pall||0) > PALL_MAX) return 'Supera '+PALL_MAX+' pallets ('+(art.pall||0)+')';
+  if(art.bloque){
+    var bs = art.bloque.includes('/')?art.bloque.split('/'):[art.bloque];
+    if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return 'Bloque protegido (zona rack)';
+  }
+  return 'Ya no califica';
+}
+
 function reevaluarRack(){
   // Reevaluación incremental:
-  // 1. Libera posiciones de artículos que ya no califican
-  // 2. Asigna candidatos pendientes a posiciones libres
-  // 3. Actualiza mapa y informe
+  // 1. Marca "pendiente de sacar" las posiciones de artículos que ya no
+  //    califican y todavía tienen stock físico (no se liberan solas —
+  //    hay que confirmar que se sacaron de verdad, ver PENDIENTES DE SACAR)
+  // 2. Libera directo las que ya están vacías (nada que mover)
+  // 3. Asigna candidatos pendientes a las posiciones que quedaron libres
+  // 4. Actualiza mapa y informe
 
   var EXCLUIR_PROV = ['SPEEDWAY'];
   var EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
   var BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
   var ROT_MAX  = 5.5;
-  var PALL_MAX = 6;
+  var PALL_MAX = 5;
 
   var EXCLUIR_DIS2 = ['AT51','AT52','MT51'];
   function califica(art){
@@ -2988,11 +3013,10 @@ function reevaluarRack(){
     if(/\d+\.5/.test(art.med||'')) return false;
     if(EXCLUIR_PROV.indexOf(art.prov)>=0) return false;
     if(EXCLUIR_USO.indexOf((art.uso||'').trim())>=0) return false;
-    if(EXCLUIR_DIS2.indexOf((art.diseno||'').trim())>=0) return false;
+    if(EXCLUIR_DIS2.indexOf((art.diseno||'').trim())>=0 && art.prov==='KUMHO') return false; // solo KUMHO
     if((art.stock||0) <= 0) return false;
     if((art.rot_sem||0) >= ROT_MAX) return false;
     if((art.pall||0) > PALL_MAX) return false;
-    if((art.pall||0) < 1) return false;
     if(art.bloque){
       var bs = art.bloque.includes('/')?art.bloque.split('/'):[art.bloque];
       if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return false;
@@ -3001,16 +3025,28 @@ function reevaluarRack(){
   }
 
   var liberadas = 0;
+  var pendientesNuevas = 0;
   var asignadas = 0;
 
-  // PASO 1: liberar posiciones de artículos que ya no califican
+  // PASO 1: detectar artículos que ya no califican
+  //   - Si la posición ya está vacía (0 un.): se libera directo, no hay nada físico que mover
+  //   - Si todavía tiene stock: queda "pendiente de sacar" — sigue ocupando el lugar
+  //     hasta que confirmes manualmente que la sacaste (panel PENDIENTES DE SACAR)
   Object.keys(ASIGN).forEach(function(posId){
     var v = ASIGN[posId];
     if(!v || !v.art) return;
+    if(v.pendienteSacar) return; // ya estaba marcada, no re-evaluar de nuevo
     var art = DATA.find(function(r){return r.art==v.art;});
     if(!califica(art)){
-      delete ASIGN[posId];
-      liberadas++;
+      if((v.unidades||0) <= 0){
+        delete ASIGN[posId];
+        liberadas++;
+      } else {
+        v.pendienteSacar = true;
+        v.pendienteSacarMotivo = motivoNoCalifica(art, EXCLUIR_PROV, EXCLUIR_USO, EXCLUIR_DIS2, BLOQUES_RACK, ROT_MAX, PALL_MAX);
+        v.pendienteSacarFecha = new Date().toLocaleDateString('es-AR');
+        pendientesNuevas++;
+      }
     }
   });
 
@@ -3026,7 +3062,7 @@ function reevaluarRack(){
     // No borrar: posición vacía queda en ASIGN con unidades=0 para que Reposición la vea
   });
 
-  if(liberadas === 0 && Object.keys(ASIGN).length >= 380){
+  if(liberadas === 0 && pendientesNuevas === 0 && Object.keys(ASIGN).length >= 380){
     showToast('✅ Rack al máximo — sin posiciones libres para reevaluar');
     return;
   }
@@ -3038,14 +3074,14 @@ function reevaluarRack(){
     return califica(r);
   });
 
-  if(candidatosNave.length === 0 && liberadas === 0){
+  if(candidatosNave.length === 0 && liberadas === 0 && pendientesNuevas === 0){
     showToast('✅ Todo en orden — sin cambios necesarios');
     renderMapa();
     renderCandidatosEnNave();
     return;
   }
 
-  // Ordenar: zona más urgente primero, luego menor rot
+  // Ordenar: rotación mensual ascendente primero, zona como desempate
   var ZB = ['4N','4S','4S PICKING','5N','5S'];
   var ZA = ['2N/3N','2S/2N'];
   var ZC = ['6N','6S','7N','7S','8S'];
@@ -3064,12 +3100,13 @@ function reevaluarRack(){
     return m;
   }
   candidatosNave.sort(function(a,b){
-    var za=zonaUrg(a),zb=zonaUrg(b);
-    if(za!==zb) return za-zb;
-    return (a.rot_sem||0)-(b.rot_sem||0);
+    var ra=a.rot_pall_mes||0, rb=b.rot_pall_mes||0;
+    if(ra!==rb) return ra-rb;
+    return zonaUrg(a)-zonaUrg(b);
   });
 
   // PASO 4: construir lista de posiciones libres
+  // (las "pendiente de sacar" siguen en ASIGN, así que quedan excluidas acá)
   var posPorNivel = {1:[],2:[],3:[],4:[]};
   FRENTES.forEach(function(f){
     [4,3,2,1].forEach(function(nv){
@@ -3086,10 +3123,12 @@ function reevaluarRack(){
   var posLibres = Object.values(posPorNivel).reduce(function(s,a){return s+a.length;},0);
 
   if(posLibres === 0){
-    showToast('✅ Rack lleno — sin posiciones libres · '+liberadas+' liberadas pero ya ocupadas');
     saveAsign();
     renderMapa();
     renderCandidatosEnNave();
+    var msgLleno = '✅ Rack lleno — sin posiciones libres · '+liberadas+' liberadas';
+    if(pendientesNuevas) msgLleno += ' · ⚠️ '+pendientesNuevas+' pendientes de sacar';
+    showToast(msgLleno);
     return;
   }
 
@@ -3180,9 +3219,71 @@ function reevaluarRack(){
 
   var msg = '🔄 Reevaluación: ';
   if(liberadas) msg += liberadas+' liberadas · ';
+  if(pendientesNuevas) msg += '⚠️ '+pendientesNuevas+' pendientes de sacar · ';
   if(asignadas) msg += asignadas+' nuevas asignaciones · ';
   msg += sinUbicacion2.length+' sin lugar';
   showToast(msg);
+}
+
+// Confirma que una posición marcada "pendiente de sacar" ya se sacó
+// físicamente del rack — recién ahí se libera y puede reasignarse.
+function confirmarSacarDeRack(posId){
+  var v = ASIGN[posId];
+  if(!v || !v.pendienteSacar){
+    showToast('❌ Esa posición ya no está pendiente de sacar');
+    renderMapa();
+    return;
+  }
+  var da = DATA.find(function(r){return r.art==v.art;});
+  var desc = da ? (da.med+' '+da.diseno) : ('art. '+v.art);
+  delete ASIGN[posId];
+  saveAsign();
+  showToast('✅ '+posId+' confirmada afuera — '+desc);
+  reevaluarRack(); // reintenta ocupar la posición liberada con otro candidato
+}
+
+function renderPendientesSacar(){
+  var box = document.getElementById('alertas-box');
+  if(!box) return;
+
+  var pendientes = Object.entries(ASIGN)
+    .filter(function(e){ return e[1] && e[1].pendienteSacar; })
+    .map(function(e){
+      var pos=e[0], v=e[1];
+      var da = DATA.find(function(r){return r.art==v.art;});
+      return {pos:pos, v:v, da:da};
+    })
+    .sort(function(a,b){ return a.pos.localeCompare(b.pos); });
+
+  var prev = document.getElementById('panel-pendientes-sacar');
+  if(!pendientes.length){
+    if(prev) prev.remove();
+    return;
+  }
+
+  var filas = pendientes.map(function(p){
+    return `<div style="background:#fde8e8;border:1px solid #f5b5b5;border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;gap:8px;align-items:center">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:700;color:#d70015">${p.pos} · ${p.v.unidades||0} un.</div>
+        <div style="font-size:11px;color:#1d1d1f">${p.da?p.da.med+' '+p.da.diseno:'art. '+p.v.art} <span style="color:#86868b">${p.da?p.da.prov:''}</span></div>
+        <div style="font-size:10px;color:#86868b;margin-top:2px">Motivo: ${p.v.pendienteSacarMotivo||'—'} · detectado ${p.v.pendienteSacarFecha||''}</div>
+      </div>
+      <button onclick="confirmarSacarDeRack('${p.pos}')" style="flex-shrink:0;padding:7px 12px;background:#d70015;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">✅ OK, ya lo saqué</button>
+    </div>`;
+  }).join('');
+
+  var html = `<div id="panel-pendientes-sacar" style="background:#fff3cd;border:1px solid #d70015;border-radius:10px;padding:10px;margin-bottom:10px">
+    <div style="font-size:13px;font-weight:700;color:#d70015;margin-bottom:8px">
+      🚨 ${pendientes.length} posición${pendientes.length>1?'es':''} pendiente${pendientes.length>1?'s':''} de sacar del rack
+    </div>
+    ${filas}
+    <div style="font-size:10px;color:#86868b;margin-top:6px;border-top:1px solid #f5b5b5;padding-top:6px">
+      Ya no califican para el rack pero todavía tienen stock físico ahí — no se liberan solas. Confirmá cuando saques el pallet para que el sistema pueda reasignar el lugar.
+    </div>
+  </div>`;
+
+  if(prev) prev.outerHTML = html;
+  else box.innerHTML = html + box.innerHTML;
 }
 
 function aplicarSugerencia(){
@@ -3350,7 +3451,6 @@ function renderCandidatosEnNave(){
     if((r.stock||0) <= 0) return false;
     if((r.rot_sem||0) >= ROT_MAX) return false;
     if((r.pall||0) > PALL_MAX) return false;
-    if((r.pall||0) < 1) return false;
     if(r.bloque){
       const bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
       if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return false;
@@ -3551,35 +3651,69 @@ function procesarPedido(pedido){
     item.bloque = dataArt?dataArt.bloque:'';
     item.med = dataArt?dataArt.med:`${item.diam} ${item.secc} ${item.llan}`;
     item.cond = dataArt?dataArt.cond:'';
+    const stockTotal = dataArt?(dataArt.stock||0):0;
 
-    // Buscar posición en rack — N1 primero, luego N2, N3, N4
-    // Dentro de cada nivel, preferir la posición con MENOS unidades (vaciar las mas chicas antes)
-    function posMenorStockEnNivel(nivel){
-      var candidatas = Object.entries(ASIGN).filter(function(e){
-        var pos=e[0], v=e[1];
-        return pos.includes('-'+nivel+'-') && v && v.art==item.art && (v.unidades||0) > 0;
-      }).sort(function(a,b){ return (a[1].unidades||0) - (b[1].unidades||0); });
-      return candidatas[0];
-    }
-    const posRackN1 = posMenorStockEnNivel('N1');
-    const posRackN2 = posMenorStockEnNivel('N2');
-    const posRackN3 = posMenorStockEnNivel('N3');
-    const posRackN4 = posMenorStockEnNivel('N4');
-    const posRack = posRackN1||posRackN2||posRackN3||posRackN4;
-    item.posRack = posRack?posRack[0]:'';
+    // Todas las posiciones del rack con stock de este artículo,
+    // ordenadas N1→N4 y, dentro de cada nivel, de menor a mayor stock
+    // (vaciar las más chicas antes)
+    const pesoNivel = {N1:1, N2:2, N3:3, N4:4};
+    const posiciones = Object.entries(ASIGN)
+      .filter(([pos,v])=>v && v.art==item.art && (v.unidades||0) > 0)
+      .sort((a,b)=>{
+        const na = a[0].split('-')[1], nb = b[0].split('-')[1];
+        const pa = pesoNivel[na]||9, pb = pesoNivel[nb]||9;
+        if(pa!==pb) return pa-pb;
+        return (a[1].unidades||0) - (b[1].unidades||0);
+      });
 
-    // Lógica simple: si está en rack → rack, si no → bloque
-    if(item.posRack){
+    // Cuánto stock hay realmente fuera del rack (según el stock total del
+    // artículo, no solo porque tenga un bloque de referencia cargado)
+    const totalEnRack = posiciones.reduce((s,[,v])=>s+(v.unidades||0), 0);
+    const fueraDeRack = Math.max(0, stockTotal - totalEnRack);
+
+    // Repartir la cantidad pedida entre las posiciones hasta cubrirla
+    let restante = item.cant;
+    const detalle = [];
+    posiciones.forEach(([pos,v])=>{
+      if(restante<=0) return;
+      const take = Math.min(restante, v.unidades||0);
+      if(take>0){ detalle.push({pos, cant:take}); restante -= take; }
+    });
+
+    item.posRackDetalle = detalle;
+    item.posRack = detalle.map(d=>d.pos).join(', ');
+    item.cantRack = item.cant - restante;   // lo que cubre el rack
+    item.cantFaltante = restante;           // lo que no alcanzó el rack
+
+    if(detalle.length && restante<=0){
+      // Todo el pedido se cubre con una o varias posiciones de rack
       conRack.push(item);
-    } else if(item.bloque){
+    } else if(restante > 0 && fueraDeRack > 0){
+      // Mixto: parte en rack (si había), el resto se busca en bloque —
+      // pero solo hasta lo que realmente queda fuera del rack
+      const cantBloque = Math.min(restante, fueraDeRack);
+      const excede = restante - cantBloque; // ni rack ni bloque alcanzan
+      item.mixto = detalle.length > 0;
+      item.excedeStock = excede > 0;
+      item.excedeCant = excede;
+      if(detalle.length) conRack.push(item);
+      conBloque.push(Object.assign({}, item, {cant: cantBloque, mixto:true, excedeStock: excede>0, excedeCant: excede}));
+    } else if(detalle.length){
+      // Rack tiene algo pero no cubre todo, y no hay más en bloque:
+      // el pedido supera el stock total disponible del artículo
+      item.mixto = true;
+      item.excedeStock = true;
+      item.excedeCant = restante;
+      conRack.push(item);
+    } else if(item.bloque && stockTotal > 0){
       conBloque.push(item);
     } else {
       sinUbic.push(item);
     }
   });
 
-  // Ordenar rack por posición
-  conRack.sort((a,b)=>a.posRack.localeCompare(b.posRack));
+  // Ordenar rack por primera posición
+  conRack.sort((a,b)=>(a.posRack||'').localeCompare(b.posRack||''));
 
   renderPedido(conRack, conBloque, sinUbic, pedido);
 }
@@ -3592,22 +3726,32 @@ function renderPedido(conRack, conBloque, sinUbic, todos){
   function mkRow(item, tipo){
     const esBuscar = item.posRack === 'BUSCAR EN RACK';
     const esBajo = item.cond === 'bajo stock';
+    const cantMostrar = tipo==='rack' ? (item.cantRack!=null ? item.cantRack : item.cant) : item.cant;
     const ubic = tipo==='rack'
       ? esBuscar
         ? `<span style="font-size:10px;font-weight:600;color:#86868b;background:#f0f0f0;padding:2px 6px;border-radius:4px">🔍 BUSCAR EN RACK</span>`
-        : `<span class="ped-ubic-rack">🔵 ${item.posRack}</span>`
+        : (item.posRackDetalle && item.posRackDetalle.length>1
+            ? item.posRackDetalle.map(d=>`<span class="ped-ubic-rack">🔵 ${d.pos} (${d.cant})</span>`).join('<br>')
+            : `<span class="ped-ubic-rack">🔵 ${item.posRack}</span>`)
       : tipo==='bloque'
       ? `<span class="ped-ubic-bloque">🟡 ${item.bloque}</span>`
       : `<span class="ped-ubic-sin">❓ Sin ubic.</span>`;
     const rowStyle = esBajo ? 'background:#fff5f5' : '';
+    let avisoMixto = '';
+    if(item.excedeStock){
+      avisoMixto = `<div style="font-size:11px;color:#d70015;font-weight:700;margin-top:2px">⛔ El pedido (${item.cant}) supera el stock total disponible (${item.stock||0} un.) — faltan ${item.excedeCant}</div>`;
+    } else if(item.mixto && tipo!=='bloque'){
+      avisoMixto = `<div style="font-size:11px;color:#856404;font-weight:600;margin-top:2px">⚠️ Rack cubre ${item.cantRack} de ${item.cant} — el resto va a Bloque ${item.bloque}</div>`;
+    }
     return `<tr class="${tipo}-row" style="${rowStyle}">
       <td><div class="ped-art">${item.art}</div></td>
       <td>
         <div class="ped-desc">${item.med} ${item.diseno}</div>
         <div class="ped-prov">${item.prov}${esBajo?' · <span style="color:#d70015;font-weight:600">⚠️ BAJO STOCK</span>':''}</div>
+        ${avisoMixto}
       </td>
       <td>${ubic}</td>
-      <td class="ped-cant">${item.cant}</td>
+      <td class="ped-cant">${cantMostrar}</td>
       <td class="ped-stock" style="${esBajo?'color:#d70015;font-weight:600':''}">${(item.stock||0).toLocaleString('es-AR')}</td>
     </tr>`;
   }
@@ -4982,6 +5126,181 @@ function registrarMovimiento(posId, artId, tipo, unidades){
 // getAlertasReposicion: ver definición más abajo
 
 // === IMPRIMIR MAPA ===
+function descargarListadoRotacion(){
+  // Unidades en rack por artículo (sumando posición propia + lo que tiene como compartido en otras)
+  const unidEnRackPorArt = {};
+  Object.values(ASIGN).forEach(v=>{
+    if(!v) return;
+    if(v.art) unidEnRackPorArt[String(v.art)] = (unidEnRackPorArt[String(v.art)]||0) + (v.unidades||0);
+    (v.compartidos||[]).forEach(c=>{
+      unidEnRackPorArt[String(c.art)] = (unidEnRackPorArt[String(c.art)]||0) + (c.unidades||0);
+    });
+  });
+
+  const rows = Object.entries(ASIGN)
+    .filter(([pos,v])=>v && v.art)
+    .map(([pos,v])=>{
+      const art = DATA.find(r=>r.art==v.art);
+      const nivelActual = parseInt((pos.split('-')[1]||'').replace('N',''))||0;
+      const nivelEsperado = nivelSegunRot(art?(art.rot_sem||0):0);
+      const stockTotal = art?(art.stock||0):0;
+      const enRack = unidEnRackPorArt[String(v.art)]||0;
+      return {
+        pos, nivelActual, nivelEsperado,
+        art: v.art,
+        med: art?art.med:'',
+        diseno: art?art.diseno:'',
+        prov: art?art.prov:'',
+        rot_sem: art?(art.rot_sem||0):0,
+        rot_mes: art?(art.rot_pall_mes||0):0,
+        pallets: art?(art.pall||0):0,
+        unidades: v.unidades||0,
+        compartidos: (v.compartidos||[]).length,
+        stockTotal,
+        fueraDeRack: Math.max(0, stockTotal - enRack)
+      };
+    })
+    .sort((a,b)=> a.rot_mes - b.rot_mes);
+
+  const wsData = [
+    ['LISTADO DE RACK POR ROTACIÓN — '+new Date().toLocaleDateString('es-AR')],
+    ['Orden: rotación mensual ascendente (rot_pall_mes) — el más bajo primero. NIVEL vs ESPERADO: si no coinciden, revisar.'],
+    [],
+    ['#','NIVEL','ESPERADO','CHEQUEO','POSICIÓN','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','ROT/SEM','ROT/MES','PALLETS','UNID. EN RACK','STOCK TOTAL','FUERA DE RACK','COMPARTE'],
+    ...rows.map((r,i)=>[
+      i+1, 'N'+r.nivelActual, 'N'+r.nivelEsperado,
+      r.nivelActual===r.nivelEsperado ? 'OK' : '⚠️ revisar',
+      r.pos, r.art, r.med, r.diseno, r.prov,
+      r.rot_sem.toFixed(2), r.rot_mes.toFixed(2), r.pallets, r.unidades,
+      r.stockTotal, r.fueraDeRack,
+      r.compartidos ? ('Sí ('+r.compartidos+')') : 'No'
+    ])
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [{wch:4},{wch:6},{wch:9},{wch:10},{wch:18},{wch:8},{wch:14},{wch:10},{wch:12},{wch:9},{wch:9},{wch:8},{wch:12},{wch:11},{wch:12},{wch:10}];
+  ws['!pageSetup'] = {orientation:'landscape'};
+  XLSX.utils.book_append_sheet(wb, ws, 'Rack por rotación');
+
+  // Hoja 2: lo que quedó afuera — candidatos que califican pero no tienen posición en rack
+  const EXCLUIR_PROV3 = ['SPEEDWAY'];
+  const EXCLUIR_USO3  = ['TT','TL','TLSB','TT ','TL '];
+  const BLOQUES_RACK3 = ['2N/3N','2S/2N','1N','1S'];
+  const enRack3 = new Set(Object.values(ASIGN).filter(v=>v&&v.art).map(v=>String(v.art)));
+  const afuera = DATA.filter(r=>{
+    if(enRack3.has(String(r.art))) return false;
+    if(/\d+\.5/.test(r.med||'')) return false;
+    if(EXCLUIR_PROV3.indexOf(r.prov)>=0) return false;
+    if(EXCLUIR_USO3.indexOf((r.uso||'').trim())>=0) return false;
+    if(['AT51','AT52','MT51'].indexOf((r.diseno||'').trim())>=0 && r.prov==='KUMHO') return false; // solo KUMHO
+    if((r.stock||0)<=0) return false;
+    if((r.rot_sem||0)>=5.5) return false;
+    if((r.pall||0)>5) return false;
+    if(r.bloque){
+      const bs=r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
+      if(bs.some(b=>BLOQUES_RACK3.indexOf(b.trim())>=0)) return false;
+    }
+    return true;
+  }).sort((a,b)=>(a.rot_pall_mes||0)-(b.rot_pall_mes||0));
+
+  const wsAfuera = [
+    ['CANDIDATOS QUE QUEDARON AFUERA DEL RACK — '+new Date().toLocaleDateString('es-AR')],
+    ['Califican para el rack (rot < 5.5/sem, 1-5 pallets) pero no tienen posición asignada. Total: '+afuera.length],
+    [],
+    ['#','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','ROT/SEM','ROT/MES','PALLETS','STOCK','BLOQUE ACTUAL','CONDICIÓN'],
+    ...afuera.map((r,i)=>[
+      i+1, r.art, r.med, r.diseno, r.prov,
+      (r.rot_sem||0).toFixed(2), (r.rot_pall_mes||0).toFixed(2),
+      r.pall||0, r.stock||0, r.bloque||'', r.cond||''
+    ])
+  ];
+  const wsA2 = XLSX.utils.aoa_to_sheet(wsAfuera);
+  wsA2['!cols'] = [{wch:4},{wch:8},{wch:14},{wch:10},{wch:12},{wch:9},{wch:9},{wch:8},{wch:8},{wch:14},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, wsA2, 'Quedaron afuera');
+
+  // Hoja 3: comparación contra TODO el stock — adentro, afuera y por qué
+  const BLOQUES_RACK4 = ['2N/3N','2S/2N','1N','1S'];
+  function motivoFuera(r){
+    if((r.stock||0)<=0) return 'Sin stock';
+    if(/\d+\.5/.test(r.med||'')) return 'Camión (.5)';
+    if(r.prov==='SPEEDWAY') return 'Proveedor Speedway';
+    if(['TT','TL','TLSB'].indexOf((r.uso||'').trim())>=0) return 'Uso agrícola';
+    if(['AT51','AT52','MT51'].indexOf((r.diseno||'').trim())>=0 && r.prov==='KUMHO') return 'Diseño excluido (KUMHO)';
+    if(r.bloque){
+      const bs=r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
+      if(bs.some(b=>BLOQUES_RACK4.indexOf(b.trim())>=0)) return 'Bloque protegido (zona rack)';
+    }
+    if((r.rot_sem||0)>=5.5) return 'Rotación alta (≥5.5/sem)';
+    if((r.pall||0)>5) return 'Más de 5 pallets';
+    return 'Califica pero sin lugar';
+  }
+
+  const todos = DATA.map(r=>{
+    const enRackUnid = unidEnRackPorArt[String(r.art)]||0;
+    const estaEnRack = enRackUnid>0;
+    return {
+      art: r.art, med: r.med, diseno: r.diseno, prov: r.prov,
+      stock: r.stock||0, rot_sem: r.rot_sem||0, rot_mes: r.rot_pall_mes||0, pallets: r.pall||0,
+      estaEnRack, enRackUnid,
+      fueraDeRack: Math.max(0, (r.stock||0) - enRackUnid),
+      motivo: estaEnRack ? '' : motivoFuera(r)
+    };
+  }).sort((a,b)=>{
+    if(a.estaEnRack!==b.estaEnRack) return a.estaEnRack ? -1 : 1;
+    return a.rot_mes - b.rot_mes;
+  });
+
+  const wsTodo = [
+    ['COMPARACIÓN CONTRA TODO EL STOCK — '+new Date().toLocaleDateString('es-AR')],
+    ['Total artículos: '+todos.length+' · En rack: '+todos.filter(t=>t.estaEnRack).length+' · Fuera: '+todos.filter(t=>!t.estaEnRack).length],
+    [],
+    ['ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','STOCK TOTAL','ROT/SEM','ROT/MES','PALLETS','EN RACK','UNID. EN RACK','FUERA DE RACK','MOTIVO SI ESTÁ AFUERA'],
+    ...todos.map(t=>[
+      t.art, t.med, t.diseno, t.prov, t.stock,
+      t.rot_sem.toFixed(2), t.rot_mes.toFixed(2), t.pallets,
+      t.estaEnRack?'Sí':'No', t.enRackUnid, t.fueraDeRack, t.motivo
+    ])
+  ];
+  const wsT = XLSX.utils.aoa_to_sheet(wsTodo);
+  wsT['!cols'] = [{wch:8},{wch:14},{wch:10},{wch:12},{wch:11},{wch:9},{wch:9},{wch:8},{wch:8},{wch:12},{wch:12},{wch:24}];
+  XLSX.utils.book_append_sheet(wb, wsT, 'Todo el stock');
+
+  // Hoja 4: cada artículo debe quedar SOLO en rack o SOLO en bloque, nunca partido
+  const partidos = todos
+    .filter(t=>t.estaEnRack)
+    .map(t=>{
+      let estado, detalle;
+      if(t.enRackUnid > t.stock){
+        estado = '🚨 ERROR DE DATOS';
+        detalle = 'Rack tiene '+t.enRackUnid+' pero el stock total es '+t.stock+' — desincronizado';
+      } else if(t.enRackUnid < t.stock){
+        estado = '⚠️ PARTIDO';
+        detalle = t.enRackUnid+' en rack + '+(t.stock-t.enRackUnid)+' fuera (bloque)';
+      } else {
+        estado = 'OK';
+        detalle = 'Las '+t.stock+' unidades están en rack';
+      }
+      return {art:t.art, med:t.med, diseno:t.diseno, stock:t.stock, enRack:t.enRackUnid, estado, detalle};
+    })
+    .filter(t=>t.estado!=='OK');
+
+  const wsPart = [
+    ['CHEQUEO: RACK O BLOQUE, NUNCA AMBOS — '+new Date().toLocaleDateString('es-AR')],
+    [partidos.length ? '⚠️ '+partidos.length+' artículo(s) partidos entre rack y bloque' : '✅ Ningún artículo está partido — todos quedan solo en rack o solo en bloque'],
+    [],
+    ['ARTÍCULO','MEDIDA','DISEÑO','STOCK TOTAL','UNID. EN RACK','ESTADO','DETALLE'],
+    ...partidos.map(p=>[p.art, p.med, p.diseno, p.stock, p.enRack, p.estado, p.detalle])
+  ];
+  const wsP = XLSX.utils.aoa_to_sheet(wsPart);
+  wsP['!cols'] = [{wch:8},{wch:14},{wch:10},{wch:11},{wch:12},{wch:16},{wch:45}];
+  XLSX.utils.book_append_sheet(wb, wsP, 'Rack o Bloque');
+
+  const revisar = rows.filter(r=>r.nivelActual!==r.nivelEsperado).length;
+  XLSX.writeFile(wb, `Listado_Rotacion_Rack_${new Date().toLocaleDateString('es-AR').replace(/\//g,'-')}.xlsx`);
+  showToast('✅ Listado exportado · '+rows.length+' en rack · '+afuera.length+' afuera'+(revisar?' · ⚠️ '+revisar+' para revisar':'')+(partidos.length?' · 🚨 '+partidos.length+' partidos rack/bloque':''));
+}
+
 function imprimirMapa(){
   const wb = XLSX.utils.book_new();
   const wsData = [
@@ -5026,17 +5345,16 @@ function imprimirMapa(){
     if(/\d+\.5/.test(r.med||'')) return false;
     if(EXCLUIR_PROV2.indexOf(r.prov)>=0) return false;
     if(EXCLUIR_USO2.indexOf((r.uso||'').trim())>=0) return false;
-    if(['AT51','AT52','MT51'].indexOf((r.diseno||'').trim())>=0) return false;
+    if(['AT51','AT52','MT51'].indexOf((r.diseno||'').trim())>=0 && r.prov==='KUMHO') return false; // solo KUMHO
     if((r.stock||0)<=0) return false;
     if((r.rot_sem||0)>=5.5) return false;
-    if((r.pall||0)>6) return false;
-    if((r.pall||0)<1) return false;
+    if((r.pall||0)>5) return false;
     if(r.bloque){
       const bs=r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
       if(bs.some(b=>BLOQUES_RACK2.indexOf(b.trim())>=0)) return false;
     }
     return true;
-  }).sort((a,b)=>(a.rot_sem||0)-(b.rot_sem||0));
+  }).sort((a,b)=>(a.rot_pall_mes||0)-(b.rot_pall_mes||0));
 
   if(candidatosNave.length){
     const ZB2=['4N','4S','4S PICKING','5N','5S'];
@@ -5052,7 +5370,7 @@ function imprimirMapa(){
     }
     const wsNave = [
       ['CANDIDATOS EN NAVE SIN LUGAR EN RACK — '+new Date().toLocaleDateString('es-AR')],
-      ['Total: '+candidatosNave.length+' artículos · Criterio: rot < 5/sem · pall ≤ 12'],
+      ['Total: '+candidatosNave.length+' artículos · Criterio: rot < 5.5/sem · pall ≤ 5'],
       [],
       ['ZONA','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','ROT/SEM','ROT/MES','PALLETS','STOCK','BLOQUE','CONDICIÓN'],
       ...candidatosNave.map(r=>[
@@ -5198,7 +5516,7 @@ function _repoCalcTraer(art, unidActual, maxU){
   var excluido = /\d+\.5/.test(art.med||'') ||
                  art.prov==='SPEEDWAY' ||
                  ['TT','TL','TLSB'].indexOf((art.uso||'').trim())>=0 ||
-                 ['AT51','AT52','MT51'].indexOf((art.diseno||'').trim())>=0;
+                 (['AT51','AT52','MT51'].indexOf((art.diseno||'').trim())>=0 && art.prov==='KUMHO');
   var bloqueOk = art.bloque && !['2N/3N','2S/2N','1N','1S'].some(b=>art.bloque.includes(b));
   var hayStock = (art.stock||0) > unidActual; // hay más en bloque que lo que ya está en rack
 
@@ -8323,8 +8641,18 @@ function confirmarColaPedido(idx){
       if(art){
         const cantReal = Math.round(item.cant * escala);
         art.stock = Math.max(0, (art.stock||0) - cantReal);
-        // Actualizar unidades en rack si tiene posición
-        if(item.posRack && ASIGN[item.posRack] && ASIGN[item.posRack].art==item.art){
+        // Actualizar unidades en rack — puede haber varias posiciones involucradas
+        if(item.posRackDetalle && item.posRackDetalle.length){
+          let restante = cantReal;
+          item.posRackDetalle.forEach(d=>{
+            if(restante<=0) return;
+            if(!(ASIGN[d.pos] && ASIGN[d.pos].art==item.art)) return;
+            const tomar = Math.min(restante, Math.round(d.cant*escala) || restante, ASIGN[d.pos].unidades||0);
+            ASIGN[d.pos].unidades = Math.max(0, (ASIGN[d.pos].unidades||0) - tomar);
+            restante -= tomar;
+          });
+        } else if(item.posRack && ASIGN[item.posRack] && ASIGN[item.posRack].art==item.art){
+          // Compatibilidad con pedidos ya en cola de antes de este cambio (una sola posición)
           ASIGN[item.posRack].unidades = Math.max(0, (ASIGN[item.posRack].unidades||0) - cantReal);
         }
       }
@@ -8592,7 +8920,7 @@ function termoStats(){
     if(['TT','TL','TLSB','TT ','TL '].indexOf(uso)>=0) return false;
     if((r.stock||0)<=0) return false;
     if((r.rot_sem||0)>=0.5) return false;
-    if((r.pall||0)>4 || (r.pall||0)<1) return false;
+    if((r.pall||0)>4) return false;
     return true;
   }).map(r=>r.art));
 
@@ -9288,6 +9616,8 @@ function transitoPosicionSugerida(artId, cantEntrada){
   var da = DATA.find(function(r){return r.art===artId;});
   if(!da) return {tipo:'desconocido', pos:'—', detalle:'Art no en DATA'};
 
+  var PALL_MAX_TR = 5; // mismo límite que el motor de rack
+
   var stockFuturo = (da.stock||0) + cantEntrada;
   var mp = da.max_pos||32;
   var pallFuturo = stockFuturo / mp;
@@ -9296,14 +9626,11 @@ function transitoPosicionSugerida(artId, cantEntrada){
   // ── Filtros de exclusión (igual que el motor) ──
   var excluido = /\d+\.5/.test(da.med||'') || (da.prov==='SPEEDWAY') ||
                  ['TT','TL','TLSB'].indexOf((da.uso||'').trim())>=0 ||
-                 ['AT51','AT52','MT51'].indexOf((da.diseno||'').trim())>=0;
+                 (['AT51','AT52','MT51'].indexOf((da.diseno||'').trim())>=0 && da.prov==='KUMHO');
 
-  if(excluido || pallFuturo > 6){
-    return {tipo:'bloque', pos: da.bloque||'—',
-            detalle:'Bloque '+( da.bloque||'—'), pallets: pallFuturo.toFixed(1)};
-  }
-
-  // ── PASO 1: buscar en ASIGN posiciones asignadas para este artículo ──
+  // ── Buscar en ASIGN posiciones YA asignadas para este artículo ──
+  // (se busca antes del límite de pallets para poder alertar si hay
+  //  que sacarlo del rack en vez de mandarlo directo a bloque)
   var posAsign = [];
   Object.entries(ASIGN).forEach(function(e){
     var posId=e[0], v=e[1];
@@ -9313,6 +9640,25 @@ function transitoPosicionSugerida(artId, cantEntrada){
       posAsign.push({id:posId, unidades:0, vacia:true});
   });
 
+  // ── Si ya está en el rack y el ingreso lo hace superar el límite → ALERTA ──
+  if(posAsign.length && (excluido || pallFuturo > PALL_MAX_TR)){
+    var posActuales = posAsign.map(function(p){return p.id;}).join(', ');
+    return {
+      tipo:    'sacar_de_rack',
+      pos:     posActuales,
+      detalle: '⚠️ Con este ingreso pasa a '+pallFuturo.toFixed(1)+' pallets (> '+PALL_MAX_TR+') — sacar de '+posActuales+' y mandar a Bloque '+(da.bloque||'—'),
+      pallets: pallFuturo.toFixed(1),
+      posActuales: posAsign,
+      bloqueDestino: da.bloque||'—',
+    };
+  }
+
+  if(excluido || pallFuturo > PALL_MAX_TR){
+    return {tipo:'bloque', pos: da.bloque||'—',
+            detalle:'Bloque '+( da.bloque||'—'), pallets: pallFuturo.toFixed(1)};
+  }
+
+  // ── El artículo YA está en el rack y sigue calificando → REPONER (misma posición, nunca una nueva) ──
   if(posAsign.length){
     // Priorizar posiciones vacías primero (quedaron vacías por pedidos del día)
     posAsign.sort(function(a,b){
@@ -9327,18 +9673,22 @@ function transitoPosicionSugerida(artId, cantEntrada){
     var vaciaLabel = mejorPos.vacia ? ' ← POSICIÓN VACÍA (prioridad)' : '';
     var posStr = posAsign.map(function(p){return p.id+(p.vacia?'★':'');}).join(', ');
     return {
-      tipo:    'rack',
+      tipo:    'reponer',
       pos:     posStr,
-      detalle: 'Rack: '+posStr+vaciaLabel,
+      detalle: '🔁 Reponer en: '+posStr+vaciaLabel,
       pallets: pallFuturo.toFixed(1),
       exacto:  true,
       posVacia: mejorPos.vacia,
     };
   }
 
+  // ── A partir de acá el artículo NO tiene ninguna posición en el rack todavía ──
+  // (nunca llega hasta acá si posAsign.length>0 — evita que termine con
+  //  el mismo artículo repartido en dos posiciones distintas)
+
   // ── PASO 2: buscar posición vacía existente en ASIGN para cualquier art ──
   // Una posición "vacía" es la que tiene unidades=0 — quedó libre por pedidos
-  if(pallFuturo >= 1 && rot < 5.5){
+  if(pallFuturo >= 0 && rot < 5.5){
     var nivelIdeal = rot<=0?4: rot<1.25?3: rot<2.5?2:1;
 
     // Primero: buscar posiciones en ASIGN con unidades=0 del nivel correcto
@@ -9716,7 +10066,7 @@ function cydExportarPlanilla(id){
     var stockNuevo = (r.stockActual||0) + r.cant;
     var cantStr = '+'+r.cant;
     var cantColor = '#34c759';
-    var destColor = sug.tipo==='rack' ? '#0071e3' : '#ff9500';
+    var destColor = sug.tipo==='rack' ? '#0071e3' : sug.tipo==='reponer' ? '#34c759' : sug.tipo==='sacar_de_rack' ? '#d70015' : '#ff9500';
     var rango = (typeof RANGOS !== 'undefined' && RANGOS[String(r.art)]) ? RANGOS[String(r.art)] : '—';
     var dot = (function(){
       try{
@@ -9937,7 +10287,7 @@ function cydRenderTransito(){
       } else {
         // INGRESO: igual que antes
         var sug = r.sugerencia||{};
-        var colorDest = sug.tipo==='rack'?'#0071e3':'#ff9500';
+        var colorDest = sug.tipo==='rack'?'#0071e3':sug.tipo==='reponer'?'#34c759':sug.tipo==='sacar_de_rack'?'#d70015':'#ff9500';
         html += '<tr style="'+bg+'">';
         html += '<td style="padding:4px 8px;font-weight:600">'+r.art+'</td>';
         html += '<td style="padding:4px 8px">'+r.med+'</td>';
