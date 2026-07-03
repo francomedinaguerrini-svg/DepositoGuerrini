@@ -565,6 +565,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     <div class="tab-row2-item" id="row2tab-dif" onclick="switchTab('dif',this)">📊 Diferencias</div>
     <div class="tab-row2-item" id="row2tab-grupos" onclick="switchTab('grupos',this)">👥 Grupos</div>
     <div class="tab-row2-item" id="row2tab-dot" onclick="switchTab('dot',this)">📅 DOTs</div>
+    <div class="tab-row2-item" id="row2tab-checklist" onclick="switchTab('checklist',this)">🚛 Checklist</div>
   </div>
 </div>
 
@@ -1205,6 +1206,18 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
   </div>
 </div>
 
+<!-- CHECKLIST MÁQUINAS Y CAMIONES -->
+<div class="view" id="view-checklist">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <span style="font-size:13px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px">🚛 Checklist Máquinas y Camiones</span>
+    <button onclick="agregarEquipoChecklist()" style="padding:6px 12px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">+ Agregar equipo</button>
+  </div>
+
+  <div id="checklist-alertas"></div>
+  <div id="checklist-form-box"></div>
+  <div id="checklist-lista"></div>
+</div>
+
 <!-- ROTACION -->
 <div class="view" id="view-rot">
   <div class="rot-wrap">
@@ -1686,6 +1699,7 @@ function switchTab(name,btn){
   if(name==='repo') renderReposicion();
   if(name==='pedidos') initPedidos();
   if(name==='cydesc') initCyDesc();
+  if(name==='checklist') renderChecklist();
 }
 
 // --- UPDATE ---
@@ -7903,6 +7917,239 @@ function exportarAlertasDOT(){
   XLSX.writeFile(wb, 'Alertas_DOT_'+new Date().toLocaleDateString('es-AR').replace(/\//g,'-')+'.xlsx');
   showToast('✅ Alertas exportadas');
 }
+
+// ═══════════════════════════════════════════════════════════════
+// CHECKLIST MÁQUINAS Y CAMIONES
+// ═══════════════════════════════════════════════════════════════
+
+const CHECKLIST_ITEMS_DEFAULT = {
+  maquina: ['Frenos', 'Luces y baliza', 'Bocina / alarma de retroceso', 'Horquillas y mástil', 'Fugas de aceite o hidráulico', 'Nivel de batería / combustible', 'Cinturón de seguridad', 'Neumáticos / ruedas'],
+  camion: ['Frenos', 'Luces (altas, bajas, giro, freno)', 'Neumáticos y presión', 'Niveles (aceite, agua, líquido de frenos)', 'Matafuego', 'Documentación (VTV, seguro, cédula)', 'Espejos', 'Limpiaparabrisas']
+};
+
+function getChecklistEquipos(){
+  return JSON.parse(localStorage.getItem('wms_checklist_equipos')||'[]');
+}
+function saveChecklistEquipos(arr){
+  localStorage.setItem('wms_checklist_equipos', JSON.stringify(arr));
+}
+function getChecklistItems(tipo){
+  const raw = localStorage.getItem('wms_checklist_items_'+tipo);
+  return raw ? JSON.parse(raw) : CHECKLIST_ITEMS_DEFAULT[tipo].slice();
+}
+function saveChecklistItems(tipo, items){
+  localStorage.setItem('wms_checklist_items_'+tipo, JSON.stringify(items));
+}
+function getChecklistRegistros(){
+  return JSON.parse(localStorage.getItem('wms_checklist_registros')||'[]');
+}
+function saveChecklistRegistros(arr){
+  localStorage.setItem('wms_checklist_registros', JSON.stringify(arr.slice(0,500)));
+}
+
+function agregarEquipoChecklist(){
+  const tipo = prompt('¿Qué tipo de equipo es?\n\nEscribí "maquina" o "camion"', 'maquina');
+  if(!tipo || ['maquina','camion'].indexOf(tipo.trim().toLowerCase())<0){
+    if(tipo!==null) showToast('❌ Escribí "maquina" o "camion"');
+    return;
+  }
+  const nombre = prompt('Nombre o identificación del equipo (ej. "Autoelevador 1", "Camión Ford Cargo - AB123CD")');
+  if(!nombre || !nombre.trim()) return;
+  const interno = prompt('Interno / patente (opcional)') || '';
+
+  const equipos = getChecklistEquipos();
+  equipos.push({
+    id: 'eq_'+Date.now(),
+    tipo: tipo.trim().toLowerCase(),
+    nombre: nombre.trim(),
+    interno: interno.trim()
+  });
+  saveChecklistEquipos(equipos);
+  showToast('✅ Equipo agregado: '+nombre.trim());
+  renderChecklist();
+}
+
+function eliminarEquipoChecklist(id){
+  if(!confirm('¿Eliminar este equipo? El historial de checklists queda guardado igual.')) return;
+  const equipos = getChecklistEquipos().filter(e=>e.id!==id);
+  saveChecklistEquipos(equipos);
+  showToast('🗑️ Equipo eliminado');
+  renderChecklist();
+}
+
+function editarItemsChecklist(tipo){
+  const actuales = getChecklistItems(tipo);
+  const texto = prompt('Ítems del checklist de '+(tipo==='maquina'?'máquinas':'camiones')+' (uno por línea):', actuales.join('\n'));
+  if(texto===null) return;
+  const items = texto.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!items.length){ showToast('❌ Tiene que quedar al menos un ítem'); return; }
+  saveChecklistItems(tipo, items);
+  showToast('✅ Ítems de '+(tipo==='maquina'?'máquinas':'camiones')+' actualizados');
+  renderChecklist();
+}
+
+function abrirFormChecklist(equipoId, subtipo){
+  const equipos = getChecklistEquipos();
+  const eq = equipos.find(e=>e.id===equipoId);
+  if(!eq) return;
+  const items = getChecklistItems(eq.tipo);
+
+  const filas = items.map((item,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f0">
+      <div style="flex:1;font-size:13px;color:#1d1d1f">${item}</div>
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+        <input type="radio" name="cl-item-${i}" value="ok" checked> ✅ OK
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#d70015">
+        <input type="radio" name="cl-item-${i}" value="falla"> ⚠️ Falla
+      </label>
+    </div>`).join('');
+
+  const html = `<div id="checklist-form-inner" style="background:#fff;border:2px solid #0071e3;border-radius:12px;padding:14px;margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#1d1d1f">${eq.nombre} ${eq.interno?'· '+eq.interno:''}</div>
+        <div style="font-size:11px;color:#86868b">Checklist ${subtipo==='diario'?'diario':'por evento'} — ${new Date().toLocaleDateString('es-AR')}</div>
+      </div>
+      <button onclick="cerrarFormChecklist()" style="background:none;border:none;font-size:18px;color:#86868b;cursor:pointer">✕</button>
+    </div>
+    <input type="text" id="cl-responsable" placeholder="Responsable (nombre)" style="width:100%;padding:9px 12px;border:1px solid #d2d2d7;border-radius:10px;font-size:13px;margin-bottom:10px;box-sizing:border-box">
+    <div style="max-height:340px;overflow-y:auto">${filas}</div>
+    <textarea id="cl-obs" placeholder="Observaciones generales (opcional)" style="width:100%;padding:9px 12px;border:1px solid #d2d2d7;border-radius:10px;font-size:13px;margin-top:10px;box-sizing:border-box;min-height:50px"></textarea>
+    <button onclick="guardarChecklistForm('${eq.id}','${subtipo}')" style="width:100%;margin-top:10px;padding:11px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">💾 Guardar checklist</button>
+  </div>`;
+
+  document.getElementById('checklist-form-box').innerHTML = html;
+  window._checklistItemsActuales = items;
+  document.getElementById('checklist-form-inner').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function cerrarFormChecklist(){
+  document.getElementById('checklist-form-box').innerHTML = '';
+}
+
+function guardarChecklistForm(equipoId, subtipo){
+  const responsable = (document.getElementById('cl-responsable').value||'').trim();
+  if(!responsable){ showToast('❌ Falta el nombre del responsable'); return; }
+  const items = window._checklistItemsActuales||[];
+  const detalle = items.map((item,i)=>{
+    const radios = document.getElementsByName('cl-item-'+i);
+    let estado = 'ok';
+    for(const r of radios){ if(r.checked) estado = r.value; }
+    return {item, estado};
+  });
+  const tieneFalla = detalle.some(d=>d.estado==='falla');
+  const obs = (document.getElementById('cl-obs').value||'').trim();
+
+  const registros = getChecklistRegistros();
+  registros.unshift({
+    id: 'cl_'+Date.now(),
+    equipoId, subtipo,
+    fecha: new Date().toLocaleDateString('es-AR'),
+    hora: new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),
+    responsable, detalle, obs, tieneFalla
+  });
+  saveChecklistRegistros(registros);
+
+  cerrarFormChecklist();
+  showToast(tieneFalla ? '⚠️ Checklist guardado — con fallas reportadas' : '✅ Checklist guardado — todo OK');
+  renderChecklist();
+}
+
+function toggleHistorialEquipo(equipoId){
+  const el = document.getElementById('cl-hist-'+equipoId);
+  if(!el) return;
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+function renderChecklist(){
+  const equipos = getChecklistEquipos();
+  const registros = getChecklistRegistros();
+  const hoy = new Date().toLocaleDateString('es-AR');
+
+  // ── Alertas: equipos sin checklist hecho hoy ──
+  const sinHacerHoy = equipos.filter(eq=>!registros.some(r=>r.equipoId===eq.id && r.fecha===hoy));
+  const alertasBox = document.getElementById('checklist-alertas');
+  if(alertasBox){
+    if(!equipos.length){
+      alertasBox.innerHTML = `<div style="background:#f5f5f7;border-radius:10px;padding:16px;text-align:center;color:#86868b;font-size:13px;margin-bottom:12px">
+        Todavía no cargaste ningún equipo. Usá "+ Agregar equipo" para empezar.
+      </div>`;
+    } else if(sinHacerHoy.length){
+      alertasBox.innerHTML = `<div style="background:#fde8e8;border:1px solid #f5b5b5;border-radius:10px;padding:10px;margin-bottom:12px">
+        <div style="font-size:13px;font-weight:700;color:#d70015;margin-bottom:6px">🚨 ${sinHacerHoy.length} equipo${sinHacerHoy.length>1?'s':''} sin checklist hoy (${hoy})</div>
+        ${sinHacerHoy.map(eq=>`<div style="font-size:12px;color:#1d1d1f;padding:3px 0">${eq.tipo==='camion'?'🚚':'🏗️'} ${eq.nombre} ${eq.interno?'· '+eq.interno:''}</div>`).join('')}
+      </div>`;
+    } else {
+      alertasBox.innerHTML = `<div style="background:#e8f8ee;border:1px solid #b8e6c8;border-radius:10px;padding:10px;margin-bottom:12px;font-size:13px;font-weight:700;color:#1a7a3d">
+        ✅ Todos los equipos tienen el checklist de hoy hecho
+      </div>`;
+    }
+  }
+
+  // ── Lista de equipos agrupada por tipo ──
+  const listaBox = document.getElementById('checklist-lista');
+  if(!listaBox) return;
+  if(!equipos.length){ listaBox.innerHTML=''; return; }
+
+  function tarjetaEquipo(eq){
+    const regsEquipo = registros.filter(r=>r.equipoId===eq.id);
+    const ultimo = regsEquipo[0]; // ya vienen unshift (más reciente primero)
+    const hechoHoy = ultimo && ultimo.fecha===hoy;
+    const estadoBadge = !ultimo
+      ? `<span style="background:#f0f0f0;color:#86868b;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px">SIN REGISTROS</span>`
+      : hechoHoy
+        ? (ultimo.tieneFalla
+          ? `<span style="background:#fde8e8;color:#d70015;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px">⚠️ FALLA HOY</span>`
+          : `<span style="background:#e8f8ee;color:#1a7a3d;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px">✅ OK HOY</span>`)
+        : `<span style="background:#fff3cd;color:#856404;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px">PENDIENTE HOY</span>`;
+
+    const historial = regsEquipo.slice(0,10).map(r=>`
+      <div style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:11px">
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-weight:600;color:${r.tieneFalla?'#d70015':'#1d1d1f'}">${r.fecha} ${r.hora} · ${r.subtipo==='diario'?'Diario':'Evento'} ${r.tieneFalla?'⚠️':'✅'}</span>
+          <span style="color:#86868b">${r.responsable}</span>
+        </div>
+        ${r.detalle.filter(d=>d.estado==='falla').map(d=>`<div style="color:#d70015;margin-top:2px">⚠️ ${d.item}</div>`).join('')}
+        ${r.obs?`<div style="color:#86868b;margin-top:2px;font-style:italic">${r.obs}</div>`:''}
+      </div>`).join('') || '<div style="font-size:11px;color:#86868b;padding:6px 0">Sin registros todavía</div>';
+
+    return `<div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;color:#1d1d1f">${eq.tipo==='camion'?'🚚':'🏗️'} ${eq.nombre} ${eq.interno?'<span style="color:#86868b;font-weight:400">· '+eq.interno+'</span>':''}</div>
+          <div style="margin-top:4px">${estadoBadge}</div>
+        </div>
+        <button onclick="eliminarEquipoChecklist('${eq.id}')" style="background:none;border:none;color:#c0c0c5;font-size:14px;cursor:pointer;flex-shrink:0">✕</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px">
+        <button onclick="abrirFormChecklist('${eq.id}','diario')" style="flex:1;padding:8px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">📋 Checklist diario</button>
+        <button onclick="abrirFormChecklist('${eq.id}','evento')" style="flex:1;padding:8px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">⚡ Por evento</button>
+        <button onclick="toggleHistorialEquipo('${eq.id}')" style="padding:8px 10px;background:#f5f5f7;color:#86868b;border:none;border-radius:8px;font-size:11px;cursor:pointer">🕒</button>
+      </div>
+      <div id="cl-hist-${eq.id}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid #f0f0f0">${historial}</div>
+    </div>`;
+  }
+
+  const maquinas = equipos.filter(e=>e.tipo==='maquina');
+  const camiones = equipos.filter(e=>e.tipo==='camion');
+
+  let html = '';
+  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px">
+    <span style="font-size:12px;font-weight:700;color:#86868b;text-transform:uppercase">🏗️ Máquinas (${maquinas.length})</span>
+    <button onclick="editarItemsChecklist('maquina')" style="font-size:11px;color:#0071e3;background:none;border:none;cursor:pointer">✏️ Editar ítems</button>
+  </div>`;
+  html += maquinas.length ? maquinas.map(tarjetaEquipo).join('') : `<div style="font-size:12px;color:#86868b;padding:8px 0">Sin máquinas cargadas</div>`;
+
+  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 8px">
+    <span style="font-size:12px;font-weight:700;color:#86868b;text-transform:uppercase">🚚 Camiones (${camiones.length})</span>
+    <button onclick="editarItemsChecklist('camion')" style="font-size:11px;color:#0071e3;background:none;border:none;cursor:pointer">✏️ Editar ítems</button>
+  </div>`;
+  html += camiones.length ? camiones.map(tarjetaEquipo).join('') : `<div style="font-size:12px;color:#86868b;padding:8px 0">Sin camiones cargados</div>`;
+
+  listaBox.innerHTML = html;
+}
+
 
 
 // === BOTTOM NAV ===
