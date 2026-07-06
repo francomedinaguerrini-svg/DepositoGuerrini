@@ -1080,6 +1080,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     <!-- TAB: MOVIMIENTOS -->
     <div id="prod-tab-movs">
       <!-- Resumen del día -->
+      <div id="prod-cubhh"></div>
       <div class="prod-resumen" id="prod-resumen"></div>
       <div id="prod-resumen-perdido"></div>
       <div id="prod-resumen-tipos" style="margin-bottom:10px"></div>
@@ -7466,6 +7467,8 @@ function renderProdResumen(){
   // Tiempo REAL trabajado/perdido: se calcula por grupo, fusionando intervalos
   // solapados (misma lógica que los huecos de más abajo). Sumar durMin "a lo bruto"
   // duplica cuando dos grupos trabajan en paralelo — esto no.
+  // Además, cada grupo se pondera por su dotación (personas presentes ese día en
+  // ese grupo) para obtener Horas-Hombre reales, no solo minutos de reloj.
   const personalHoy = getGruposHoy();
   const gruposConGente = [...new Set(personalHoy.filter(p=>p.presente).map(p=>p.grupoHoy))];
   const esHoyResumen = !_prodFechaManual;
@@ -7474,32 +7477,54 @@ function renderProdResumen(){
     const ahora = new Date();
     finLimiteResumen = Math.min(JORNADA_FIN_MIN, ahora.getHours()*60+ahora.getMinutes());
   }
-  let totalTrabajado = 0, totalPerdido = 0;
+  let totalTrabajado = 0, totalPerdido = 0; // minutos, sin ponderar (solo referencia)
+  let totalHHTrabajado = 0, totalHHPerdido = 0; // horas-hombre, ponderadas por dotación
+  const detalleGrupos = [];
   if(finLimiteResumen > JORNADA_INICIO_MIN){
     gruposConGente.forEach(g=>{
       const huecos = calcularHuecosGrupo(movs, g, finLimiteResumen);
       const perdidoG = huecos.reduce((s,h)=>s+h.dur,0);
       const trabajadoG = Math.max(0, (finLimiteResumen - JORNADA_INICIO_MIN) - perdidoG);
+      const dotacionG = personalHoy.filter(p=>p.presente && p.grupoHoy===g).length || 1;
+      const hhTrabajadoG = (trabajadoG/60) * dotacionG;
+      const hhPerdidoG   = (perdidoG/60) * dotacionG;
       totalTrabajado += trabajadoG;
       totalPerdido += perdidoG;
+      totalHHTrabajado += hhTrabajadoG;
+      totalHHPerdido += hhPerdidoG;
+      detalleGrupos.push({g, dotacionG, trabajadoG, perdidoG, hhTrabajadoG, hhPerdidoG});
     });
   }
+  const cubPorHH = totalHHTrabajado>0 ? (totalUnid/totalHHTrabajado) : 0;
 
   const el = document.getElementById('prod-resumen');
   if(!el) return;
   el.innerHTML = `
     <div class="prod-res-card"><div class="prod-res-val" style="color:#0071e3">${totalUnid.toLocaleString('es-AR')}</div><div class="prod-res-lbl">Unidades hoy</div></div>
     <div class="prod-res-card"><div class="prod-res-val">${totalSemis}</div><div class="prod-res-lbl">Semis / Pedidos</div></div>
-    <div class="prod-res-card"><div class="prod-res-val" style="color:#34c759">${totalTrabajado>0?Math.round(totalTrabajado/60)+'h '+totalTrabajado%60+'m':'—'}</div><div class="prod-res-lbl">Trabajado real</div></div>
+    <div class="prod-res-card"><div class="prod-res-val" style="color:#34c759">${totalHHTrabajado>0?totalHHTrabajado.toFixed(1).replace('.',',')+' HH':'—'}</div><div class="prod-res-lbl">HH trabajadas</div></div>
   `;
+
+  // KPI principal: Cubiertas por Hora-Hombre
+  const elCub = document.getElementById('prod-cubhh');
+  if(elCub){
+    elCub.innerHTML = !gruposConGente.length ? '' : `
+      <div style="background:linear-gradient(135deg,#0071e3,#af52de);border-radius:12px;padding:14px;margin-bottom:8px;color:#fff;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.5px">🎯 Cubiertas por Hora-Hombre</div>
+          <div style="font-size:10px;opacity:.7;margin-top:2px">${totalUnid.toLocaleString('es-AR')} unid ÷ ${totalHHTrabajado.toFixed(1).replace('.',',')} HH</div>
+        </div>
+        <div style="font-size:26px;font-weight:700">${cubPorHH>0?Math.round(cubPorHH).toLocaleString('es-AR'):'—'}</div>
+      </div>`;
+  }
 
   // Línea de perdido real, al lado del desglose por tipo
   const elTiempo = document.getElementById('prod-resumen-perdido');
   if(elTiempo){
     elTiempo.innerHTML = !gruposConGente.length ? '' : `
       <div style="display:flex;justify-content:space-between;padding:6px 10px;background:#fff;border:1px solid #e5e5ea;border-radius:8px;margin-bottom:6px">
-        <span style="font-size:11px;color:#86868b">⏱️ Suma de grupos presentes (${gruposConGente.join(', ')}), ${_minAHhmm(JORNADA_INICIO_MIN)}–${_minAHhmm(finLimiteResumen)}</span>
-        <span style="font-size:11px;font-weight:700;color:#d70015">🔴 Perdido: ${totalPerdido>0?Math.round(totalPerdido/60)+'h '+totalPerdido%60+'m':'0m'}</span>
+        <span style="font-size:11px;color:#86868b">⏱️ Grupos presentes (${gruposConGente.join(', ')}), ${_minAHhmm(JORNADA_INICIO_MIN)}–${_minAHhmm(finLimiteResumen)}</span>
+        <span style="font-size:11px;font-weight:700;color:#d70015">🔴 Perdido: ${totalHHPerdido>0?totalHHPerdido.toFixed(1).replace('.',',')+' HH':'0 HH'}</span>
       </div>`;
   }
 
@@ -9556,6 +9581,31 @@ function renderResumenProd(){
   });
   const unidPorCabezaMes = personaDiasMes>0 ? Math.round(totalUnid/personaDiasMes) : 0;
 
+  // ── Unidades por operario (mes) ──
+  // Para cada persona, cada día que estuvo presente se le atribuye
+  // unidGrupoEseDia / personasPresentesEnEseGrupoEseDia — y se acumula en el mes.
+  const rankPersonaMes = [];
+  getPersonalBase().forEach(pb=>{
+    let totalEst = 0, diasContados = 0;
+    histGruposMes.forEach(h=>{
+      const per = h.data.find(p=>p.nombre===pb.nombre);
+      if(!per || !per.presente) return;
+      const g = per.grupoHoy || per.grupo;
+      const movsDia = hist.filter(m=>m.fecha===h.fecha && m.grupo===g);
+      const uG = movsDia.reduce((s,m)=>s+(m.unidades||0),0);
+      const presG = h.data.filter(p=>p.presente && (p.grupoHoy||p.grupo)===g).length;
+      if(uG>0 && presG>0){ totalEst += uG/presG; diasContados++; }
+    });
+    if(diasContados>0) rankPersonaMes.push({
+      nombre: pb.nombre, grupo: pb.grupo,
+      total: Math.round(totalEst),
+      promDia: Math.round(totalEst/diasContados),
+      dias: diasContados
+    });
+  });
+  rankPersonaMes.sort((a,b)=>b.total-a.total);
+  const maxTotalPersona = rankPersonaMes.length ? (rankPersonaMes[0].total||1) : 1;
+
   const muertoPorGrupo = {};
   grupos.forEach(g=>{
     const diasG = diasPorGrupo[g];
@@ -9604,6 +9654,27 @@ function renderResumenProd(){
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 12px;background:#fff;border-radius:8px;border:1px solid #e5e5ea;margin-bottom:4px">
         <span style="font-size:12px;font-weight:600;color:${GRUPOS_COLORES[g]||'#86868b'}">${GRUPOS_NOMBRES[g]||g}</span>
         <span style="font-size:11px;color:#86868b"><b style="color:${color}">${m}min</b> muertos/día prom. · ${diasPorGrupo[g]} días</span>
+      </div>`;
+    }).join('')}
+
+    <div style="font-size:11px;font-weight:600;color:#86868b;margin:14px 0 6px;text-transform:uppercase">👤 Unidades por operario (mes)</div>
+    <div style="font-size:10px;color:#86868b;margin-bottom:8px">Estimado: unidades de su grupo ese día ÷ personas presentes ese día, acumulado en el mes</div>
+    ${!rankPersonaMes.length ? '<div class="empty">Sin datos suficientes aún</div>' : rankPersonaMes.map((p,ri)=>{
+      const color = GRUPOS_COLORES[p.grupo]||'#86868b';
+      const pct = Math.round((p.total/maxTotalPersona)*100);
+      const medal = ri===0?'🥇':ri===1?'🥈':ri===2?'🥉':(ri+1);
+      return `<div style="background:#fff;border-radius:8px;border:1px solid #e5e5ea;padding:8px 12px;margin-bottom:5px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="display:flex;align-items:center;gap:6px;min-width:0">
+            <span style="font-size:11px;color:#86868b;width:16px;flex-shrink:0">${medal}</span>
+            <span style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nombre.split(' ').slice(0,2).join(' ')}</span>
+            <span style="font-size:9px;font-weight:700;color:${color};background:${color}18;padding:1px 5px;border-radius:6px;flex-shrink:0">${p.grupo}</span>
+          </div>
+          <span style="font-size:11px;color:#86868b;flex-shrink:0"><b style="color:${color};font-size:13px">${p.total.toLocaleString('es-AR')}</b> un. · ${p.promDia}/día · ${p.dias}d</span>
+        </div>
+        <div style="background:#f5f5f7;border-radius:4px;height:6px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${color};border-radius:4px"></div>
+        </div>
       </div>`;
     }).join('')}
   `;
