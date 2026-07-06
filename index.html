@@ -1045,11 +1045,13 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
       <button class="grupos-tab active" onclick="setGruposTab('hoy',this)">📅 Hoy</button>
       <button class="grupos-tab" onclick="setGruposTab('hist',this)">📋 Historial</button>
       <button class="grupos-tab" onclick="setGruposTab('kpi',this)">📊 KPIs</button>
+      <button class="grupos-tab" onclick="setGruposTab('viajes',this)">🚚 Viajes</button>
       <button class="grupos-tab" onclick="setGruposTab('abm',this)">👤 Personal</button>
     </div>
     <div id="grupos-hoy-panel"></div>
     <div id="grupos-hist-panel" style="display:none"></div>
     <div id="grupos-kpi-panel" style="display:none"></div>
+    <div id="grupos-viajes-panel" style="display:none"></div>
     <div id="grupos-abm-panel" style="display:none"></div>
   </div>
 </div>
@@ -6381,11 +6383,13 @@ function setGruposTab(tab, btn){
   document.getElementById('grupos-hoy-panel').style.display   = tab==='hoy'  ?'block':'none';
   document.getElementById('grupos-hist-panel').style.display  = tab==='hist' ?'block':'none';
   document.getElementById('grupos-kpi-panel').style.display   = tab==='kpi'  ?'block':'none';
+  document.getElementById('grupos-viajes-panel').style.display= tab==='viajes'?'block':'none';
   document.getElementById('grupos-abm-panel').style.display   = tab==='abm'  ?'block':'none';
-  if(tab==='hoy')  renderGruposHoy();
-  if(tab==='hist') renderGruposHist();
-  if(tab==='kpi')  renderGruposKPI();
-  if(tab==='abm')  renderGruposABM();
+  if(tab==='hoy')    renderGruposHoy();
+  if(tab==='hist')   renderGruposHist();
+  if(tab==='kpi')    renderGruposKPI();
+  if(tab==='viajes') renderGruposViajes();
+  if(tab==='abm')    renderGruposABM();
 }
 
 function renderGruposKPI(){
@@ -6928,6 +6932,172 @@ function exportarInformeMensual(){
 
   XLSX.writeFile(wb, 'Informe_RRHH_'+mes.replace(' ','_')+'.xlsx');
   showToast('✅ Informe mensual exportado');
+}
+
+// ── Viajes de Chasis (kms / combustible / fondo fijo) ────────
+function getViajesChasis(){
+  try{ var s = localStorage.getItem('viajes_chasis'); return s?JSON.parse(s):[]; }catch(e){ return []; }
+}
+function saveViajesChasis(arr){
+  localStorage.setItem('viajes_chasis', JSON.stringify(arr));
+}
+function _viajesIsoHoy(){
+  var d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function _viajesMesDe(fechaStr){
+  var p = (fechaStr||'').split('/'); // DD/MM/YYYY
+  return p.length===3 ? (p[2]+'-'+p[1]) : '';
+}
+function cambiarMesViajes(val){
+  window._viajesMesSel = val;
+  renderGruposViajes();
+}
+
+function renderGruposViajes(){
+  var panel = document.getElementById('grupos-viajes-panel');
+  if(!panel) return;
+
+  if(!window._viajesMesSel){
+    var d = new Date();
+    window._viajesMesSel = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  }
+
+  var viajes = getViajesChasis();
+  var delMes = viajes.filter(function(v){ return _viajesMesDe(v.fecha)===window._viajesMesSel; });
+
+  var totalKm    = delMes.reduce(function(s,v){ return s+(+v.km||0); },0);
+  var totalComb  = delMes.reduce(function(s,v){ return s+(+v.gastoCombustible||0); },0);
+  var totalFondo = delMes.reduce(function(s,v){ return s+(+v.gastoFondoFijo||0); },0);
+
+  var choferOpts = getPersonalBase().filter(function(p){ return p.grupo==='R'; })
+    .map(function(p){ return '<option value="'+p.nombre+'">'+p.nombre+'</option>'; }).join('')
+    + '<option value="Otro">Otro</option>';
+
+  var html = '';
+
+  html += '<div class="prod-form">'+
+    '<div class="prod-form-title">🚚 Nuevo viaje de chasis</div>'+
+    '<div class="prod-input-row">'+
+      '<div><div class="prod-label">Fecha</div><input type="date" id="via-fecha" class="prod-input" value="'+_viajesIsoHoy()+'"></div>'+
+      '<div><div class="prod-label">Chofer</div><select id="via-chofer" class="prod-input">'+choferOpts+'</select></div>'+
+    '</div>'+
+    '<div class="prod-input-row">'+
+      '<div><div class="prod-label">Destino / Motivo</div><input type="text" id="via-destino" class="prod-input" placeholder="Ej: Retiro chasis San Rafael"></div>'+
+      '<div><div class="prod-label">Kms recorridos</div><input type="number" id="via-km" class="prod-input" placeholder="0" min="0"></div>'+
+    '</div>'+
+    '<div class="prod-input-row">'+
+      '<div><div class="prod-label">Gasto combustible ($)</div><input type="number" id="via-comb" class="prod-input" placeholder="0" min="0"></div>'+
+      '<div><div class="prod-label">Gasto fondo fijo ($)</div><input type="number" id="via-fondo" class="prod-input" placeholder="0" min="0"></div>'+
+    '</div>'+
+    '<div class="prod-input-row full"><div><div class="prod-label">Observaciones</div><input type="text" id="via-obs" class="prod-input" placeholder="opcional"></div></div>'+
+    '<button class="prod-save-btn" onclick="agregarViaje()">💾 Guardar viaje</button>'+
+  '</div>';
+
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">'+
+    '<input type="month" value="'+window._viajesMesSel+'" onchange="cambiarMesViajes(this.value)" style="padding:6px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px">'+
+    '<button onclick="exportarViajesExcel()" style="padding:8px 12px;background:#1d1d1f;color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer">📄 Exportar</button>'+
+  '</div>';
+
+  html += '<div class="prod-resumen">'+
+    '<div class="prod-res-card"><div class="prod-res-val" style="color:#af52de">'+totalKm.toLocaleString('es-AR')+'</div><div class="prod-res-lbl">KM DEL MES</div></div>'+
+    '<div class="prod-res-card"><div class="prod-res-val" style="color:#ff9500">$'+totalComb.toLocaleString('es-AR')+'</div><div class="prod-res-lbl">COMBUSTIBLE</div></div>'+
+    '<div class="prod-res-card"><div class="prod-res-val" style="color:#0071e3">$'+totalFondo.toLocaleString('es-AR')+'</div><div class="prod-res-lbl">FONDO FIJO</div></div>'+
+  '</div>';
+
+  if(!delMes.length){
+    html += '<div class="empty">Sin viajes registrados este mes</div>';
+  } else {
+    var ordenados = delMes.slice().sort(function(a,b){
+      return new Date(b.fecha.split('/').reverse().join('-')) - new Date(a.fecha.split('/').reverse().join('-'));
+    });
+    ordenados.forEach(function(v){
+      html += '<div class="mov-card" style="align-items:flex-start;flex-wrap:wrap">'+
+        '<div class="mov-info">'+
+          '<div class="mov-title">'+v.fecha+' — '+(v.chofer||'—')+'</div>'+
+          '<div class="mov-sub">'+(v.destino||'Sin destino')+(v.obs?' · '+v.obs:'')+'</div>'+
+        '</div>'+
+        '<div class="mov-stats">'+
+          '<div class="mov-unid">'+(v.km||0)+' km</div>'+
+          '<div class="mov-time">⛽ $'+(+v.gastoCombustible||0).toLocaleString('es-AR')+' · 💰 $'+(+v.gastoFondoFijo||0).toLocaleString('es-AR')+'</div>'+
+        '</div>'+
+        '<button onclick="eliminarViaje('+v.id+')" style="width:100%;margin-top:6px;padding:6px;background:#fff5f5;color:#d70015;border:1px solid #ffd6d9;border-radius:8px;font-size:11px;cursor:pointer">🗑️ Eliminar</button>'+
+      '</div>';
+    });
+  }
+
+  panel.innerHTML = html;
+}
+
+function agregarViaje(){
+  var fechaInput = document.getElementById('via-fecha').value; // YYYY-MM-DD
+  if(!fechaInput){ showToast('⚠️ Falta la fecha'); return; }
+  var partes = fechaInput.split('-');
+  var fecha = partes[2]+'/'+partes[1]+'/'+partes[0];
+  var chofer   = document.getElementById('via-chofer').value;
+  var destino  = document.getElementById('via-destino').value.trim();
+  var km       = +document.getElementById('via-km').value || 0;
+  var comb     = +document.getElementById('via-comb').value || 0;
+  var fondo    = +document.getElementById('via-fondo').value || 0;
+  var obs      = document.getElementById('via-obs').value.trim();
+
+  if(!km && !comb && !fondo){ showToast('⚠️ Ingresá al menos kms o un gasto'); return; }
+
+  var viajes = getViajesChasis();
+  viajes.push({
+    id: Date.now(),
+    fecha: fecha,
+    chofer: chofer,
+    destino: destino,
+    km: km,
+    gastoCombustible: comb,
+    gastoFondoFijo: fondo,
+    obs: obs
+  });
+  saveViajesChasis(viajes);
+
+  document.getElementById('via-destino').value='';
+  document.getElementById('via-km').value='';
+  document.getElementById('via-comb').value='';
+  document.getElementById('via-fondo').value='';
+  document.getElementById('via-obs').value='';
+
+  showToast('✅ Viaje registrado');
+  renderGruposViajes();
+}
+
+function eliminarViaje(id){
+  if(!confirm('¿Eliminar este viaje?')) return;
+  var viajes = getViajesChasis().filter(function(v){ return v.id!==id; });
+  saveViajesChasis(viajes);
+  showToast('🗑️ Viaje eliminado');
+  renderGruposViajes();
+}
+
+function exportarViajesExcel(){
+  var viajes = getViajesChasis();
+  if(!viajes.length){ showToast('Sin viajes para exportar'); return; }
+  var wb = XLSX.utils.book_new();
+  var ws = [
+    ['VIAJES DE CHASIS'],
+    [],
+    ['FECHA','CHOFER','DESTINO/MOTIVO','KMS','GASTO COMBUSTIBLE','GASTO FONDO FIJO','OBSERVACIONES']
+  ];
+  var ordenados = viajes.slice().sort(function(a,b){
+    return new Date(a.fecha.split('/').reverse().join('-')) - new Date(b.fecha.split('/').reverse().join('-'));
+  });
+  var totKm=0, totComb=0, totFondo=0;
+  ordenados.forEach(function(v){
+    ws.push([v.fecha, v.chofer||'', v.destino||'', v.km||0, v.gastoCombustible||0, v.gastoFondoFijo||0, v.obs||'']);
+    totKm += (+v.km||0); totComb += (+v.gastoCombustible||0); totFondo += (+v.gastoFondoFijo||0);
+  });
+  ws.push([]);
+  ws.push(['TOTALES','','',totKm,totComb,totFondo,'']);
+  var wsSheet = XLSX.utils.aoa_to_sheet(ws);
+  wsSheet['!cols'] = [{wch:12},{wch:22},{wch:30},{wch:8},{wch:16},{wch:14},{wch:35}];
+  XLSX.utils.book_append_sheet(wb, wsSheet, 'Viajes Chasis');
+  XLSX.writeFile(wb, 'Viajes_Chasis_'+_fechaKeyDDMMYYYY()+'.xlsx');
+  showToast('✅ Exportado');
 }
 
 
