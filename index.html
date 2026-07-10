@@ -541,6 +541,21 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 .inv-tipo-chip[data-tipo="Cruce"].active{background:#fff3cd;color:#a8710a;border-color:#a8710a}
 .inv-tipo-chip[data-tipo="Sobrante"].active{background:#e8f8ee;color:#248a3d;border-color:#248a3d}
 .inv-tipo-chip[data-tipo="Faltante"].active{background:#fdeaea;color:#d70015;border-color:#d70015}
+.punt-zona-header{font-size:13px;font-weight:700;color:#1d1d1f;margin:14px 0 8px}
+.punt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:6px}
+.punt-card{background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:8px;cursor:pointer;min-height:74px;transition:transform .1s}
+.punt-card:active{transform:scale(.97)}
+.punt-card.vacia{background:#f5f5f7}
+.punt-card.activa{border:2px solid #0071e3}
+.punt-card .punt-id{font-size:11px;font-weight:700;color:#86868b}
+.punt-card .punt-cant{font-size:11px;color:#1d1d1f;margin-top:4px}
+.punt-card .punt-bar{height:4px;background:#e5e5ea;border-radius:2px;margin-top:6px;overflow:hidden}
+.punt-card .punt-bar-fill{height:100%;background:#0071e3}
+.punt-detalle{background:#fff;border-radius:12px;border:2px solid #0071e3;padding:12px;margin:8px 0 14px}
+.punt-item-row{display:flex;align-items:center;gap:8px;background:#f5f5f7;border-radius:8px;padding:8px;margin-bottom:6px}
+.punt-add-form{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;border-top:1px solid #e5e5ea;padding-top:8px}
+.punt-add-form input[type="text"]{flex:1;min-width:120px;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px}
+.punt-add-form input[type="number"]{width:64px;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px}
 .btn-danger{flex:1;padding:12px;background:#ffd6d9;color:#d70015;border:none;border-radius:10px;font-size:15px;font-weight:500;cursor:pointer}
 .btn-secondary{width:100%;padding:12px;background:#f5f5f7;border:none;border-radius:10px;font-size:15px;font-weight:500;cursor:pointer;margin-top:8px}
 .search-result-item{padding:10px;border-radius:8px;border:1px solid #e5e5ea;margin-bottom:6px;cursor:pointer;background:#fff}
@@ -595,6 +610,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     <div class="tab-row2-item" id="row2tab-grupos" onclick="switchTab('grupos',this)">👥 Grupos</div>
     <div class="tab-row2-item" id="row2tab-dot" onclick="switchTab('dot',this)">📅 DOTs</div>
     <div class="tab-row2-item" id="row2tab-pensa" onclick="switchTab('pensa',this)">🧠 Pensamiento</div>
+    <div class="tab-row2-item" id="row2tab-punteras" onclick="switchTab('punteras',this)">🔚 Punteras</div>
   </div>
 </div>
 
@@ -1659,6 +1675,7 @@ function switchTab(name,btn){
   if(name==='pedidos') initPedidos();
   if(name==='cydesc') initCyDesc();
   if(name==='pensa') renderPensamiento();
+  if(name==='punteras') renderPunteras();
 }
 
 // --- UPDATE ---
@@ -2204,10 +2221,48 @@ function renderMapa(){
       html+='</div></div>';
     });
     html+='</div></div>';
+
+    // Insertar bloques de Punteras junto al pasillo correspondiente
+    if(f.id==='4S') html += renderBloquePuntera('4');
+    if(f.id==='5S') html += renderBloquePuntera('5');
+    if(f.id==='7S'){ html += renderBloquePuntera('7'); html += renderBloquePuntera('8'); }
   });
   container.innerHTML=html;
   renderAlertas();
   renderCobertura();
+}
+
+function renderBloquePuntera(zona){
+  const punteras = (typeof getPunteras==='function') ? getPunteras() : {};
+  let conAlgo = 0;
+  let html = `<div class="frente-block" id="fb-punt-${zona}" style="border-color:#0071e3">
+    <div class="frente-header" onclick="toggleFrente('punt-${zona}')" style="background:#f0f6ff">
+      <span class="frente-name" style="color:#0071e3">🔚 Puntera ${zona}</span>
+      <span class="frente-stats" id="punt-mapa-stats-${zona}"></span>
+      <span class="frente-arrow">▼</span>
+    </div>
+    <div class="frente-grid"><div class="punt-grid" style="margin:0">`;
+  for(let i=1;i<=PARRILLAS_X_ZONA;i++){
+    const id = 'P'+zona+'-'+i;
+    const items = punteras[id] || [];
+    if(items.length) conAlgo++;
+    const usado = capacidadUsada(items);
+    const pct = Math.min(100, Math.round((usado/CAP_PARRILLA_UNIDADES)*100));
+    html += `<div class="punt-card ${items.length?'':'vacia'}" onclick="irAParrillaDesdeMapa('${id}')">
+      <div class="punt-id">${id}</div>
+      <div class="punt-cant">${items.length} art. · ${usado}/${CAP_PARRILLA_UNIDADES} un.</div>
+      <div class="punt-bar"><div class="punt-bar-fill" style="width:${pct}%"></div></div>
+    </div>`;
+  }
+  html += '</div></div></div>';
+  html = html.replace(`id="punt-mapa-stats-${zona}"></span>`, `id="punt-mapa-stats-${zona}">${conAlgo}/${PARRILLAS_X_ZONA} parrillas</span>`);
+  return html;
+}
+
+function irAParrillaDesdeMapa(id){
+  switchTab('punteras', document.getElementById('row2tab-punteras'));
+  _punteraActiva = id;
+  renderPunteras();
 }
 
 function renderCobertura(){
@@ -3423,6 +3478,95 @@ function renderCandidatosEnNave(){
 
   // Reemplazar o agregar el panel
   const prev = document.getElementById('panel-nave-candidatos');
+  if(prev) prev.outerHTML = html;
+  else box.innerHTML += html;
+
+  renderCandidatosPunteras();
+}
+
+// ───────────────────────────────────────────────────────────────
+// Candidatos a puntera: stock > 0 pero MENOS de 1 pallet.
+// Hoy el motor los excluye del rack (pall<1). Se van a ubicar
+// a mano en las punteras de los racks — este panel es el listado
+// para saber cuáles son y priorizarlos por rotación.
+// ───────────────────────────────────────────────────────────────
+function togglePanelPunteras(){
+  var body  = document.getElementById('panel-punteras-body');
+  var arrow = document.getElementById('panel-punteras-arrow');
+  if(!body) return;
+  var open = body.style.display !== 'none';
+  body.style.display  = open ? 'none' : 'block';
+  if(arrow) arrow.textContent = open ? '▼' : '▲';
+}
+
+function renderCandidatosPunteras(){
+  const box = document.getElementById('alertas-box');
+  if(!box) return;
+
+  const EXCLUIR_PROV = ['SPEEDWAY'];
+  const EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
+  const BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
+
+  const enRack = new Set(Object.values(ASIGN).filter(v=>v&&v.art).map(v=>String(v.art)));
+  const punterasActuales = getPunteras();
+  const enPunteraSet = articulosAsignadosSet(punterasActuales, null);
+
+  const candidatosPuntera = DATA.filter(function(r){
+    if(enRack.has(String(r.art))) return false;
+    if(enPunteraSet.has(String(r.art))) return false;
+    if(/\d+\.5/.test(r.med||'')) return false;
+    if(EXCLUIR_PROV.indexOf(r.prov)>=0) return false;
+    if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false;
+    if((r.stock||0) <= 0) return false;
+    if((r.pall||0) <= 0) return false;
+    if((r.pall||0) >= 1) return false; // esto es lo nuevo: < 1 pallet, no ≥1
+    if(r.bloque){
+      const bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
+      if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return false;
+    }
+    return true;
+  });
+
+  if(!candidatosPuntera.length){
+    const prev = document.getElementById('panel-punteras-candidatos');
+    if(prev) prev.remove();
+    return;
+  }
+
+  // Prioridad: mayor rotación primero (son los que más urge sacar de la nave)
+  candidatosPuntera.sort(function(a,b){ return (b.rot_sem||0)-(a.rot_sem||0); });
+
+  var panelId = 'panel-punteras-candidatos';
+  var bodyId  = 'panel-punteras-body';
+  var isOpen  = false;
+  var prev2 = document.getElementById(panelId);
+  if(prev2){ var prevBody = document.getElementById(bodyId); isOpen = prevBody && prevBody.style.display !== 'none'; }
+
+  let html = '<div id="'+panelId+'" style="background:#fff;border:1px solid #0071e3;border-radius:10px;margin-top:10px;overflow:hidden">';
+  html += '<div onclick="togglePanelPunteras()" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;cursor:pointer;user-select:none;background:#f0f6ff">';
+  html += '<span style="font-size:12px;font-weight:700;color:#0071e3">🔚 '+candidatosPuntera.length+' artículos — sugerencia puntera (stock &lt; 1 pallet)</span>';
+  html += '<span id="panel-punteras-arrow" style="font-size:14px;color:#86868b;transition:transform 0.2s">'+(isOpen?'▲':'▼')+'</span>';
+  html += '</div>';
+
+  html += '<div id="'+bodyId+'" style="display:'+(isOpen?'block':'none')+';padding:0 14px 12px">';
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">';
+  html += '<tr style="background:#f5f5f7"><th style="padding:4px 6px;text-align:left">Art</th><th style="padding:4px 6px;text-align:left">Medida</th><th style="padding:4px 6px;text-align:left">Diseño</th><th style="padding:4px 6px;text-align:right">Rot/sem</th><th style="padding:4px 6px;text-align:right">Stock</th><th style="padding:4px 6px;text-align:right">Pallets</th><th style="padding:4px 6px;text-align:left">Bloque</th></tr>';
+  candidatosPuntera.forEach(function(r){
+    html += '<tr style="border-bottom:1px solid #f0f0f0">';
+    html += '<td style="padding:4px 6px;font-weight:600">'+r.art+'</td>';
+    html += '<td style="padding:4px 6px">'+r.med+'</td>';
+    html += '<td style="padding:4px 6px;color:#555">'+r.diseno+'</td>';
+    html += '<td style="padding:4px 6px;text-align:right;color:#0071e3;font-weight:700">'+(r.rot_sem||0).toFixed(2)+'</td>';
+    html += '<td style="padding:4px 6px;text-align:right">'+(r.stock||0)+'</td>';
+    html += '<td style="padding:4px 6px;text-align:right">'+(r.pall||0).toFixed(2)+'</td>';
+    html += '<td style="padding:4px 6px;color:#86868b">'+(r.bloque||'—')+'</td>';
+    html += '</tr>';
+  });
+  html += '</table></div>';
+  html += '<div style="font-size:10px;color:#86868b;margin-top:4px;border-top:1px solid #f0f0f0;padding-top:5px">Criterio: stock &gt; 0 y &lt; 1 pallet · excluye .5, Speedway, agrícola, bloques 1-2 · ordenado por mayor rotación primero</div>';
+  html += '</div></div>';
+
+  const prev = document.getElementById(panelId);
   if(prev) prev.outerHTML = html;
   else box.innerHTML += html;
 }
@@ -5122,6 +5266,11 @@ function imprimirMapa(){
   const resFull = window._motorResumen || {};
   const sinLugarFullSet = new Set((resFull.sinUbicacionArts||[]).map(a=>String(a.art)));
   const BLOQUES_RACK_FULL = ['2N/3N','2S/2N','1N','1S'];
+  const punterasFull = getPunteras();
+  const parrillaPorArt = {};
+  Object.entries(punterasFull).forEach(function(e){
+    (e[1]||[]).forEach(function(it){ parrillaPorArt[String(it.art)] = e[0]; });
+  });
 
   function motivoNoRackCompleto(r){
     if((r.stock||0) <= 0) return 'Sin stock';
@@ -5133,8 +5282,9 @@ function imprimirMapa(){
       const bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
       if(bs.some(b=>BLOQUES_RACK_FULL.indexOf(b.trim())>=0)) return 'Ya está en zona física de rack (bloque 1-2)';
     }
+    if(parrillaPorArt[String(r.art)]) return 'Asignado a puntera '+parrillaPorArt[String(r.art)];
     if((r.pall||0) > 6) return 'Supera 6 pallets (máx. que admite el motor)';
-    if((r.pall||0) < 1) return 'Menos de 1 pallet — no amerita rack';
+    if((r.pall||0) < 1) return 'Sugerencia puntera — stock < 1 pallet (asignación manual)';
     if((r.rot_sem||0) >= 5.5) return 'Rotación semanal alta — no es candidato a rack';
     if(sinLugarFullSet.has(String(r.art))) return 'Candidato válido — rack sin lugar (límite 80%)';
     return 'Candidato válido — falta correr "Reevaluar"';
@@ -5149,8 +5299,8 @@ function imprimirMapa(){
       const enRack = enRackFull.has(String(r.art));
       return [
         r.art, r.med, r.diseno, r.prov, r.stock||0, r.pall||0, (r.rot_sem||0).toFixed(2),
-        enRack?'SÍ':'NO',
-        enRack?(posPorArt[String(r.art)]||''):'',
+        enRack?'SÍ':(parrillaPorArt[String(r.art)]?'PUNTERA':'NO'),
+        enRack?(posPorArt[String(r.art)]||''):(parrillaPorArt[String(r.art)]||''),
         r.bloque||'',
         enRack?'':motivoNoRackCompleto(r)
       ];
@@ -5159,6 +5309,42 @@ function imprimirMapa(){
   const wsS = XLSX.utils.aoa_to_sheet(wsStock);
   wsS['!cols'] = [{wch:8},{wch:14},{wch:12},{wch:12},{wch:9},{wch:8},{wch:8},{wch:8},{wch:14},{wch:12},{wch:38}];
   XLSX.utils.book_append_sheet(wb, wsS, 'Stock Total');
+
+  // Hoja: candidatos a puntera (stock > 0 pero < 1 pallet)
+  const EXCLUIR_PROV3 = ['SPEEDWAY'];
+  const EXCLUIR_USO3  = ['TT','TL','TLSB','TT ','TL '];
+  const BLOQUES_RACK3 = ['2N/3N','2S/2N','1N','1S'];
+  const candidatosPunteraExp = DATA.filter(r=>{
+    if(enRackFull.has(String(r.art))) return false;
+    if(/\d+\.5/.test(r.med||'')) return false;
+    if(EXCLUIR_PROV3.indexOf(r.prov)>=0) return false;
+    if(EXCLUIR_USO3.indexOf((r.uso||'').trim())>=0) return false;
+    if((r.stock||0)<=0) return false;
+    if((r.pall||0)<=0) return false;
+    if((r.pall||0)>=1) return false;
+    if(r.bloque){
+      const bs=r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
+      if(bs.some(b=>BLOQUES_RACK3.indexOf(b.trim())>=0)) return false;
+    }
+    return true;
+  }).sort((a,b)=>(b.rot_sem||0)-(a.rot_sem||0));
+
+  if(candidatosPunteraExp.length){
+    const wsPunt = [
+      ['SUGERENCIA PUNTERA — STOCK MAYOR A 0 Y MENOR A 1 PALLET (asignación manual) — '+new Date().toLocaleDateString('es-AR')],
+      ['Total: '+candidatosPunteraExp.length+' artículos · Ordenado por mayor rotación primero'],
+      [],
+      ['ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','ROT/SEM','ROT/MES','STOCK','PALLETS','BLOQUE','CONDICIÓN'],
+      ...candidatosPunteraExp.map(r=>[
+        r.art, r.med, r.diseno, r.prov,
+        (r.rot_sem||0).toFixed(2), (r.rot||0).toFixed(1),
+        r.stock||0, (r.pall||0).toFixed(2), r.bloque||'', r.cond||''
+      ])
+    ];
+    const wsP = XLSX.utils.aoa_to_sheet(wsPunt);
+    wsP['!cols'] = [{wch:8},{wch:14},{wch:12},{wch:12},{wch:9},{wch:9},{wch:8},{wch:8},{wch:12},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, wsP, 'Punteras');
+  }
 
   // Hoja de alertas
   const alertas = getAlertasReposicion();
@@ -9089,7 +9275,20 @@ if('serviceWorker' in navigator){
   <div id="pensa-lista"></div>
 </div>
 
+<!-- PUNTERAS -->
+<div class="view" id="view-punteras">
+  <div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:14px;margin-bottom:12px">
+    <div style="font-size:14px;font-weight:700;margin-bottom:4px">🔚 Punteras — stock &lt; 1 pallet</div>
+    <div style="font-size:12px;color:#86868b;margin-bottom:10px">4 punteras (pasillos 4, 5, 7 y 8) · 7 parrillas c/u · 28 parrillas en total · cada parrilla admite varios artículos mezclados, hasta <span id="punt-cap-label">6</span> unidades · asignación 100% manual, vos elegís la posición de cada artículo</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button onclick="limpiarPunteras()" style="padding:10px 16px;background:#ffd6d9;color:#d70015;border:none;border-radius:10px;font-size:14px;cursor:pointer">🗑️ Vaciar todo</button>
+    </div>
+  </div>
+  <div id="punteras-grid"></div>
+</div>
+
 <script>
+
 
 // ═══════════════════════════════════════════════════════════
 // MÓDULO CARGAS / DESCARGAS
@@ -10606,7 +10805,179 @@ function renderPensamiento(){
   });
   cont.innerHTML = html;
 }
+
+// ═══════════════════════════════════════════════════════════
+// MÓDULO PUNTERAS — 4 zonas (pasillos 4,5,7,8) x 7 parrillas c/u
+// Cada parrilla admite varios artículos mezclados hasta CAP_PARRILLA_UNIDADES.
+// ═══════════════════════════════════════════════════════════
+var PUNTERA_ZONAS = ['4','5','7','8'];
+var PARRILLAS_X_ZONA = 7;
+var CAP_PARRILLA_UNIDADES = 6; // ← ajustar acá si la capacidad real de cada parrilla es otra
+var _punteraActiva = null;
+
+function getParrillaIds(){
+  var ids = [];
+  PUNTERA_ZONAS.forEach(function(z){
+    for(var i=1;i<=PARRILLAS_X_ZONA;i++) ids.push('P'+z+'-'+i);
+  });
+  return ids;
+}
+
+function getPunteras(){ return JSON.parse(localStorage.getItem('wms_punteras')||'{}'); }
+function savePunteras(obj){ localStorage.setItem('wms_punteras', JSON.stringify(obj)); }
+
+function capacidadUsada(items){
+  return (items||[]).reduce(function(s,it){return s+(it.unidades||0);},0);
+}
+
+function articulosAsignadosSet(punteras, excluirParrilla){
+  var set = new Set();
+  Object.entries(punteras).forEach(function(e){
+    if(e[0]===excluirParrilla) return;
+    (e[1]||[]).forEach(function(it){ set.add(String(it.art)); });
+  });
+  return set;
+}
+
+function candidatosParaPuntera(){
+  const EXCLUIR_PROV = ['SPEEDWAY'];
+  const EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
+  const BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
+  const enRack = new Set(Object.values(ASIGN).filter(v=>v&&v.art).map(v=>String(v.art)));
+  return DATA.filter(function(r){
+    if(enRack.has(String(r.art))) return false;
+    if(/\d+\.5/.test(r.med||'')) return false;
+    if(EXCLUIR_PROV.indexOf(r.prov)>=0) return false;
+    if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false;
+    if((r.stock||0) <= 0) return false;
+    if((r.pall||0) <= 0) return false;
+    if((r.pall||0) >= 1) return false;
+    if(r.bloque){
+      const bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
+      if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return false;
+    }
+    return true;
+  }).sort(function(a,b){ return (b.rot_sem||0)-(a.rot_sem||0); });
+}
+
+function renderPunteras(){
+  document.getElementById('punt-cap-label').textContent = CAP_PARRILLA_UNIDADES;
+  const punteras = getPunteras();
+  const grid = document.getElementById('punteras-grid');
+  let html = '';
+
+  PUNTERA_ZONAS.forEach(function(zona){
+    html += '<div class="punt-zona-header">🔚 Puntera pasillo '+zona+'</div>';
+    html += '<div class="punt-grid">';
+    for(let i=1;i<=PARRILLAS_X_ZONA;i++){
+      const id = 'P'+zona+'-'+i;
+      const items = punteras[id] || [];
+      const usado = capacidadUsada(items);
+      const pct = Math.min(100, Math.round((usado/CAP_PARRILLA_UNIDADES)*100));
+      const activa = _punteraActiva===id;
+      html += `<div class="punt-card ${items.length?'':'vacia'} ${activa?'activa':''}" onclick="abrirParrilla('${id}')">
+        <div class="punt-id">${id}</div>
+        <div class="punt-cant">${items.length} art. · ${usado}/${CAP_PARRILLA_UNIDADES} un.</div>
+        <div class="punt-bar"><div class="punt-bar-fill" style="width:${pct}%"></div></div>
+      </div>`;
+    }
+    html += '</div>';
+    // Si hay una parrilla activa de esta zona, mostrar detalle acá debajo del grid
+    if(_punteraActiva && _punteraActiva.indexOf('P'+zona+'-')===0){
+      html += renderDetalleParrilla(_punteraActiva, punteras);
+    }
+  });
+
+  grid.innerHTML = html;
+}
+
+function abrirParrilla(id){
+  _punteraActiva = (_punteraActiva===id) ? null : id;
+  renderPunteras();
+}
+
+function renderDetalleParrilla(id, punteras){
+  const items = punteras[id] || [];
+  const usado = capacidadUsada(items);
+  const libre = Math.max(0, CAP_PARRILLA_UNIDADES - usado);
+
+  let html = '<div class="punt-detalle">';
+  html += '<div style="font-size:13px;font-weight:700;margin-bottom:8px">'+id+' — '+usado+'/'+CAP_PARRILLA_UNIDADES+' unidades</div>';
+
+  if(!items.length){
+    html += '<div style="font-size:12px;color:#86868b;margin-bottom:8px">Sin artículos asignados todavía.</div>';
+  } else {
+    items.forEach(function(it,idx){
+      const art = DATA.find(r=>String(r.art)===String(it.art));
+      html += '<div class="punt-item-row">';
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-size:12px;font-weight:600">'+(art?art.med+' '+art.diseno:it.art)+'</div>';
+      html += '<div style="font-size:10px;color:#86868b">Art '+it.art+(art?' · '+art.prov:'')+'</div>';
+      html += '</div>';
+      html += '<div style="font-size:13px;font-weight:700">'+it.unidades+' un.</div>';
+      html += '<button onclick="quitarDeParrilla(\''+id+'\','+idx+')" style="border:none;background:#ffd6d9;color:#d70015;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer">🗑</button>';
+      html += '</div>';
+    });
+  }
+
+  html += '<div class="punt-add-form">';
+  html += '<input type="text" id="punt-add-art-'+id+'" placeholder="Código de artículo...">';
+  html += '<input type="number" id="punt-add-cant-'+id+'" placeholder="Cant." min="1" max="'+libre+'" value="'+(libre>0?1:0)+'">';
+  html += '<button class="btn-primary" style="flex:none;padding:8px 14px" onclick="agregarAParrilla(\''+id+'\')" '+(libre<=0?'disabled':'')+'>+ Agregar</button>';
+  html += '</div>';
+  if(libre<=0) html += '<div style="font-size:11px;color:#d70015;margin-top:6px">⚠️ Parrilla llena — sin capacidad disponible</div>';
+  html += '<div style="font-size:10px;color:#86868b;margin-top:8px">Tip: los candidatos con más rotación están en el panel de Mapa Racks → 🔚 candidatos a puntera</div>';
+  html += '</div>';
+  return html;
+}
+
+function agregarAParrilla(id){
+  const artInput = document.getElementById('punt-add-art-'+id);
+  const cantInput = document.getElementById('punt-add-cant-'+id);
+  const artCode = (artInput.value||'').trim();
+  const cant = parseInt(cantInput.value)||0;
+  if(!artCode){ showToast('Ingresá un código de artículo'); return; }
+  if(cant<=0){ showToast('Ingresá una cantidad válida'); return; }
+
+  const art = DATA.find(r=>String(r.art)===artCode);
+  if(!art){ showToast('❌ Artículo no encontrado'); return; }
+
+  const punteras = getPunteras();
+  const items = punteras[id] || [];
+  const usado = capacidadUsada(items);
+  if(usado + cant > CAP_PARRILLA_UNIDADES){
+    showToast('⚠️ Supera la capacidad de la parrilla ('+(CAP_PARRILLA_UNIDADES-usado)+' disponibles)');
+    return;
+  }
+
+  const existente = items.find(it=>String(it.art)===artCode);
+  if(existente) existente.unidades += cant;
+  else items.push({art:artCode, unidades:cant});
+
+  punteras[id] = items;
+  savePunteras(punteras);
+  renderPunteras();
+  showToast('✅ Agregado a '+id);
+}
+
+function quitarDeParrilla(id, idx){
+  const punteras = getPunteras();
+  const items = punteras[id] || [];
+  items.splice(idx,1);
+  punteras[id] = items;
+  savePunteras(punteras);
+  renderPunteras();
+}
+
+function limpiarPunteras(){
+  if(!confirm('¿Vaciar todas las parrillas de todas las punteras?')) return;
+  localStorage.setItem('wms_punteras', JSON.stringify({}));
+  _punteraActiva = null;
+  renderPunteras();
+  showToast('🗑️ Punteras vaciadas');
+}
 </script>
+
 
 
 
