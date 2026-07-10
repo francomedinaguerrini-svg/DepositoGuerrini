@@ -204,10 +204,6 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 .prod-tipo-btn.carga.active{border-color:#34c759;background:#e8f8ee;color:#1c7c2c}
 .prod-tipo-btn.descarga.active{border-color:#ff9500;background:#fff3e0;color:#856404}
 .prod-tipo-btn.chasis.active{border-color:#af52de;background:#f3e8ff;color:#6e36a0}
-.prod-tipo-btn.despacho.active{border-color:#0071e3;background:#e8f0fe;color:#0071e3}
-.prod-tipo-btn.pedidos.active{border-color:#ff2d55;background:#ffe8ee;color:#c4123f}
-.prod-tipo-btn.orden.active{border-color:#5856d6;background:#eeedfc;color:#403fae}
-.prod-tipo-btn.stock.active{border-color:#00a3a3;background:#e0f7f7;color:#007a7a}
 .prod-grupo-row{display:flex;gap:6px;margin-bottom:10px}
 .prod-grupo-btn{flex:1;padding:7px;border-radius:8px;border:2px solid #d2d2d7;background:#fff;color:#86868b;font-size:12px;font-weight:700;cursor:pointer}
 .prod-input-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
@@ -222,9 +218,6 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 .mov-tipo.descarga{background:#fff3e0;color:#856404}
 .mov-tipo.despacho{background:#e8f0fe;color:#0071e3}
 .mov-tipo.chasis{background:#f3e8ff;color:#6e36a0}
-.mov-tipo.pedidos{background:#ffe8ee;color:#c4123f}
-.mov-tipo.orden{background:#eeedfc;color:#403fae}
-.mov-tipo.stock{background:#e0f7f7;color:#007a7a}
 .mov-info{flex:1;min-width:0}
 .mov-title{font-size:13px;font-weight:600}
 .mov-sub{font-size:11px;color:#86868b}
@@ -512,6 +505,37 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 .barra-pos-fill{height:100%;border-radius:4px;transition:width .3s}
 .btn-row{display:flex;gap:8px}
 .btn-primary{flex:1;padding:12px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:500;cursor:pointer}
+.pensa-form{background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:14px;margin-bottom:12px}
+.pensa-form textarea{width:100%;border:1px solid #d2d2d7;border-radius:10px;padding:10px;font-size:14px;font-family:inherit;resize:vertical;min-height:44px;outline:none;box-sizing:border-box}
+.pensa-form select{padding:8px 10px;border:1px solid #d2d2d7;border-radius:10px;font-size:13px;background:#fff;color:#1d1d1f;outline:none}
+.pensa-filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.pensa-chip{padding:6px 12px;border-radius:20px;border:1px solid #d2d2d7;font-size:12px;font-weight:500;background:#fff;color:#86868b;cursor:pointer;white-space:nowrap}
+.pensa-chip.active{background:#1d1d1f;color:#fff;border-color:#1d1d1f}
+.pensa-card{background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:12px;margin-bottom:8px}
+.pensa-card.hecho{opacity:.55}
+.pensa-card.hecho .pensa-titulo{text-decoration:line-through}
+.pensa-top{display:flex;align-items:flex-start;gap:10px}
+.pensa-check{width:22px;height:22px;border-radius:50%;border:2px solid #d2d2d7;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;margin-top:1px}
+.pensa-check.hecho{background:#34c759;border-color:#34c759}
+.pensa-titulo{font-size:14px;font-weight:600;color:#1d1d1f;line-height:1.35}
+.pensa-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.pensa-tag{font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;text-transform:uppercase;letter-spacing:.3px}
+.pensa-tag.cat{background:#e8f0fe;color:#0071e3}
+.pensa-tag.prio-alta{background:#fdeaea;color:#d70015}
+.pensa-tag.prio-media{background:#fff3cd;color:#a8710a}
+.pensa-tag.prio-baja{background:#e8f8ee;color:#248a3d}
+.pensa-fecha{font-size:11px;color:#86868b}
+.pensa-acciones{display:flex;gap:8px;margin-top:8px}
+.pensa-acciones button{border:none;background:none;font-size:12px;color:#0071e3;cursor:pointer;padding:4px 6px;font-weight:500}
+.pensa-acciones button.del{color:#d70015}
+.pensa-desarrollo{margin-top:8px}
+.pensa-desarrollo textarea{width:100%;border:1px solid #d2d2d7;border-radius:10px;padding:10px;font-size:13px;font-family:inherit;resize:vertical;min-height:80px;outline:none;box-sizing:border-box;background:#f9f9fb}
+.pensa-desarrollo-texto{font-size:13px;color:#48484a;line-height:1.5;white-space:pre-wrap;background:#f9f9fb;border-radius:10px;padding:10px;margin-top:8px}
+.pensa-empty{text-align:center;padding:30px 10px;color:#86868b;font-size:13px}
+.pensa-stats{display:flex;gap:8px;margin-bottom:12px}
+.pensa-stats .kpi{flex:1;text-align:center;padding:10px}
+.pensa-stats .kpi b{display:block;font-size:20px;color:#1d1d1f}
+.pensa-stats .kpi span{font-size:11px;color:#86868b}
 .btn-danger{flex:1;padding:12px;background:#ffd6d9;color:#d70015;border:none;border-radius:10px;font-size:15px;font-weight:500;cursor:pointer}
 .btn-secondary{width:100%;padding:12px;background:#f5f5f7;border:none;border-radius:10px;font-size:15px;font-weight:500;cursor:pointer;margin-top:8px}
 .search-result-item{padding:10px;border-radius:8px;border:1px solid #e5e5ea;margin-bottom:6px;cursor:pointer;background:#fff}
@@ -560,12 +584,12 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     <div class="tab-row2-item" id="row2tab-nave" onclick="switchTab('nave',this)">🏭 Nave</div>
     <div class="tab-row2-item" id="row2tab-rot" onclick="switchTab('rot',this)">🔥 Rotación</div>
     <div class="tab-row2-item" id="row2tab-termometro" onclick="switchTab('termometro',this)">🌡️ Termómetro</div>
-    <div class="tab-row2-item" id="row2tab-dash" onclick="switchTab('dash',this)">📊 KPIs</div>
+    <div class="tab-row2-item" id="row2tab-dash" onclick="switchTab('dash',this)">📊 Dashboard</div>
     <div class="tab-row2-item" id="row2tab-inv" onclick="switchTab('inv',this)">🔢 Inventario</div>
     <div class="tab-row2-item" id="row2tab-dif" onclick="switchTab('dif',this)">📊 Diferencias</div>
     <div class="tab-row2-item" id="row2tab-grupos" onclick="switchTab('grupos',this)">👥 Grupos</div>
     <div class="tab-row2-item" id="row2tab-dot" onclick="switchTab('dot',this)">📅 DOTs</div>
-    <div class="tab-row2-item" id="row2tab-checklist" onclick="switchTab('checklist',this)">🚛 Checklist</div>
+    <div class="tab-row2-item" id="row2tab-pensa" onclick="switchTab('pensa',this)">🧠 Pensamiento</div>
   </div>
 </div>
 
@@ -646,7 +670,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
       <div class="home-btn-icon">
         <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="3" y="16" width="5" height="8" rx="1" fill="#34c759" opacity=".3" stroke="#34c759" stroke-width="1.6"/><rect x="11" y="11" width="5" height="13" rx="1" fill="#34c759" opacity=".3" stroke="#34c759" stroke-width="1.6"/><rect x="19" y="6" width="5" height="18" rx="1" fill="#34c759" opacity=".3" stroke="#34c759" stroke-width="1.6"/><path d="M3 24h22" stroke="#34c759" stroke-width="1.5" stroke-linecap="round"/></svg>
       </div>
-      <div class="home-btn-label">KPIs</div>
+      <div class="home-btn-label">Dashboard</div>
       <div class="home-btn-sub">Resumen</div>
     </button>
 
@@ -821,7 +845,6 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
         <button onclick="aplicarSugerencia()" style="flex:1;padding:11px;background:#ff9500;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">📉 Aplicar Rotación Baja</button>
         <button onclick="reevaluarRack()" style="flex:1;padding:11px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer" title="Reevaluar posiciones libres y candidatos en nave">🔄 Reevaluar</button>
         <button onclick="imprimirMapa()" style="padding:11px 14px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:13px;cursor:pointer" title="Exportar mapa">📥</button>
-        <button onclick="descargarListadoRotacion()" style="padding:11px 14px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:13px;cursor:pointer" title="Bajar listado ordenado por rotación para chequear el motor">📊</button>
         <button onclick="limpiarMapa()" style="padding:11px 14px;background:#ffd6d9;color:#d70015;border:none;border-radius:10px;font-size:13px;cursor:pointer">🗑️</button>
       </div>
     </div>
@@ -1008,9 +1031,6 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
         <button onclick="exportarReposicion()" style="padding:7px 12px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">📥 Exportar</button>
       </div>
     </div>
-    <div style="padding:0 0 10px 0">
-      <input id="repo-search" type="text" placeholder="🔍 Buscar por posición o nivel (ej: 5S-N4-P06 o N2)..." oninput="renderReposicion()" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none">
-    </div>
     <div id="repo-content">
       <div class="empty">Cargando...</div>
     </div>
@@ -1045,13 +1065,11 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
       <button class="grupos-tab active" onclick="setGruposTab('hoy',this)">📅 Hoy</button>
       <button class="grupos-tab" onclick="setGruposTab('hist',this)">📋 Historial</button>
       <button class="grupos-tab" onclick="setGruposTab('kpi',this)">📊 KPIs</button>
-      <button class="grupos-tab" onclick="setGruposTab('viajes',this)">🚚 Viajes</button>
       <button class="grupos-tab" onclick="setGruposTab('abm',this)">👤 Personal</button>
     </div>
     <div id="grupos-hoy-panel"></div>
     <div id="grupos-hist-panel" style="display:none"></div>
     <div id="grupos-kpi-panel" style="display:none"></div>
-    <div id="grupos-viajes-panel" style="display:none"></div>
     <div id="grupos-abm-panel" style="display:none"></div>
   </div>
 </div>
@@ -1059,15 +1077,9 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 <!-- PRODUCTIVIDAD -->
 <div class="view" id="view-prod">
   <div class="prod-wrap">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <span style="font-size:13px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px">⚡ Productividad</span>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button onclick="backupWMS()" style="padding:6px 12px;background:#34c759;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">💾 Backup</button>
-        <label style="padding:6px 12px;background:#ff9500;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin:0">
-          📂 Restaurar<input type="file" accept=".json" onchange="restaurarWMS(event)" style="display:none">
-        </label>
-        <button onclick="exportarProductividad()" style="padding:6px 12px;background:#1d1d1f;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">📄 Informe</button>
-      </div>
+      <button onclick="exportarProductividad()" style="padding:6px 12px;background:#1d1d1f;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">📄 Informe</button>
     </div>
 
     <!-- Tabs internos -->
@@ -1080,70 +1092,19 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     <!-- TAB: MOVIMIENTOS -->
     <div id="prod-tab-movs">
       <!-- Resumen del día -->
-      <div id="prod-cubhh"></div>
       <div class="prod-resumen" id="prod-resumen"></div>
-      <div id="prod-resumen-perdido"></div>
-      <div id="prod-resumen-tipos" style="margin-bottom:10px"></div>
-
-      <!-- Registrar tiempo / movimiento manual -->
-      <div style="background:#fff;border:1px solid #e5e5ea;border-radius:12px;padding:12px;margin-bottom:12px">
-        <div style="font-size:11px;font-weight:600;color:#86868b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Registrar tiempo</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-          <button class="prod-tipo-btn pedidos active" onclick="setProdTipo('pedidos',this)">📝 Pedidos</button>
-          <button class="prod-tipo-btn orden" onclick="setProdTipo('orden',this)">🧹 Orden/Limpieza</button>
-          <button class="prod-tipo-btn stock" onclick="setProdTipo('stock',this)">📦 Stock</button>
-          <button class="prod-tipo-btn chasis" onclick="setProdTipo('chasis',this)">🚗 Chasis</button>
-        </div>
-        <div style="font-size:10px;color:#86868b;margin-bottom:6px">Carga, Descarga y Despacho se registran automáticamente desde Carga/Desc. — no hace falta cargarlos acá.</div>
-        <div style="font-size:10px;color:#86868b;margin-bottom:4px">Grupo</div>
-        <div id="prod-grupos-btns" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-          <div>
-            <div style="font-size:10px;color:#86868b;margin-bottom:3px">Inicio</div>
-            <input id="prod-inicio" type="time" style="width:100%;padding:8px 6px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">
-          </div>
-          <div>
-            <div style="font-size:10px;color:#86868b;margin-bottom:3px">Fin</div>
-            <input id="prod-fin" type="time" style="width:100%;padding:8px 6px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">
-          </div>
-          <div>
-            <div style="font-size:10px;color:#86868b;margin-bottom:3px">Unidades (opcional)</div>
-            <input id="prod-unidades" type="number" placeholder="0" style="width:100%;padding:8px 6px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">
-          </div>
-          <div>
-            <div style="font-size:10px;color:#86868b;margin-bottom:3px">Semis / Pedidos</div>
-            <input id="prod-semis" type="number" value="1" style="width:100%;padding:8px 6px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-          <div>
-            <div style="font-size:10px;color:#86868b;margin-bottom:3px">Dársena (opcional)</div>
-            <input id="prod-darsena" type="text" placeholder="Nro..." style="width:100%;padding:8px 6px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">
-          </div>
-          <div>
-            <div style="font-size:10px;color:#86868b;margin-bottom:3px">Detalle / destino</div>
-            <input id="prod-destino-mov" type="text" placeholder="Ej: Orden pasillo 3, recuento art. 33952..." style="width:100%;padding:8px 6px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">
-          </div>
-        </div>
-        <button onclick="guardarMovimientoFecha()" style="width:100%;padding:10px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">✅ Registrar movimiento</button>
-      </div>
 
       <!-- Lista del día — ARRIBA -->
       <div style="font-size:11px;font-weight:600;color:#86868b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Movimientos de hoy</div>
       <div id="prod-lista" style="margin-bottom:12px"></div>
 
-      <!-- Huecos sin actividad -->
-      <div style="font-size:11px;font-weight:600;color:#86868b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">🕳️ Huecos sin actividad (08:15 → 17:30)</div>
-      <div id="prod-huecos" style="margin-bottom:12px"></div>
-
+      <div id="prod-grupos-btns" style="display:none"></div>
       <!-- Selector de fecha para ver histórico -->
-      <div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
         <span style="font-size:11px;color:#86868b">Ver fecha:</span>
         <input type="date" id="prod-fecha-manual"
           style="padding:4px 8px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;color:#1d1d1f;background:#fff;outline:none"
           onchange="checkFechaManual(this.value)">
-        <button onclick="migrarMovsDia()" title="Fusionar movimientos del día si faltan entradas (fix zero-padding)"
-          style="padding:4px 10px;background:#ff9500;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">🔧 Recuperar hoy</button>
       </div>
     </div>
 
@@ -1209,21 +1170,6 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 
     <div id="dot-lista"></div>
   </div>
-</div>
-
-<!-- CHECKLIST MÁQUINAS, CAMIONES Y PORTONES -->
-<div class="view" id="view-checklist">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-    <span style="font-size:13px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px">🚛 Checklist Máquinas, Camiones y Portones</span>
-    <div style="display:flex;gap:6px">
-      <button onclick="exportarInformeChecklist()" style="padding:6px 12px;background:#1d1d1f;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">📊 Informe</button>
-      <button onclick="agregarEquipoChecklist()" style="padding:6px 12px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">+ Agregar equipo</button>
-    </div>
-  </div>
-
-  <div id="checklist-alertas"></div>
-  <div id="checklist-form-box"></div>
-  <div id="checklist-lista"></div>
 </div>
 
 <!-- ROTACION -->
@@ -1707,7 +1653,7 @@ function switchTab(name,btn){
   if(name==='repo') renderReposicion();
   if(name==='pedidos') initPedidos();
   if(name==='cydesc') initCyDesc();
-  if(name==='checklist') renderChecklist();
+  if(name==='pensa') renderPensamiento();
 }
 
 // --- UPDATE ---
@@ -1738,18 +1684,6 @@ function getUbicaciones(artId){
   const dataArt = DATA.find(r=>r.art==artId);
   const bloque = dataArt?dataArt.bloque:'';
 
-  // Unidades reales en rack: posición propia + lo que tiene como compartido en otras posiciones
-  let unidEnRack = posRacks.reduce((s,[pos,v])=>s+(v.unidades||0), 0);
-  Object.values(ASIGN).forEach(v=>{
-    if(!v) return;
-    (v.compartidos||[]).forEach(c=>{
-      if(c.art==artId) unidEnRack += c.unidades||0;
-    });
-  });
-  const stockTotal = dataArt?(dataArt.stock||0):0;
-  const fueraDeRack = Math.max(0, stockTotal - unidEnRack);
-  const mp = dataArt?(dataArt.max_pos||32):32;
-
   if(!posRacks.length && !bloque) return '<div style="font-size:12px;color:#d2d2d7;padding:4px 0">Sin ubicación asignada</div>';
 
   let html3 = '<div style="display:flex;flex-direction:column;gap:5px">';
@@ -1768,15 +1702,14 @@ function getUbicaciones(artId){
     </div>`;
   });
 
-  // Bloque — solo si efectivamente queda stock fuera del rack
-  if(bloque && fueraDeRack > 0){
-    const pallFuera = Math.floor(fueraDeRack / mp);
+  // Bloque
+  if(bloque){
     html3 += `<div style="display:flex;align-items:center;justify-content:space-between;background:#fff3cd;border-radius:8px;padding:7px 10px">
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:11px;font-weight:700;color:#856404;background:#f5c842;padding:2px 8px;border-radius:6px">BLQ</span>
         <span style="font-size:13px;font-weight:700;color:#1d1d1f">${bloque}</span>
       </div>
-      <span style="font-size:14px;font-weight:700;color:#856404">${fueraDeRack} un. <span style="font-size:10px;font-weight:400;color:#86868b">(${pallFuera} pall.)</span></span>
+      <span style="font-size:14px;font-weight:700;color:#856404">${dataArt.pall||0} <span style="font-size:10px;font-weight:400;color:#86868b">pall.</span></span>
     </div>`;
   }
 
@@ -2258,9 +2191,8 @@ function renderMapa(){
         const cls=celldaColor(unid,maxU);
         const pct=maxU?Math.round((unid/maxU)*100):0;
         const label=art?art.diseno.substring(0,5):'';
-        const pend=asig&&asig.pendienteSacar;
-        html+=`<div class="celda ${cls}" style="${pend?'outline:2px solid #d70015;outline-offset:-2px;position:relative':''}" onclick="clickCelda('${posId}')" title="${posId}${art?' · '+art.med+' '+art.diseno:''}${pend?' · 🚨 PENDIENTE DE SACAR: '+(asig.pendienteSacarMotivo||''):''}">
-          ${label}${pend?'<span style="position:absolute;top:1px;right:2px;font-size:9px">🚨</span>':''}
+        html+=`<div class="celda ${cls}" onclick="clickCelda('${posId}')" title="${posId}${art?' · '+art.med+' '+art.diseno:''}">
+          ${label}
           ${art?`<div class="barra"><div class="barra-fill" style="width:${pct}%"></div></div>`:''}
         </div>`;
       }
@@ -2270,7 +2202,6 @@ function renderMapa(){
   });
   container.innerHTML=html;
   renderAlertas();
-  renderPendientesSacar();
   renderCobertura();
 }
 
@@ -2497,16 +2428,15 @@ function saveRackStock(rs){ localStorage.setItem('wms_rack_stock', JSON.stringif
 // PASO 1 — BARRIDO
 // Detecta artículos candidatos al rack:
 //   • Excluye: camión (.5), agrícola (TT/TL), Speedway
-//   • Filtra: rot_sem < 5.5 Y pall 1-5
-//   • Ordena: rotación mensual (rot_pall_mes) ascendente — el más
-//     bajo primero. Empate de rotación → desempata por zona más
-//     caliente primero (sacar lentos de B→A→C→D)
+//   • Filtra: rot_sem < 0.5 Y pall 1-4
+//   • Prioriza: zona más caliente primero (sacar lentos de B→C→D)
+//   • Dentro de zona: menor rot primero (los más muertos al rack)
 // ───────────────────────────────────────────────────────────────
 function barridoCandidatosRack(){
   var EXCLUIR_PROV = ['SPEEDWAY'];
   var EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
   var ROT_MAX  = 5.5;  // rot_sem máxima para entrar al rack
-  var PALL_MAX = 5;   // máximo 5 pallets
+  var PALL_MAX = 6;   // máximo 6 pallets
 
   // Bloques 1 y 2 son la zona física del rack — no se mueven
   var BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
@@ -2518,10 +2448,10 @@ function barridoCandidatosRack(){
     if(/\d+\.5/.test(r.med||''))                    return false; // camión
     if(EXCLUIR_PROV.indexOf(r.prov)>=0)             return false; // Speedway
     if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0)  return false; // agrícola
-    if(EXCLUIR_DISENO.indexOf((r.diseno||'').trim())>=0 && r.prov==='KUMHO') return false; // AT51/AT52/MT51 solo KUMHO
+    if(EXCLUIR_DISENO.indexOf((r.diseno||'').trim())>=0) return false; // AT51/AT52/MT51
     if((r.stock||0) <= 0)                           return false; // sin stock
-    if((r.rot_sem||0) >= ROT_MAX)                   return false; // rotación demasiado alta
     if((r.pall||0) > PALL_MAX)                      return false; // > 5 pallets → bloque
+    if((r.pall||0) < 1)                             return false; // menos de 1 pallet
     if(r.bloque){
       var bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
       if(bs.some(function(b){ return BLOQUES_RACK.indexOf(b.trim())>=0; })) return false;
@@ -2529,11 +2459,22 @@ function barridoCandidatosRack(){
     return true;
   }
 
-  // Candidatos: todos los que pasan el filtro base (rot=0 incluidos)
-  var candidatos = DATA.filter(pasaFiltroBase);
+  // GRUPO 1: rot = 0 (muertos totales) — máxima prioridad
+  var grupo1 = DATA.filter(function(r){
+    if(!pasaFiltroBase(r)) return false;
+    return (r.rot_sem||0) === 0;
+  });
 
-  // Zona (solo para desempate, ya no para prioridad principal)
-  // B (3-5) > A piso (1-2) > C (6-8) > D (9-10) > sin zona
+  // GRUPO 2: rot baja pero existe (0 < rot < ROT_MAX)
+  var grupo2 = DATA.filter(function(r){
+    if(!pasaFiltroBase(r)) return false;
+    return (r.rot_sem||0) > 0 && (r.rot_sem||0) < ROT_MAX;
+  });
+
+  // Candidatos: grupo 1 primero, luego grupo 2
+  var candidatos = grupo1.concat(grupo2);
+
+  // Prioridad de zona: B (3-5) > A piso (1-2) > C (6-8) > D (9-10) > sin zona
   var ZB = ['4N','4S','4S PICKING','5N','5S'];
   var ZA = ['2N/3N','2S/2N'];
   var ZC = ['6N','6S','7N','7S','8S'];
@@ -2554,9 +2495,9 @@ function barridoCandidatosRack(){
   }
 
   candidatos.sort(function(a,b){
-    var ra = a.rot_pall_mes||0, rb = b.rot_pall_mes||0;
-    if(ra !== rb) return ra - rb;           // 1° rotación mensual ascendente
-    return zonaUrgencia(a) - zonaUrgencia(b); // 2° empate: zona más caliente primero
+    var zA=zonaUrgencia(a), zB=zonaUrgencia(b);
+    if(zA!==zB) return zA-zB;               // zona más urgente primero
+    return (a.rot_sem||0)-(b.rot_sem||0);   // empate: más muerto primero → N4
   });
 
   return candidatos;
@@ -2998,36 +2939,17 @@ function setSugerencia(nombre, btn){
   }
 }
 
-function motivoNoCalifica(art, EXCLUIR_PROV, EXCLUIR_USO, EXCLUIR_DIS2, BLOQUES_RACK, ROT_MAX, PALL_MAX){
-  if(!art) return 'Artículo no encontrado en DATA';
-  if(/\d+\.5/.test(art.med||'')) return 'Camión (.5)';
-  if(EXCLUIR_PROV.indexOf(art.prov)>=0) return 'Proveedor Speedway';
-  if(EXCLUIR_USO.indexOf((art.uso||'').trim())>=0) return 'Uso agrícola';
-  if(EXCLUIR_DIS2.indexOf((art.diseno||'').trim())>=0 && art.prov==='KUMHO') return 'Diseño excluido (KUMHO)';
-  if((art.stock||0) <= 0) return 'Sin stock';
-  if((art.rot_sem||0) >= ROT_MAX) return 'Rotación alta (≥'+ROT_MAX+'/sem)';
-  if((art.pall||0) > PALL_MAX) return 'Supera '+PALL_MAX+' pallets ('+(art.pall||0)+')';
-  if(art.bloque){
-    var bs = art.bloque.includes('/')?art.bloque.split('/'):[art.bloque];
-    if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return 'Bloque protegido (zona rack)';
-  }
-  return 'Ya no califica';
-}
-
 function reevaluarRack(){
   // Reevaluación incremental:
-  // 1. Marca "pendiente de sacar" las posiciones de artículos que ya no
-  //    califican y todavía tienen stock físico (no se liberan solas —
-  //    hay que confirmar que se sacaron de verdad, ver PENDIENTES DE SACAR)
-  // 2. Libera directo las que ya están vacías (nada que mover)
-  // 3. Asigna candidatos pendientes a las posiciones que quedaron libres
-  // 4. Actualiza mapa y informe
+  // 1. Libera posiciones de artículos que ya no califican
+  // 2. Asigna candidatos pendientes a posiciones libres
+  // 3. Actualiza mapa y informe
 
   var EXCLUIR_PROV = ['SPEEDWAY'];
   var EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
   var BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
   var ROT_MAX  = 5.5;
-  var PALL_MAX = 5;
+  var PALL_MAX = 6;
 
   var EXCLUIR_DIS2 = ['AT51','AT52','MT51'];
   function califica(art){
@@ -3035,10 +2957,11 @@ function reevaluarRack(){
     if(/\d+\.5/.test(art.med||'')) return false;
     if(EXCLUIR_PROV.indexOf(art.prov)>=0) return false;
     if(EXCLUIR_USO.indexOf((art.uso||'').trim())>=0) return false;
-    if(EXCLUIR_DIS2.indexOf((art.diseno||'').trim())>=0 && art.prov==='KUMHO') return false; // solo KUMHO
+    if(EXCLUIR_DIS2.indexOf((art.diseno||'').trim())>=0) return false;
     if((art.stock||0) <= 0) return false;
     if((art.rot_sem||0) >= ROT_MAX) return false;
     if((art.pall||0) > PALL_MAX) return false;
+    if((art.pall||0) < 1) return false;
     if(art.bloque){
       var bs = art.bloque.includes('/')?art.bloque.split('/'):[art.bloque];
       if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return false;
@@ -3047,28 +2970,16 @@ function reevaluarRack(){
   }
 
   var liberadas = 0;
-  var pendientesNuevas = 0;
   var asignadas = 0;
 
-  // PASO 1: detectar artículos que ya no califican
-  //   - Si la posición ya está vacía (0 un.): se libera directo, no hay nada físico que mover
-  //   - Si todavía tiene stock: queda "pendiente de sacar" — sigue ocupando el lugar
-  //     hasta que confirmes manualmente que la sacaste (panel PENDIENTES DE SACAR)
+  // PASO 1: liberar posiciones de artículos que ya no califican
   Object.keys(ASIGN).forEach(function(posId){
     var v = ASIGN[posId];
     if(!v || !v.art) return;
-    if(v.pendienteSacar) return; // ya estaba marcada, no re-evaluar de nuevo
     var art = DATA.find(function(r){return r.art==v.art;});
     if(!califica(art)){
-      if((v.unidades||0) <= 0){
-        delete ASIGN[posId];
-        liberadas++;
-      } else {
-        v.pendienteSacar = true;
-        v.pendienteSacarMotivo = motivoNoCalifica(art, EXCLUIR_PROV, EXCLUIR_USO, EXCLUIR_DIS2, BLOQUES_RACK, ROT_MAX, PALL_MAX);
-        v.pendienteSacarFecha = new Date().toLocaleDateString('es-AR');
-        pendientesNuevas++;
-      }
+      delete ASIGN[posId];
+      liberadas++;
     }
   });
 
@@ -3084,7 +2995,7 @@ function reevaluarRack(){
     // No borrar: posición vacía queda en ASIGN con unidades=0 para que Reposición la vea
   });
 
-  if(liberadas === 0 && pendientesNuevas === 0 && Object.keys(ASIGN).length >= 380){
+  if(liberadas === 0 && Object.keys(ASIGN).length >= 380){
     showToast('✅ Rack al máximo — sin posiciones libres para reevaluar');
     return;
   }
@@ -3096,14 +3007,14 @@ function reevaluarRack(){
     return califica(r);
   });
 
-  if(candidatosNave.length === 0 && liberadas === 0 && pendientesNuevas === 0){
+  if(candidatosNave.length === 0 && liberadas === 0){
     showToast('✅ Todo en orden — sin cambios necesarios');
     renderMapa();
     renderCandidatosEnNave();
     return;
   }
 
-  // Ordenar: rotación mensual ascendente primero, zona como desempate
+  // Ordenar: zona más urgente primero, luego menor rot
   var ZB = ['4N','4S','4S PICKING','5N','5S'];
   var ZA = ['2N/3N','2S/2N'];
   var ZC = ['6N','6S','7N','7S','8S'];
@@ -3122,13 +3033,12 @@ function reevaluarRack(){
     return m;
   }
   candidatosNave.sort(function(a,b){
-    var ra=a.rot_pall_mes||0, rb=b.rot_pall_mes||0;
-    if(ra!==rb) return ra-rb;
-    return zonaUrg(a)-zonaUrg(b);
+    var za=zonaUrg(a),zb=zonaUrg(b);
+    if(za!==zb) return za-zb;
+    return (a.rot_sem||0)-(b.rot_sem||0);
   });
 
   // PASO 4: construir lista de posiciones libres
-  // (las "pendiente de sacar" siguen en ASIGN, así que quedan excluidas acá)
   var posPorNivel = {1:[],2:[],3:[],4:[]};
   FRENTES.forEach(function(f){
     [4,3,2,1].forEach(function(nv){
@@ -3145,12 +3055,10 @@ function reevaluarRack(){
   var posLibres = Object.values(posPorNivel).reduce(function(s,a){return s+a.length;},0);
 
   if(posLibres === 0){
+    showToast('✅ Rack lleno — sin posiciones libres · '+liberadas+' liberadas pero ya ocupadas');
     saveAsign();
     renderMapa();
     renderCandidatosEnNave();
-    var msgLleno = '✅ Rack lleno — sin posiciones libres · '+liberadas+' liberadas';
-    if(pendientesNuevas) msgLleno += ' · ⚠️ '+pendientesNuevas+' pendientes de sacar';
-    showToast(msgLleno);
     return;
   }
 
@@ -3241,71 +3149,9 @@ function reevaluarRack(){
 
   var msg = '🔄 Reevaluación: ';
   if(liberadas) msg += liberadas+' liberadas · ';
-  if(pendientesNuevas) msg += '⚠️ '+pendientesNuevas+' pendientes de sacar · ';
   if(asignadas) msg += asignadas+' nuevas asignaciones · ';
   msg += sinUbicacion2.length+' sin lugar';
   showToast(msg);
-}
-
-// Confirma que una posición marcada "pendiente de sacar" ya se sacó
-// físicamente del rack — recién ahí se libera y puede reasignarse.
-function confirmarSacarDeRack(posId){
-  var v = ASIGN[posId];
-  if(!v || !v.pendienteSacar){
-    showToast('❌ Esa posición ya no está pendiente de sacar');
-    renderMapa();
-    return;
-  }
-  var da = DATA.find(function(r){return r.art==v.art;});
-  var desc = da ? (da.med+' '+da.diseno) : ('art. '+v.art);
-  delete ASIGN[posId];
-  saveAsign();
-  showToast('✅ '+posId+' confirmada afuera — '+desc);
-  reevaluarRack(); // reintenta ocupar la posición liberada con otro candidato
-}
-
-function renderPendientesSacar(){
-  var box = document.getElementById('alertas-box');
-  if(!box) return;
-
-  var pendientes = Object.entries(ASIGN)
-    .filter(function(e){ return e[1] && e[1].pendienteSacar; })
-    .map(function(e){
-      var pos=e[0], v=e[1];
-      var da = DATA.find(function(r){return r.art==v.art;});
-      return {pos:pos, v:v, da:da};
-    })
-    .sort(function(a,b){ return a.pos.localeCompare(b.pos); });
-
-  var prev = document.getElementById('panel-pendientes-sacar');
-  if(!pendientes.length){
-    if(prev) prev.remove();
-    return;
-  }
-
-  var filas = pendientes.map(function(p){
-    return `<div style="background:#fde8e8;border:1px solid #f5b5b5;border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;gap:8px;align-items:center">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:700;color:#d70015">${p.pos} · ${p.v.unidades||0} un.</div>
-        <div style="font-size:11px;color:#1d1d1f">${p.da?p.da.med+' '+p.da.diseno:'art. '+p.v.art} <span style="color:#86868b">${p.da?p.da.prov:''}</span></div>
-        <div style="font-size:10px;color:#86868b;margin-top:2px">Motivo: ${p.v.pendienteSacarMotivo||'—'} · detectado ${p.v.pendienteSacarFecha||''}</div>
-      </div>
-      <button onclick="confirmarSacarDeRack('${p.pos}')" style="flex-shrink:0;padding:7px 12px;background:#d70015;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">✅ OK, ya lo saqué</button>
-    </div>`;
-  }).join('');
-
-  var html = `<div id="panel-pendientes-sacar" style="background:#fff3cd;border:1px solid #d70015;border-radius:10px;padding:10px;margin-bottom:10px">
-    <div style="font-size:13px;font-weight:700;color:#d70015;margin-bottom:8px">
-      🚨 ${pendientes.length} posición${pendientes.length>1?'es':''} pendiente${pendientes.length>1?'s':''} de sacar del rack
-    </div>
-    ${filas}
-    <div style="font-size:10px;color:#86868b;margin-top:6px;border-top:1px solid #f5b5b5;padding-top:6px">
-      Ya no califican para el rack pero todavía tienen stock físico ahí — no se liberan solas. Confirmá cuando saques el pallet para que el sistema pueda reasignar el lugar.
-    </div>
-  </div>`;
-
-  if(prev) prev.outerHTML = html;
-  else box.innerHTML = html + box.innerHTML;
 }
 
 function aplicarSugerencia(){
@@ -3473,6 +3319,7 @@ function renderCandidatosEnNave(){
     if((r.stock||0) <= 0) return false;
     if((r.rot_sem||0) >= ROT_MAX) return false;
     if((r.pall||0) > PALL_MAX) return false;
+    if((r.pall||0) < 1) return false;
     if(r.bloque){
       const bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
       if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return false;
@@ -3673,69 +3520,35 @@ function procesarPedido(pedido){
     item.bloque = dataArt?dataArt.bloque:'';
     item.med = dataArt?dataArt.med:`${item.diam} ${item.secc} ${item.llan}`;
     item.cond = dataArt?dataArt.cond:'';
-    const stockTotal = dataArt?(dataArt.stock||0):0;
 
-    // Todas las posiciones del rack con stock de este artículo,
-    // ordenadas N1→N4 y, dentro de cada nivel, de menor a mayor stock
-    // (vaciar las más chicas antes)
-    const pesoNivel = {N1:1, N2:2, N3:3, N4:4};
-    const posiciones = Object.entries(ASIGN)
-      .filter(([pos,v])=>v && v.art==item.art && (v.unidades||0) > 0)
-      .sort((a,b)=>{
-        const na = a[0].split('-')[1], nb = b[0].split('-')[1];
-        const pa = pesoNivel[na]||9, pb = pesoNivel[nb]||9;
-        if(pa!==pb) return pa-pb;
-        return (a[1].unidades||0) - (b[1].unidades||0);
-      });
+    // Buscar posición en rack — N1 primero, luego N2, N3, N4
+    // Dentro de cada nivel, preferir la posición con MENOS unidades (vaciar las mas chicas antes)
+    function posMenorStockEnNivel(nivel){
+      var candidatas = Object.entries(ASIGN).filter(function(e){
+        var pos=e[0], v=e[1];
+        return pos.includes('-'+nivel+'-') && v && v.art==item.art && (v.unidades||0) > 0;
+      }).sort(function(a,b){ return (a[1].unidades||0) - (b[1].unidades||0); });
+      return candidatas[0];
+    }
+    const posRackN1 = posMenorStockEnNivel('N1');
+    const posRackN2 = posMenorStockEnNivel('N2');
+    const posRackN3 = posMenorStockEnNivel('N3');
+    const posRackN4 = posMenorStockEnNivel('N4');
+    const posRack = posRackN1||posRackN2||posRackN3||posRackN4;
+    item.posRack = posRack?posRack[0]:'';
 
-    // Cuánto stock hay realmente fuera del rack (según el stock total del
-    // artículo, no solo porque tenga un bloque de referencia cargado)
-    const totalEnRack = posiciones.reduce((s,[,v])=>s+(v.unidades||0), 0);
-    const fueraDeRack = Math.max(0, stockTotal - totalEnRack);
-
-    // Repartir la cantidad pedida entre las posiciones hasta cubrirla
-    let restante = item.cant;
-    const detalle = [];
-    posiciones.forEach(([pos,v])=>{
-      if(restante<=0) return;
-      const take = Math.min(restante, v.unidades||0);
-      if(take>0){ detalle.push({pos, cant:take}); restante -= take; }
-    });
-
-    item.posRackDetalle = detalle;
-    item.posRack = detalle.map(d=>d.pos).join(', ');
-    item.cantRack = item.cant - restante;   // lo que cubre el rack
-    item.cantFaltante = restante;           // lo que no alcanzó el rack
-
-    if(detalle.length && restante<=0){
-      // Todo el pedido se cubre con una o varias posiciones de rack
+    // Lógica simple: si está en rack → rack, si no → bloque
+    if(item.posRack){
       conRack.push(item);
-    } else if(restante > 0 && fueraDeRack > 0){
-      // Mixto: parte en rack (si había), el resto se busca en bloque —
-      // pero solo hasta lo que realmente queda fuera del rack
-      const cantBloque = Math.min(restante, fueraDeRack);
-      const excede = restante - cantBloque; // ni rack ni bloque alcanzan
-      item.mixto = detalle.length > 0;
-      item.excedeStock = excede > 0;
-      item.excedeCant = excede;
-      if(detalle.length) conRack.push(item);
-      conBloque.push(Object.assign({}, item, {cant: cantBloque, mixto:true, excedeStock: excede>0, excedeCant: excede}));
-    } else if(detalle.length){
-      // Rack tiene algo pero no cubre todo, y no hay más en bloque:
-      // el pedido supera el stock total disponible del artículo
-      item.mixto = true;
-      item.excedeStock = true;
-      item.excedeCant = restante;
-      conRack.push(item);
-    } else if(item.bloque && stockTotal > 0){
+    } else if(item.bloque){
       conBloque.push(item);
     } else {
       sinUbic.push(item);
     }
   });
 
-  // Ordenar rack por primera posición
-  conRack.sort((a,b)=>(a.posRack||'').localeCompare(b.posRack||''));
+  // Ordenar rack por posición
+  conRack.sort((a,b)=>a.posRack.localeCompare(b.posRack));
 
   renderPedido(conRack, conBloque, sinUbic, pedido);
 }
@@ -3748,32 +3561,22 @@ function renderPedido(conRack, conBloque, sinUbic, todos){
   function mkRow(item, tipo){
     const esBuscar = item.posRack === 'BUSCAR EN RACK';
     const esBajo = item.cond === 'bajo stock';
-    const cantMostrar = tipo==='rack' ? (item.cantRack!=null ? item.cantRack : item.cant) : item.cant;
     const ubic = tipo==='rack'
       ? esBuscar
         ? `<span style="font-size:10px;font-weight:600;color:#86868b;background:#f0f0f0;padding:2px 6px;border-radius:4px">🔍 BUSCAR EN RACK</span>`
-        : (item.posRackDetalle && item.posRackDetalle.length>1
-            ? item.posRackDetalle.map(d=>`<span class="ped-ubic-rack">🔵 ${d.pos} (${d.cant})</span>`).join('<br>')
-            : `<span class="ped-ubic-rack">🔵 ${item.posRack}</span>`)
+        : `<span class="ped-ubic-rack">🔵 ${item.posRack}</span>`
       : tipo==='bloque'
       ? `<span class="ped-ubic-bloque">🟡 ${item.bloque}</span>`
       : `<span class="ped-ubic-sin">❓ Sin ubic.</span>`;
     const rowStyle = esBajo ? 'background:#fff5f5' : '';
-    let avisoMixto = '';
-    if(item.excedeStock){
-      avisoMixto = `<div style="font-size:11px;color:#d70015;font-weight:700;margin-top:2px">⛔ El pedido (${item.cant}) supera el stock total disponible (${item.stock||0} un.) — faltan ${item.excedeCant}</div>`;
-    } else if(item.mixto && tipo!=='bloque'){
-      avisoMixto = `<div style="font-size:11px;color:#856404;font-weight:600;margin-top:2px">⚠️ Rack cubre ${item.cantRack} de ${item.cant} — el resto va a Bloque ${item.bloque}</div>`;
-    }
     return `<tr class="${tipo}-row" style="${rowStyle}">
       <td><div class="ped-art">${item.art}</div></td>
       <td>
         <div class="ped-desc">${item.med} ${item.diseno}</div>
         <div class="ped-prov">${item.prov}${esBajo?' · <span style="color:#d70015;font-weight:600">⚠️ BAJO STOCK</span>':''}</div>
-        ${avisoMixto}
       </td>
       <td>${ubic}</td>
-      <td class="ped-cant">${cantMostrar}</td>
+      <td class="ped-cant">${item.cant}</td>
       <td class="ped-stock" style="${esBajo?'color:#d70015;font-weight:600':''}">${(item.stock||0).toLocaleString('es-AR')}</td>
     </tr>`;
   }
@@ -4408,7 +4211,6 @@ function cydEjecutarDespacho(id){
   tr.estado = 'confirmado';
   tr.fechaConfirmacion = fecha;
   tr.horaConfirmacion  = hora;
-  tr.fechaISO = new Date().toISOString().split('T')[0]; // re-sellar con fecha de CONFIRMACIÓN, no de creación
   transitoSave(lista);
 
   // NOTA: ya no se llama a reevaluarRack() acá — la posición liberada queda
@@ -4962,11 +4764,20 @@ function seleccionarDiseno(diseno){
     // Preparar items
     _invItemsActivos = DATA.filter(r=>r.diseno===diseno&&r.stock>0).map(r=>{
       const posRack = Object.entries(ASIGN).find(([pos,v])=>v&&v.art==r.art);
+      const tieneRack = !!posRack;
+      const tieneNave = !!r.bloque;
+      let ubic;
+      if(tieneRack&&tieneNave) ubic = posRack[0]+' + Nave '+r.bloque;
+      else if(tieneRack) ubic = posRack[0];
+      else if(tieneNave) ubic = 'Nave '+r.bloque;
+      else ubic = 'Sin ubicación';
       return {
         art: r,
         posId: posRack?posRack[0]:('BLQ_'+r.art),
-        ubic: posRack?posRack[0]:(r.bloque||'Sin ubicación'),
-        sistema: posRack?(ASIGN[posRack[0]]?.unidades||0):r.pall,
+        ubic: ubic,
+        posRack: tieneRack?posRack[0]:'',
+        bloqueNave: tieneNave?r.bloque:'',
+        sistema: r.stock||0, // stock TOTAL del artículo (rack + nave), no solo lo asignado en rack
         contado: null,
       };
     }).sort((a,b)=>b.art.rot-a.art.rot);
@@ -5033,8 +4844,8 @@ function confirmarConteoDiseno(){
     if(val !== item.sistema){
       difs.push({
         art:item.art.art, med:item.art.med, diseno:item.art.diseno,
-        prov:item.art.prov, posRack:item.posId.startsWith('BLQ_')?'':item.posId,
-        bloque:item.posId.startsWith('BLQ_')?item.art.bloque:'',
+        prov:item.art.prov, posRack:item.posRack||'',
+        bloque:item.bloqueNave||'',
         cantPedida:item.sistema, cantReal:val, diff:val-item.sistema,
       });
     }
@@ -5148,181 +4959,6 @@ function registrarMovimiento(posId, artId, tipo, unidades){
 // getAlertasReposicion: ver definición más abajo
 
 // === IMPRIMIR MAPA ===
-function descargarListadoRotacion(){
-  // Unidades en rack por artículo (sumando posición propia + lo que tiene como compartido en otras)
-  const unidEnRackPorArt = {};
-  Object.values(ASIGN).forEach(v=>{
-    if(!v) return;
-    if(v.art) unidEnRackPorArt[String(v.art)] = (unidEnRackPorArt[String(v.art)]||0) + (v.unidades||0);
-    (v.compartidos||[]).forEach(c=>{
-      unidEnRackPorArt[String(c.art)] = (unidEnRackPorArt[String(c.art)]||0) + (c.unidades||0);
-    });
-  });
-
-  const rows = Object.entries(ASIGN)
-    .filter(([pos,v])=>v && v.art)
-    .map(([pos,v])=>{
-      const art = DATA.find(r=>r.art==v.art);
-      const nivelActual = parseInt((pos.split('-')[1]||'').replace('N',''))||0;
-      const nivelEsperado = nivelSegunRot(art?(art.rot_sem||0):0);
-      const stockTotal = art?(art.stock||0):0;
-      const enRack = unidEnRackPorArt[String(v.art)]||0;
-      return {
-        pos, nivelActual, nivelEsperado,
-        art: v.art,
-        med: art?art.med:'',
-        diseno: art?art.diseno:'',
-        prov: art?art.prov:'',
-        rot_sem: art?(art.rot_sem||0):0,
-        rot_mes: art?(art.rot_pall_mes||0):0,
-        pallets: art?(art.pall||0):0,
-        unidades: v.unidades||0,
-        compartidos: (v.compartidos||[]).length,
-        stockTotal,
-        fueraDeRack: Math.max(0, stockTotal - enRack)
-      };
-    })
-    .sort((a,b)=> a.rot_mes - b.rot_mes);
-
-  const wsData = [
-    ['LISTADO DE RACK POR ROTACIÓN — '+new Date().toLocaleDateString('es-AR')],
-    ['Orden: rotación mensual ascendente (rot_pall_mes) — el más bajo primero. NIVEL vs ESPERADO: si no coinciden, revisar.'],
-    [],
-    ['#','NIVEL','ESPERADO','CHEQUEO','POSICIÓN','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','ROT/SEM','ROT/MES','PALLETS','UNID. EN RACK','STOCK TOTAL','FUERA DE RACK','COMPARTE'],
-    ...rows.map((r,i)=>[
-      i+1, 'N'+r.nivelActual, 'N'+r.nivelEsperado,
-      r.nivelActual===r.nivelEsperado ? 'OK' : '⚠️ revisar',
-      r.pos, r.art, r.med, r.diseno, r.prov,
-      r.rot_sem.toFixed(2), r.rot_mes.toFixed(2), r.pallets, r.unidades,
-      r.stockTotal, r.fueraDeRack,
-      r.compartidos ? ('Sí ('+r.compartidos+')') : 'No'
-    ])
-  ];
-
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [{wch:4},{wch:6},{wch:9},{wch:10},{wch:18},{wch:8},{wch:14},{wch:10},{wch:12},{wch:9},{wch:9},{wch:8},{wch:12},{wch:11},{wch:12},{wch:10}];
-  ws['!pageSetup'] = {orientation:'landscape'};
-  XLSX.utils.book_append_sheet(wb, ws, 'Rack por rotación');
-
-  // Hoja 2: lo que quedó afuera — candidatos que califican pero no tienen posición en rack
-  const EXCLUIR_PROV3 = ['SPEEDWAY'];
-  const EXCLUIR_USO3  = ['TT','TL','TLSB','TT ','TL '];
-  const BLOQUES_RACK3 = ['2N/3N','2S/2N','1N','1S'];
-  const enRack3 = new Set(Object.values(ASIGN).filter(v=>v&&v.art).map(v=>String(v.art)));
-  const afuera = DATA.filter(r=>{
-    if(enRack3.has(String(r.art))) return false;
-    if(/\d+\.5/.test(r.med||'')) return false;
-    if(EXCLUIR_PROV3.indexOf(r.prov)>=0) return false;
-    if(EXCLUIR_USO3.indexOf((r.uso||'').trim())>=0) return false;
-    if(['AT51','AT52','MT51'].indexOf((r.diseno||'').trim())>=0 && r.prov==='KUMHO') return false; // solo KUMHO
-    if((r.stock||0)<=0) return false;
-    if((r.rot_sem||0)>=5.5) return false;
-    if((r.pall||0)>5) return false;
-    if(r.bloque){
-      const bs=r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
-      if(bs.some(b=>BLOQUES_RACK3.indexOf(b.trim())>=0)) return false;
-    }
-    return true;
-  }).sort((a,b)=>(a.rot_pall_mes||0)-(b.rot_pall_mes||0));
-
-  const wsAfuera = [
-    ['CANDIDATOS QUE QUEDARON AFUERA DEL RACK — '+new Date().toLocaleDateString('es-AR')],
-    ['Califican para el rack (rot < 5.5/sem, 1-5 pallets) pero no tienen posición asignada. Total: '+afuera.length],
-    [],
-    ['#','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','ROT/SEM','ROT/MES','PALLETS','STOCK','BLOQUE ACTUAL','CONDICIÓN'],
-    ...afuera.map((r,i)=>[
-      i+1, r.art, r.med, r.diseno, r.prov,
-      (r.rot_sem||0).toFixed(2), (r.rot_pall_mes||0).toFixed(2),
-      r.pall||0, r.stock||0, r.bloque||'', r.cond||''
-    ])
-  ];
-  const wsA2 = XLSX.utils.aoa_to_sheet(wsAfuera);
-  wsA2['!cols'] = [{wch:4},{wch:8},{wch:14},{wch:10},{wch:12},{wch:9},{wch:9},{wch:8},{wch:8},{wch:14},{wch:12}];
-  XLSX.utils.book_append_sheet(wb, wsA2, 'Quedaron afuera');
-
-  // Hoja 3: comparación contra TODO el stock — adentro, afuera y por qué
-  const BLOQUES_RACK4 = ['2N/3N','2S/2N','1N','1S'];
-  function motivoFuera(r){
-    if((r.stock||0)<=0) return 'Sin stock';
-    if(/\d+\.5/.test(r.med||'')) return 'Camión (.5)';
-    if(r.prov==='SPEEDWAY') return 'Proveedor Speedway';
-    if(['TT','TL','TLSB'].indexOf((r.uso||'').trim())>=0) return 'Uso agrícola';
-    if(['AT51','AT52','MT51'].indexOf((r.diseno||'').trim())>=0 && r.prov==='KUMHO') return 'Diseño excluido (KUMHO)';
-    if(r.bloque){
-      const bs=r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
-      if(bs.some(b=>BLOQUES_RACK4.indexOf(b.trim())>=0)) return 'Bloque protegido (zona rack)';
-    }
-    if((r.rot_sem||0)>=5.5) return 'Rotación alta (≥5.5/sem)';
-    if((r.pall||0)>5) return 'Más de 5 pallets';
-    return 'Califica pero sin lugar';
-  }
-
-  const todos = DATA.map(r=>{
-    const enRackUnid = unidEnRackPorArt[String(r.art)]||0;
-    const estaEnRack = enRackUnid>0;
-    return {
-      art: r.art, med: r.med, diseno: r.diseno, prov: r.prov,
-      stock: r.stock||0, rot_sem: r.rot_sem||0, rot_mes: r.rot_pall_mes||0, pallets: r.pall||0,
-      estaEnRack, enRackUnid,
-      fueraDeRack: Math.max(0, (r.stock||0) - enRackUnid),
-      motivo: estaEnRack ? '' : motivoFuera(r)
-    };
-  }).sort((a,b)=>{
-    if(a.estaEnRack!==b.estaEnRack) return a.estaEnRack ? -1 : 1;
-    return a.rot_mes - b.rot_mes;
-  });
-
-  const wsTodo = [
-    ['COMPARACIÓN CONTRA TODO EL STOCK — '+new Date().toLocaleDateString('es-AR')],
-    ['Total artículos: '+todos.length+' · En rack: '+todos.filter(t=>t.estaEnRack).length+' · Fuera: '+todos.filter(t=>!t.estaEnRack).length],
-    [],
-    ['ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','STOCK TOTAL','ROT/SEM','ROT/MES','PALLETS','EN RACK','UNID. EN RACK','FUERA DE RACK','MOTIVO SI ESTÁ AFUERA'],
-    ...todos.map(t=>[
-      t.art, t.med, t.diseno, t.prov, t.stock,
-      t.rot_sem.toFixed(2), t.rot_mes.toFixed(2), t.pallets,
-      t.estaEnRack?'Sí':'No', t.enRackUnid, t.fueraDeRack, t.motivo
-    ])
-  ];
-  const wsT = XLSX.utils.aoa_to_sheet(wsTodo);
-  wsT['!cols'] = [{wch:8},{wch:14},{wch:10},{wch:12},{wch:11},{wch:9},{wch:9},{wch:8},{wch:8},{wch:12},{wch:12},{wch:24}];
-  XLSX.utils.book_append_sheet(wb, wsT, 'Todo el stock');
-
-  // Hoja 4: cada artículo debe quedar SOLO en rack o SOLO en bloque, nunca partido
-  const partidos = todos
-    .filter(t=>t.estaEnRack)
-    .map(t=>{
-      let estado, detalle;
-      if(t.enRackUnid > t.stock){
-        estado = '🚨 ERROR DE DATOS';
-        detalle = 'Rack tiene '+t.enRackUnid+' pero el stock total es '+t.stock+' — desincronizado';
-      } else if(t.enRackUnid < t.stock){
-        estado = '⚠️ PARTIDO';
-        detalle = t.enRackUnid+' en rack + '+(t.stock-t.enRackUnid)+' fuera (bloque)';
-      } else {
-        estado = 'OK';
-        detalle = 'Las '+t.stock+' unidades están en rack';
-      }
-      return {art:t.art, med:t.med, diseno:t.diseno, stock:t.stock, enRack:t.enRackUnid, estado, detalle};
-    })
-    .filter(t=>t.estado!=='OK');
-
-  const wsPart = [
-    ['CHEQUEO: RACK O BLOQUE, NUNCA AMBOS — '+new Date().toLocaleDateString('es-AR')],
-    [partidos.length ? '⚠️ '+partidos.length+' artículo(s) partidos entre rack y bloque' : '✅ Ningún artículo está partido — todos quedan solo en rack o solo en bloque'],
-    [],
-    ['ARTÍCULO','MEDIDA','DISEÑO','STOCK TOTAL','UNID. EN RACK','ESTADO','DETALLE'],
-    ...partidos.map(p=>[p.art, p.med, p.diseno, p.stock, p.enRack, p.estado, p.detalle])
-  ];
-  const wsP = XLSX.utils.aoa_to_sheet(wsPart);
-  wsP['!cols'] = [{wch:8},{wch:14},{wch:10},{wch:11},{wch:12},{wch:16},{wch:45}];
-  XLSX.utils.book_append_sheet(wb, wsP, 'Rack o Bloque');
-
-  const revisar = rows.filter(r=>r.nivelActual!==r.nivelEsperado).length;
-  XLSX.writeFile(wb, `Listado_Rotacion_Rack_${new Date().toLocaleDateString('es-AR').replace(/\//g,'-')}.xlsx`);
-  showToast('✅ Listado exportado · '+rows.length+' en rack · '+afuera.length+' afuera'+(revisar?' · ⚠️ '+revisar+' para revisar':'')+(partidos.length?' · 🚨 '+partidos.length+' partidos rack/bloque':''));
-}
-
 function imprimirMapa(){
   const wb = XLSX.utils.book_new();
   const wsData = [
@@ -5367,16 +5003,17 @@ function imprimirMapa(){
     if(/\d+\.5/.test(r.med||'')) return false;
     if(EXCLUIR_PROV2.indexOf(r.prov)>=0) return false;
     if(EXCLUIR_USO2.indexOf((r.uso||'').trim())>=0) return false;
-    if(['AT51','AT52','MT51'].indexOf((r.diseno||'').trim())>=0 && r.prov==='KUMHO') return false; // solo KUMHO
+    if(['AT51','AT52','MT51'].indexOf((r.diseno||'').trim())>=0) return false;
     if((r.stock||0)<=0) return false;
     if((r.rot_sem||0)>=5.5) return false;
-    if((r.pall||0)>5) return false;
+    if((r.pall||0)>6) return false;
+    if((r.pall||0)<1) return false;
     if(r.bloque){
       const bs=r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
       if(bs.some(b=>BLOQUES_RACK2.indexOf(b.trim())>=0)) return false;
     }
     return true;
-  }).sort((a,b)=>(a.rot_pall_mes||0)-(b.rot_pall_mes||0));
+  }).sort((a,b)=>(a.rot_sem||0)-(b.rot_sem||0));
 
   if(candidatosNave.length){
     const ZB2=['4N','4S','4S PICKING','5N','5S'];
@@ -5392,7 +5029,7 @@ function imprimirMapa(){
     }
     const wsNave = [
       ['CANDIDATOS EN NAVE SIN LUGAR EN RACK — '+new Date().toLocaleDateString('es-AR')],
-      ['Total: '+candidatosNave.length+' artículos · Criterio: rot < 5.5/sem · pall ≤ 5'],
+      ['Total: '+candidatosNave.length+' artículos · Criterio: rot < 5/sem · pall ≤ 12'],
       [],
       ['ZONA','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','ROT/SEM','ROT/MES','PALLETS','STOCK','BLOQUE','CONDICIÓN'],
       ...candidatosNave.map(r=>[
@@ -5538,7 +5175,7 @@ function _repoCalcTraer(art, unidActual, maxU){
   var excluido = /\d+\.5/.test(art.med||'') ||
                  art.prov==='SPEEDWAY' ||
                  ['TT','TL','TLSB'].indexOf((art.uso||'').trim())>=0 ||
-                 (['AT51','AT52','MT51'].indexOf((art.diseno||'').trim())>=0 && art.prov==='KUMHO');
+                 ['AT51','AT52','MT51'].indexOf((art.diseno||'').trim())>=0;
   var bloqueOk = art.bloque && !['2N/3N','2S/2N','1N','1S'].some(b=>art.bloque.includes(b));
   var hayStock = (art.stock||0) > unidActual; // hay más en bloque que lo que ya está en rack
 
@@ -5629,31 +5266,16 @@ function renderReposicion(){
     return b.art.rot - a.art.rot;
   });
 
-  // Búsqueda por posición o nivel — si hay texto, se busca en TODO el universo de alertas (sin límite de 15)
-  const searchEl = document.getElementById('repo-search');
-  const searchQuery = (searchEl ? searchEl.value : '').trim().toLowerCase();
-  let totalDisponibles = alertas.length;
-  let limitado = false;
-  if(searchQuery){
-    alertas = alertas.filter(a =>
-      a.pos.toLowerCase().includes(searchQuery) ||
-      (a.art.med+' '+a.art.diseno).toLowerCase().includes(searchQuery)
-    );
-    totalDisponibles = alertas.length;
-  } else {
-    // Limitar a un listado abordable en 1 hora de turno (máx. 15 posiciones, las más prioritarias)
-    const LIMITE_REPO_DIARIA = 15;
-    limitado = alertas.length > LIMITE_REPO_DIARIA;
-    alertas = alertas.slice(0, LIMITE_REPO_DIARIA);
-  }
+  // Limitar a un listado abordable en 1 hora de turno (máx. 15 posiciones, las más prioritarias)
+  const LIMITE_REPO_DIARIA = 15;
+  const totalDisponibles = alertas.length;
+  alertas = alertas.slice(0, LIMITE_REPO_DIARIA);
 
   window._repoAlertas = alertas;
 
   const el = document.getElementById('repo-content');
   if(!alertas.length){
-    el.innerHTML = searchQuery
-      ? '<div style="text-align:center;padding:40px;color:#86868b;font-size:14px">🔍 Sin resultados para "'+searchEl.value+'"</div>'
-      : '<div style="text-align:center;padding:40px;color:#34c759;font-size:14px">✅ Sin posiciones para reponer hoy</div>';
+    el.innerHTML='<div style="text-align:center;padding:40px;color:#34c759;font-size:14px">✅ Sin posiciones para reponer hoy</div>';
     return;
   }
 
@@ -5668,8 +5290,7 @@ function renderReposicion(){
       <div class="repo-stat"><div class="repo-stat-val">${alertas.length}</div><div class="repo-stat-lbl">Mostrando${totalDisponibles>alertas.length?' (de '+totalDisponibles+')':''}</div></div>
       <div class="repo-stat"><div class="repo-stat-val" style="color:#0071e3">${conAccion}</div><div class="repo-stat-lbl">Con acción bloque</div></div>
     </div>
-    ${limitado?`<div style="text-align:center;font-size:11px;color:#86868b;margin-bottom:10px">Mostrando las ${alertas.length} posiciones más prioritarias para resolver en 1 hora · quedan ${totalDisponibles-alertas.length} para mañana</div>`:''}
-    ${searchQuery?`<div style="text-align:center;font-size:11px;color:#0071e3;margin-bottom:10px">🔍 ${alertas.length} resultado(s) para "${searchEl.value}"</div>`:''}
+    ${totalDisponibles>alertas.length?`<div style="text-align:center;font-size:11px;color:#86868b;margin-bottom:10px">Mostrando las ${alertas.length} posiciones más prioritarias para resolver en 1 hora · quedan ${totalDisponibles-alertas.length} para mañana</div>`:''}
     ${alertas.map((a,i)=>`
       <div class="repo-card ${a.esCritico?'critico':'advertencia'}">
         <div class="repo-row">
@@ -6230,8 +5851,7 @@ function generarInforme(){
 </div>
 
 <div class="nav-submenu" id="sub-dash">
-  <div class="nav-sub-item" id="sub-repo-dash" onclick="navTo('repo')"><span class="nav-sub-icon">🔄</span><span class="nav-sub-label">Reposición</span></div>
-  <div class="nav-sub-item" id="sub-dash-item" onclick="navTo('dash')"><span class="nav-sub-icon">📊</span><span class="nav-sub-label">KPIs</span></div>
+  <div class="nav-sub-item" id="sub-dash-item" onclick="navTo('dash')"><span class="nav-sub-icon">📊</span><span class="nav-sub-label">Dashboard</span></div>
 </div>
 
 
@@ -6340,23 +5960,14 @@ var PERSONAL_BASE = getPersonalBase();
 
 const GRUPOS_COLORES = {C:'#86868b', G1:'#0071e3', G2:'#34c759', G3:'#ff9500', R:'#af52de', ZF:'#ff3b30'};
 const GRUPOS_NOMBRES = {C:'Controladores', G1:'Grupo 1', G2:'Grupo 2', G3:'Grupo 3', R:'Chasis', ZF:'Equipo ZF'};
-const JORNADA_MIN = 525; // jornada neta de trabajo: 9,5 hs (570 min) menos desayuno/almuerzo
 
 function getTodayKey(){
-  return 'grupos_'+_fechaKeyDDMMYYYY();
+  return 'grupos_'+new Date().toLocaleDateString('es-AR').replace(/\//g,'-');
 }
 
 function getGruposHoy(){
   var key = getTodayKeyFecha();
   var saved = localStorage.getItem(key);
-  if(!saved){
-    // Compat: datos guardados antes del fix de zero-padding en la clave de fecha
-    var m = key.match(/^grupos_(\d{2})-(\d{2})-(\d{4})$/);
-    if(m){
-      var keyVieja = 'grupos_'+(+m[1])+'-'+(+m[2])+'-'+m[3];
-      if(keyVieja !== key) saved = localStorage.getItem(keyVieja);
-    }
-  }
   if(saved) return JSON.parse(saved);
   var base = getPersonalBase();
   return base.map(function(p){ return {nombre:p.nombre,grupo:p.grupo,grupoHoy:p.grupo,presente:true,novedad:'',novedadDetalle:''}; });
@@ -6384,13 +5995,11 @@ function setGruposTab(tab, btn){
   document.getElementById('grupos-hoy-panel').style.display   = tab==='hoy'  ?'block':'none';
   document.getElementById('grupos-hist-panel').style.display  = tab==='hist' ?'block':'none';
   document.getElementById('grupos-kpi-panel').style.display   = tab==='kpi'  ?'block':'none';
-  document.getElementById('grupos-viajes-panel').style.display= tab==='viajes'?'block':'none';
   document.getElementById('grupos-abm-panel').style.display   = tab==='abm'  ?'block':'none';
-  if(tab==='hoy')    renderGruposHoy();
-  if(tab==='hist')   renderGruposHist();
-  if(tab==='kpi')    renderGruposKPI();
-  if(tab==='viajes') renderGruposViajes();
-  if(tab==='abm')    renderGruposABM();
+  if(tab==='hoy')  renderGruposHoy();
+  if(tab==='hist') renderGruposHist();
+  if(tab==='kpi')  renderGruposKPI();
+  if(tab==='abm')  renderGruposABM();
 }
 
 function renderGruposKPI(){
@@ -6463,7 +6072,7 @@ function renderGruposKPI(){
   html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">';
   html += _kpiCard('Unidades hoy','#0071e3', totalUnidDia.toLocaleString('es-AR'), 'total');
   html += _kpiCard('Personas presentes','#34c759', totalPres, 'personas');
-  html += _kpiCard('Unid/persona hoy','#ff9500', unidPorCabezaDia, 'promedio');
+  html += _kpiCard('Unid/cabeza hoy','#ff9500', unidPorCabezaDia, 'promedio');
   html += '</div>';
 
   // Ranking por grupo — HOY
@@ -6480,7 +6089,7 @@ function renderGruposKPI(){
     html += '<div style="margin-bottom:8px">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">';
     html += '<span style="font-size:12px;font-weight:700;color:'+color+'">'+GRUPOS_NOMBRES[g]+'</span>';
-    html += '<span style="font-size:11px;color:#86868b">'+pres+' pers. · <b style="color:'+color+'">'+u.toLocaleString('es-AR')+'</b> un. · <b>'+upc+'</b>/persona</span>';
+    html += '<span style="font-size:11px;color:#86868b">'+pres+' pers. · <b style="color:'+color+'">'+u.toLocaleString('es-AR')+'</b> un. · <b>'+upc+'</b>/cabeza</span>';
     html += '</div>';
     html += '<div style="background:#f5f5f7;border-radius:6px;height:8px;overflow:hidden">';
     html += '<div style="width:'+pct+'%;height:100%;background:'+color+';border-radius:6px;transition:width .4s"></div>';
@@ -6490,7 +6099,7 @@ function renderGruposKPI(){
 
   // Ranking por grupo — MES
   html += '<div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:12px;margin-bottom:10px">';
-  html += '<div style="font-size:12px;font-weight:700;color:#86868b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Mes — Promedio unidades/persona/día</div>';
+  html += '<div style="font-size:12px;font-weight:700;color:#86868b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Mes — Promedio unidades/cabeza/día</div>';
   var rankMes = grupos
     .map(function(g){ return {g:g, prom:promCabeza(g), total:mesGrupo[g].unid, dias:mesGrupo[g].dias}; })
     .filter(function(x){return x.total>0;})
@@ -6935,175 +6544,9 @@ function exportarInformeMensual(){
   showToast('✅ Informe mensual exportado');
 }
 
-// ── Viajes de Chasis (kms / combustible / fondo fijo) ────────
-function getViajesChasis(){
-  try{ var s = localStorage.getItem('viajes_chasis'); return s?JSON.parse(s):[]; }catch(e){ return []; }
-}
-function saveViajesChasis(arr){
-  localStorage.setItem('viajes_chasis', JSON.stringify(arr));
-}
-function _viajesIsoHoy(){
-  var d = new Date();
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
-function _viajesMesDe(fechaStr){
-  var p = (fechaStr||'').split('/'); // DD/MM/YYYY
-  return p.length===3 ? (p[2]+'-'+p[1]) : '';
-}
-function cambiarMesViajes(val){
-  window._viajesMesSel = val;
-  renderGruposViajes();
-}
-
-function renderGruposViajes(){
-  var panel = document.getElementById('grupos-viajes-panel');
-  if(!panel) return;
-
-  if(!window._viajesMesSel){
-    var d = new Date();
-    window._viajesMesSel = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-  }
-
-  var viajes = getViajesChasis();
-  var delMes = viajes.filter(function(v){ return _viajesMesDe(v.fecha)===window._viajesMesSel; });
-
-  var totalKm    = delMes.reduce(function(s,v){ return s+(+v.km||0); },0);
-  var totalComb  = delMes.reduce(function(s,v){ return s+(+v.gastoCombustible||0); },0);
-  var totalFondo = delMes.reduce(function(s,v){ return s+(+v.gastoFondoFijo||0); },0);
-
-  var choferOpts = getPersonalBase().filter(function(p){ return p.grupo==='R'; })
-    .map(function(p){ return '<option value="'+p.nombre+'">'+p.nombre+'</option>'; }).join('')
-    + '<option value="Otro">Otro</option>';
-
-  var html = '';
-
-  html += '<div class="prod-form">'+
-    '<div class="prod-form-title">🚚 Nuevo viaje de chasis</div>'+
-    '<div class="prod-input-row">'+
-      '<div><div class="prod-label">Fecha</div><input type="date" id="via-fecha" class="prod-input" value="'+_viajesIsoHoy()+'"></div>'+
-      '<div><div class="prod-label">Chofer</div><select id="via-chofer" class="prod-input">'+choferOpts+'</select></div>'+
-    '</div>'+
-    '<div class="prod-input-row">'+
-      '<div><div class="prod-label">Destino / Motivo</div><input type="text" id="via-destino" class="prod-input" placeholder="Ej: Retiro chasis San Rafael"></div>'+
-      '<div><div class="prod-label">Kms recorridos</div><input type="number" id="via-km" class="prod-input" placeholder="0" min="0"></div>'+
-    '</div>'+
-    '<div class="prod-input-row">'+
-      '<div><div class="prod-label">Gasto combustible ($)</div><input type="number" id="via-comb" class="prod-input" placeholder="0" min="0"></div>'+
-      '<div><div class="prod-label">Gasto fondo fijo ($)</div><input type="number" id="via-fondo" class="prod-input" placeholder="0" min="0"></div>'+
-    '</div>'+
-    '<div class="prod-input-row full"><div><div class="prod-label">Observaciones</div><input type="text" id="via-obs" class="prod-input" placeholder="opcional"></div></div>'+
-    '<button class="prod-save-btn" onclick="agregarViaje()">💾 Guardar viaje</button>'+
-  '</div>';
-
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">'+
-    '<input type="month" value="'+window._viajesMesSel+'" onchange="cambiarMesViajes(this.value)" style="padding:6px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px">'+
-    '<button onclick="exportarViajesExcel()" style="padding:8px 12px;background:#1d1d1f;color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer">📄 Exportar</button>'+
-  '</div>';
-
-  html += '<div class="prod-resumen">'+
-    '<div class="prod-res-card"><div class="prod-res-val" style="color:#af52de">'+totalKm.toLocaleString('es-AR')+'</div><div class="prod-res-lbl">KM DEL MES</div></div>'+
-    '<div class="prod-res-card"><div class="prod-res-val" style="color:#ff9500">$'+totalComb.toLocaleString('es-AR')+'</div><div class="prod-res-lbl">COMBUSTIBLE</div></div>'+
-    '<div class="prod-res-card"><div class="prod-res-val" style="color:#0071e3">$'+totalFondo.toLocaleString('es-AR')+'</div><div class="prod-res-lbl">FONDO FIJO</div></div>'+
-  '</div>';
-
-  if(!delMes.length){
-    html += '<div class="empty">Sin viajes registrados este mes</div>';
-  } else {
-    var ordenados = delMes.slice().sort(function(a,b){
-      return new Date(b.fecha.split('/').reverse().join('-')) - new Date(a.fecha.split('/').reverse().join('-'));
-    });
-    ordenados.forEach(function(v){
-      html += '<div class="mov-card" style="align-items:flex-start;flex-wrap:wrap">'+
-        '<div class="mov-info">'+
-          '<div class="mov-title">'+v.fecha+' — '+(v.chofer||'—')+'</div>'+
-          '<div class="mov-sub">'+(v.destino||'Sin destino')+(v.obs?' · '+v.obs:'')+'</div>'+
-        '</div>'+
-        '<div class="mov-stats">'+
-          '<div class="mov-unid">'+(v.km||0)+' km</div>'+
-          '<div class="mov-time">⛽ $'+(+v.gastoCombustible||0).toLocaleString('es-AR')+' · 💰 $'+(+v.gastoFondoFijo||0).toLocaleString('es-AR')+'</div>'+
-        '</div>'+
-        '<button onclick="eliminarViaje('+v.id+')" style="width:100%;margin-top:6px;padding:6px;background:#fff5f5;color:#d70015;border:1px solid #ffd6d9;border-radius:8px;font-size:11px;cursor:pointer">🗑️ Eliminar</button>'+
-      '</div>';
-    });
-  }
-
-  panel.innerHTML = html;
-}
-
-function agregarViaje(){
-  var fechaInput = document.getElementById('via-fecha').value; // YYYY-MM-DD
-  if(!fechaInput){ showToast('⚠️ Falta la fecha'); return; }
-  var partes = fechaInput.split('-');
-  var fecha = partes[2]+'/'+partes[1]+'/'+partes[0];
-  var chofer   = document.getElementById('via-chofer').value;
-  var destino  = document.getElementById('via-destino').value.trim();
-  var km       = +document.getElementById('via-km').value || 0;
-  var comb     = +document.getElementById('via-comb').value || 0;
-  var fondo    = +document.getElementById('via-fondo').value || 0;
-  var obs      = document.getElementById('via-obs').value.trim();
-
-  if(!km && !comb && !fondo){ showToast('⚠️ Ingresá al menos kms o un gasto'); return; }
-
-  var viajes = getViajesChasis();
-  viajes.push({
-    id: Date.now(),
-    fecha: fecha,
-    chofer: chofer,
-    destino: destino,
-    km: km,
-    gastoCombustible: comb,
-    gastoFondoFijo: fondo,
-    obs: obs
-  });
-  saveViajesChasis(viajes);
-
-  document.getElementById('via-destino').value='';
-  document.getElementById('via-km').value='';
-  document.getElementById('via-comb').value='';
-  document.getElementById('via-fondo').value='';
-  document.getElementById('via-obs').value='';
-
-  showToast('✅ Viaje registrado');
-  renderGruposViajes();
-}
-
-function eliminarViaje(id){
-  if(!confirm('¿Eliminar este viaje?')) return;
-  var viajes = getViajesChasis().filter(function(v){ return v.id!==id; });
-  saveViajesChasis(viajes);
-  showToast('🗑️ Viaje eliminado');
-  renderGruposViajes();
-}
-
-function exportarViajesExcel(){
-  var viajes = getViajesChasis();
-  if(!viajes.length){ showToast('Sin viajes para exportar'); return; }
-  var wb = XLSX.utils.book_new();
-  var ws = [
-    ['VIAJES DE CHASIS'],
-    [],
-    ['FECHA','CHOFER','DESTINO/MOTIVO','KMS','GASTO COMBUSTIBLE','GASTO FONDO FIJO','OBSERVACIONES']
-  ];
-  var ordenados = viajes.slice().sort(function(a,b){
-    return new Date(a.fecha.split('/').reverse().join('-')) - new Date(b.fecha.split('/').reverse().join('-'));
-  });
-  var totKm=0, totComb=0, totFondo=0;
-  ordenados.forEach(function(v){
-    ws.push([v.fecha, v.chofer||'', v.destino||'', v.km||0, v.gastoCombustible||0, v.gastoFondoFijo||0, v.obs||'']);
-    totKm += (+v.km||0); totComb += (+v.gastoCombustible||0); totFondo += (+v.gastoFondoFijo||0);
-  });
-  ws.push([]);
-  ws.push(['TOTALES','','',totKm,totComb,totFondo,'']);
-  var wsSheet = XLSX.utils.aoa_to_sheet(ws);
-  wsSheet['!cols'] = [{wch:12},{wch:22},{wch:30},{wch:8},{wch:16},{wch:14},{wch:35}];
-  XLSX.utils.book_append_sheet(wb, wsSheet, 'Viajes Chasis');
-  XLSX.writeFile(wb, 'Viajes_Chasis_'+_fechaKeyDDMMYYYY()+'.xlsx');
-  showToast('✅ Exportado');
-}
-
 
 // === PRODUCTIVIDAD ===
-let _prodTipo = 'pedidos';
+let _prodTipo = 'carga';
 let _prodGrupo = 'G1';
 
 // ── Registrar movimiento automático en productividad ──────────
@@ -7130,14 +6573,12 @@ function registrarMovProd(tipo, unidades, detalle){
       auto: true            // marca que fue generado automáticamente
     };
 
-    // Usar getProdKey() que siempre genera clave zero-padded (DD-MM-YYYY)
     var dayKey = getProdKey();
-    var movsDia = _leerMovsConFallback('prod_', new Date()); // leer con fallback por compat
+    var movsDia = JSON.parse(localStorage.getItem(dayKey)||'[]');
     movsDia.push(mov);
     localStorage.setItem(dayKey, JSON.stringify(movsDia));
 
-    var mes = _fechaKeyDDMMYYYY().slice(3); // MM-YYYY → reemplazar - por _
-    mes = mes.replace('-','_');
+    var mes = new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
     var histKey = 'prod_hist_'+mes;
     var hist = JSON.parse(localStorage.getItem(histKey)||'[]');
     hist.push(mov);
@@ -7145,47 +6586,21 @@ function registrarMovProd(tipo, unidades, detalle){
   } catch(e){ console.warn('registrarMovProd error', e); }
 }
 
-function _fechaKeyDDMMYYYY(d){
-  d = d || new Date();
-  var dd = String(d.getDate()).padStart(2,'0');
-  var mm = String(d.getMonth()+1).padStart(2,'0');
-  var yyyy = d.getFullYear();
-  return dd+'-'+mm+'-'+yyyy;
-}
-
 function getProdKey(){
-  return 'prod_'+_fechaKeyDDMMYYYY();
-}
-
-function _leerMovsConFallback(prefix, fechaObj){
-  // Lee con la clave nueva (siempre con ceros). Si no hay nada, prueba la clave vieja
-  // (sin ceros en día/mes) para no perder movimientos ya guardados antes del fix.
-  var dd  = String(fechaObj.getDate()).padStart(2,'0');
-  var mm  = String(fechaObj.getMonth()+1).padStart(2,'0');
-  var yyyy = fechaObj.getFullYear();
-  var keyNueva = prefix+dd+'-'+mm+'-'+yyyy;
-  var raw = localStorage.getItem(keyNueva);
-  if(raw) return JSON.parse(raw);
-
-  var keyVieja = prefix+fechaObj.getDate()+'-'+(fechaObj.getMonth()+1)+'-'+yyyy;
-  if(keyVieja !== keyNueva){
-    raw = localStorage.getItem(keyVieja);
-    if(raw) return JSON.parse(raw);
-  }
-  return [];
+  return 'prod_'+new Date().toLocaleDateString('es-AR').replace(/\//g,'-');
 }
 
 function getMovimientos(){
-  return _leerMovsConFallback('prod_', new Date());
+  return JSON.parse(localStorage.getItem(getProdKey())||'[]');
 }
 
 function saveMovimiento(mov){
   const movs = getMovimientos();
   movs.push(mov);
   localStorage.setItem(getProdKey(), JSON.stringify(movs));
-  // Save to monthly history — usar _fechaKeyDDMMYYYY para consistencia
-  const mesRaw = _fechaKeyDDMMYYYY().slice(3).replace('-','_'); // MM_YYYY
-  const histKey = 'prod_hist_'+mesRaw;
+  // Save to monthly history
+  const mes = new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+  const histKey = 'prod_hist_'+mes;
   const hist = JSON.parse(localStorage.getItem(histKey)||'[]');
   hist.push(mov);
   localStorage.setItem(histKey, JSON.stringify(hist));
@@ -7198,54 +6613,6 @@ function checkFechaManual(val){
   _prodFechaManual = val || null;
   // Update lista to show movements for selected date
   renderProdLista();
-  renderHuecosDia();
-  renderProdResumen();
-}
-
-function migrarMovsDia(){
-  // Fusiona movimientos guardados con clave sin ceros (bug viejo)
-  // hacia la clave con ceros (formato actual), para el día actual.
-  var hoy = new Date();
-  var dd   = String(hoy.getDate()).padStart(2,'0');
-  var mm   = String(hoy.getMonth()+1).padStart(2,'0');
-  var yyyy = hoy.getFullYear();
-  var keyNueva = 'prod_'+dd+'-'+mm+'-'+yyyy;
-  var keyVieja = 'prod_'+hoy.getDate()+'-'+(hoy.getMonth()+1)+'-'+yyyy;
-
-  if(keyVieja === keyNueva){
-    showToast('✅ Sin diferencias — el día de hoy no tiene cero en mes/día');
-    return;
-  }
-  var rawVieja = localStorage.getItem(keyVieja);
-  if(!rawVieja){
-    showToast('✅ Sin datos en clave vieja — nada que migrar');
-    return;
-  }
-  var movsViejos = JSON.parse(rawVieja);
-  if(!movsViejos.length){
-    showToast('✅ Clave vieja vacía — nada que migrar');
-    return;
-  }
-  var movsNuevos = JSON.parse(localStorage.getItem(keyNueva)||'[]');
-  // Deduplicar: comparar tipo+destino+unidades+hora
-  var existentes = new Set(movsNuevos.map(function(m){ return m.tipo+'|'+m.destino+'|'+m.unidades+'|'+m.hora; }));
-  var agregados = 0;
-  movsViejos.forEach(function(m){
-    var sig = m.tipo+'|'+m.destino+'|'+m.unidades+'|'+m.hora;
-    if(!existentes.has(sig)){
-      movsNuevos.push(m);
-      existentes.add(sig);
-      agregados++;
-    }
-  });
-  if(!agregados){
-    showToast('✅ Todos los movimientos ya estaban en la clave actual');
-    return;
-  }
-  localStorage.setItem(keyNueva, JSON.stringify(movsNuevos));
-  showToast('✅ '+agregados+' movimiento(s) recuperado(s) correctamente');
-  renderProdLista();
-  renderHuecosDia();
   renderProdResumen();
 }
 
@@ -7257,12 +6624,8 @@ function getProdKeyFecha(fecha){
 }
 
 function getMovimientosFecha(){
-  if(_prodFechaManual){
-    const parts = _prodFechaManual.split('-'); // yyyy-mm-dd del input date
-    const fechaObj = new Date(+parts[0], +parts[1]-1, +parts[2]);
-    return _leerMovsConFallback('prod_', fechaObj);
-  }
-  return getMovimientos();
+  const key = _prodFechaManual ? getProdKeyFecha(_prodFechaManual) : getProdKey();
+  return JSON.parse(localStorage.getItem(key)||'[]');
 }
 
 // Override guardarMovimiento to use manual date
@@ -7284,7 +6647,7 @@ function guardarMovimientoFecha(){
   const darsena = document.getElementById('prod-darsena').value||'';
   const destino = document.getElementById('prod-destino-mov').value||'';
 
-  if(!unidades && !(inicio && fin)){ showToast('❌ Ingresá unidades o el horario (inicio/fin)'); return; }
+  if(!unidades){ showToast('❌ Ingresá las unidades'); return; }
   if(!_prodGrupo){ showToast('❌ Seleccioná un grupo'); return; }
 
   let durMin = 0;
@@ -7340,7 +6703,6 @@ function guardarMovimientoFecha(){
 
   renderProdResumen();
   renderProdLista();
-  renderHuecosDia();
   const fechaLabel = _prodFechaManual ? ' ('+fechaMov+')' : '';
   showToast('✅ Movimiento registrado'+fechaLabel);
 }
@@ -7387,7 +6749,6 @@ function renderProductividad(){
 
   renderProdResumen();
   renderProdLista();
-  renderHuecosDia();
 }
 
 function setProdTipo(tipo, btn){
@@ -7411,7 +6772,7 @@ function guardarMovimiento(){
   const darsena = document.getElementById('prod-darsena').value||'';
   const destino = document.getElementById('prod-destino-mov').value||'';
 
-  if(!unidades && !(inicio && fin)){ showToast('❌ Ingresá unidades o el horario (inicio/fin)'); return; }
+  if(!unidades){ showToast('❌ Ingresá las unidades'); return; }
   if(!_prodGrupo){ showToast('❌ Seleccioná un grupo'); return; }
 
   // Calcular duración
@@ -7451,196 +6812,21 @@ function guardarMovimiento(){
 
   renderProdResumen();
   renderProdLista();
-  renderHuecosDia();
   showToast('✅ Movimiento registrado');
-}
-
-function _tipoLabelProd(tipo){
-  return tipo==='carga'?'📥 Carga':tipo==='descarga'?'📤 Descarga':tipo==='despacho'?'📋 Despacho':tipo==='pedidos'?'📝 Pedidos':tipo==='orden'?'🧹 Orden/Limpieza':tipo==='stock'?'📦 Stock':tipo==='chasis'?'🚗 Chasis':tipo;
 }
 
 function renderProdResumen(){
   const movs = getMovimientosFecha();
   const totalUnid = movs.reduce((s,m)=>s+m.unidades,0);
   const totalSemis = movs.reduce((s,m)=>s+m.semis,0);
-
-  // Tiempo REAL trabajado/perdido: se calcula por grupo, fusionando intervalos
-  // solapados (misma lógica que los huecos de más abajo). Sumar durMin "a lo bruto"
-  // duplica cuando dos grupos trabajan en paralelo — esto no.
-  // Además, cada grupo se pondera por su dotación (personas presentes ese día en
-  // ese grupo) para obtener Horas-Hombre reales, no solo minutos de reloj.
-  const personalHoy = getGruposHoy();
-  const gruposConGente = [...new Set(personalHoy.filter(p=>p.presente).map(p=>p.grupoHoy))];
-  const esHoyResumen = !_prodFechaManual;
-  let finLimiteResumen = JORNADA_FIN_MIN;
-  if(esHoyResumen){
-    const ahora = new Date();
-    finLimiteResumen = Math.min(JORNADA_FIN_MIN, ahora.getHours()*60+ahora.getMinutes());
-  }
-  let totalTrabajado = 0, totalPerdido = 0; // minutos, sin ponderar (solo referencia)
-  let totalHHTrabajado = 0, totalHHPerdido = 0; // horas-hombre, ponderadas por dotación
-  const detalleGrupos = [];
-  if(finLimiteResumen > JORNADA_INICIO_MIN){
-    gruposConGente.forEach(g=>{
-      const huecos = calcularHuecosGrupo(movs, g, finLimiteResumen);
-      const perdidoG = huecos.reduce((s,h)=>s+h.dur,0);
-      const trabajadoG = Math.max(0, (finLimiteResumen - JORNADA_INICIO_MIN) - perdidoG);
-      const dotacionG = personalHoy.filter(p=>p.presente && p.grupoHoy===g).length || 1;
-      const hhTrabajadoG = (trabajadoG/60) * dotacionG;
-      const hhPerdidoG   = (perdidoG/60) * dotacionG;
-      totalTrabajado += trabajadoG;
-      totalPerdido += perdidoG;
-      totalHHTrabajado += hhTrabajadoG;
-      totalHHPerdido += hhPerdidoG;
-      detalleGrupos.push({g, dotacionG, trabajadoG, perdidoG, hhTrabajadoG, hhPerdidoG});
-    });
-  }
-  const cubPorHH = totalHHTrabajado>0 ? (totalUnid/totalHHTrabajado) : 0;
-
+  const totalDurMin = movs.filter(m=>m.durMin>0).reduce((s,m)=>s+m.durMin,0);
   const el = document.getElementById('prod-resumen');
   if(!el) return;
   el.innerHTML = `
     <div class="prod-res-card"><div class="prod-res-val" style="color:#0071e3">${totalUnid.toLocaleString('es-AR')}</div><div class="prod-res-lbl">Unidades hoy</div></div>
     <div class="prod-res-card"><div class="prod-res-val">${totalSemis}</div><div class="prod-res-lbl">Semis / Pedidos</div></div>
-    <div class="prod-res-card"><div class="prod-res-val" style="color:#34c759">${totalHHTrabajado>0?totalHHTrabajado.toFixed(1).replace('.',',')+' HH':'—'}</div><div class="prod-res-lbl">HH trabajadas</div></div>
+    <div class="prod-res-card"><div class="prod-res-val">${totalDurMin>0?Math.round(totalDurMin/60)+'h '+totalDurMin%60+'m':'—'}</div><div class="prod-res-lbl">Tiempo total</div></div>
   `;
-
-  // KPI principal: Cubiertas por Hora-Hombre
-  const elCub = document.getElementById('prod-cubhh');
-  if(elCub){
-    elCub.innerHTML = !gruposConGente.length ? '' : `
-      <div style="background:linear-gradient(135deg,#0071e3,#af52de);border-radius:12px;padding:14px;margin-bottom:8px;color:#fff;display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.5px">🎯 Cubiertas por Hora-Hombre</div>
-          <div style="font-size:10px;opacity:.7;margin-top:2px">${totalUnid.toLocaleString('es-AR')} unid ÷ ${totalHHTrabajado.toFixed(1).replace('.',',')} HH</div>
-        </div>
-        <div style="font-size:26px;font-weight:700">${cubPorHH>0?Math.round(cubPorHH).toLocaleString('es-AR'):'—'}</div>
-      </div>`;
-  }
-
-  // Línea de perdido real, al lado del desglose por tipo
-  const elTiempo = document.getElementById('prod-resumen-perdido');
-  if(elTiempo){
-    elTiempo.innerHTML = !gruposConGente.length ? '' : `
-      <div style="display:flex;justify-content:space-between;padding:6px 10px;background:#fff;border:1px solid #e5e5ea;border-radius:8px;margin-bottom:6px">
-        <span style="font-size:11px;color:#86868b">⏱️ Grupos presentes (${gruposConGente.join(', ')}), ${_minAHhmm(JORNADA_INICIO_MIN)}–${_minAHhmm(finLimiteResumen)}</span>
-        <span style="font-size:11px;font-weight:700;color:#d70015">🔴 Perdido: ${totalHHPerdido>0?totalHHPerdido.toFixed(1).replace('.',',')+' HH':'0 HH'}</span>
-      </div>`;
-  }
-
-  // Desglose por tipo — para que el total no se vea como un solo número mezclado
-  // (ej: Pedidos preparados vs Despachos confirmados no son lo mismo, aunque ambos sumen "unidades")
-  const elTipos = document.getElementById('prod-resumen-tipos');
-  if(elTipos){
-    const porTipo = {};
-    movs.forEach(m=>{ if(m.unidades) porTipo[m.tipo]=(porTipo[m.tipo]||0)+m.unidades; });
-    const entries = Object.entries(porTipo).sort((a,b)=>b[1]-a[1]);
-    elTipos.innerHTML = entries.length<=1 ? '' : `
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${entries.map(([tipo,unid])=>`
-          <div style="flex:1;min-width:100px;background:#fff;border:1px solid #e5e5ea;border-radius:8px;padding:6px 8px;text-align:center">
-            <div style="font-size:13px;font-weight:700">${unid.toLocaleString('es-AR')}</div>
-            <div style="font-size:9px;color:#86868b">${_tipoLabelProd(tipo)}</div>
-          </div>`).join('')}
-      </div>`;
-  }
-}
-
-// ── HUECOS DEL DÍA (tramos sin actividad registrada) ──
-const JORNADA_INICIO_MIN = 8*60+15;  // 08:15 — arranque real (después de entrar 8:00)
-const JORNADA_FIN_MIN    = 17*60+30; // 17:30 — salida
-
-function _hhmmAMin(hhmm){
-  if(!hhmm) return null;
-  const [h,m] = hhmm.split(':').map(Number);
-  return h*60+m;
-}
-function _minAHhmm(min){
-  const h = Math.floor(min/60), m = min%60;
-  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
-}
-
-function calcularHuecosGrupo(movs, grupo, finLimite){
-  finLimite = finLimite==null ? JORNADA_FIN_MIN : finLimite;
-  // Intervalos [inicio,fin] en minutos, del grupo, con horario cargado
-  const intervalos = movs
-    .filter(m=>m.grupo===grupo && m.inicio && m.fin)
-    .map(m=>{
-      let a = _hhmmAMin(m.inicio), b = _hhmmAMin(m.fin);
-      if(a==null||b==null) return null;
-      if(b<a) return null; // horario inválido, se ignora
-      a = Math.max(a, JORNADA_INICIO_MIN);
-      b = Math.min(b, finLimite);
-      if(b<=a) return null;
-      return [a,b];
-    })
-    .filter(Boolean)
-    .sort((x,y)=>x[0]-y[0]);
-
-  // Fusionar solapados/adyacentes
-  const fusion = [];
-  intervalos.forEach(iv=>{
-    if(fusion.length && iv[0] <= fusion[fusion.length-1][1]){
-      fusion[fusion.length-1][1] = Math.max(fusion[fusion.length-1][1], iv[1]);
-    } else {
-      fusion.push(iv.slice());
-    }
-  });
-
-  // Huecos entre jornada e intervalos
-  const huecos = [];
-  let cursor = JORNADA_INICIO_MIN;
-  if(cursor >= finLimite) return []; // la jornada todavía no arrancó
-  fusion.forEach(iv=>{
-    if(iv[0] > cursor) huecos.push({inicio:cursor, fin:iv[0], dur:iv[0]-cursor});
-    cursor = Math.max(cursor, iv[1]);
-  });
-  if(cursor < finLimite) huecos.push({inicio:cursor, fin:finLimite, dur:finLimite-cursor});
-
-  return huecos.filter(h=>h.dur >= 5); // ignorar huecos triviales de redondeo
-}
-
-function renderHuecosDia(){
-  const el = document.getElementById('prod-huecos');
-  if(!el) return;
-  const movs = getMovimientosFecha();
-  const personal = getGruposHoy();
-  const gruposHoy = [...new Set(personal.filter(p=>p.presente).map(p=>p.grupoHoy))];
-
-  // Si estamos viendo el día de HOY, no calcular huecos más allá de la hora actual
-  // (las horas que todavía no pasaron no pueden ser "tiempo muerto")
-  const esHoy = !_prodFechaManual;
-  let finLimite = JORNADA_FIN_MIN;
-  if(esHoy){
-    const ahora = new Date();
-    const nowMin = ahora.getHours()*60 + ahora.getMinutes();
-    finLimite = Math.min(JORNADA_FIN_MIN, nowMin);
-  }
-
-  if(!gruposHoy.length){ el.innerHTML = '<div class="empty">Sin grupos presentes para calcular huecos</div>'; return; }
-
-  const notaHoy = esHoy ? `<div style="font-size:10px;color:#86868b;margin-bottom:8px">Calculado hasta la hora actual (${_minAHhmm(finLimite)}) — lo que falta del día todavía no cuenta</div>` : '';
-
-  el.innerHTML = notaHoy + gruposHoy.map(g=>{
-    const huecos = calcularHuecosGrupo(movs, g, finLimite);
-    const color = GRUPOS_COLORES[g]||'#86868b';
-    if(!huecos.length){
-      return `<div style="background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:10px 12px;margin-bottom:6px">
-        <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:2px">${GRUPOS_NOMBRES[g]||g}</div>
-        <div style="font-size:11px;color:#34c759">✅ Sin huecos — cubierto de ${_minAHhmm(JORNADA_INICIO_MIN)} a ${_minAHhmm(finLimite)}</div>
-      </div>`;
-    }
-    return `<div style="background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:10px 12px;margin-bottom:6px">
-      <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:6px">${GRUPOS_NOMBRES[g]||g}</div>
-      ${huecos.map(h=>{
-        const badge = h.dur>=40 && h.dur<=70 ? '🍽️ posible almuerzo' : h.dur>=10 && h.dur<40 ? '☕ posible descanso' : '❓ sin explicar';
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-top:1px solid #f5f5f7">
-          <span style="font-size:11px;color:#1d1d1f">${_minAHhmm(h.inicio)} → ${_minAHhmm(h.fin)}</span>
-          <span style="font-size:11px;color:#86868b">${badge} · <b>${h.dur}min</b></span>
-        </div>`;
-      }).join('')}
-    </div>`;
-  }).join('');
 }
 
 function renderProdLista(){
@@ -7649,7 +6835,7 @@ function renderProdLista(){
   if(!el) return;
   if(!movs.length){ el.innerHTML='<div class="empty">Sin movimientos hoy</div>'; return; }
   el.innerHTML = movs.map((m,i)=>{
-    var tipoLabel = m.tipo==='carga'?'📥 CARGA':m.tipo==='descarga'?'📤 DESCARGA':m.tipo==='despacho'?'📋 DESPACHO':m.tipo==='pedidos'?'📝 PEDIDOS':m.tipo==='orden'?'🧹 ORDEN/LIMPIEZA':m.tipo==='stock'?'📦 STOCK':'🚗 CHASIS';
+    var tipoLabel = m.tipo==='carga'?'📥 CARGA':m.tipo==='descarga'?'📤 DESCARGA':m.tipo==='despacho'?'📋 DESPACHO':'🚗 CHASIS';
     var autoTag = m.auto?' <span style="font-size:8px;opacity:.6">auto</span>':'';
     var subInfo = [];
     subInfo.push((GRUPOS_NOMBRES[m.grupo]||m.grupo||'—'));
@@ -7681,74 +6867,6 @@ function eliminarMov(idx){
   localStorage.setItem(getProdKey(), JSON.stringify(movs));
   renderProdResumen();
   renderProdLista();
-  renderHuecosDia();
-}
-
-// ═══════════════════════════════════════════════════
-//  BACKUP / RESTAURAR — todo localStorage relevante
-// ═══════════════════════════════════════════════════
-function backupWMS(){
-  var backup = { version: 2, fecha: new Date().toISOString(), datos: {} };
-  var prefijos = [
-    'prod_',          // movimientos diarios de productividad
-    'prod_hist_',     // historial mensual productividad
-    'grupos_',        // asignación de grupos por día
-    'grupos_hist',    // historial de grupos (clave exacta)
-    'zf_',            // datos ZF por día
-    'wms_transitos',  // tránsitos (ingresos/despachos C/D)
-    'wms_asign',      // asignaciones de rack
-    'wms_rack_stock', // stock por posición rack
-    'wms_repo_',      // historial reposición
-    'wms_personal_base', // base de personal
-    'wms_movimientos',   // movimientos de stock intraday
-    'repo_hist_',        // historial confirmaciones repo
-  ];
-
-  Object.keys(localStorage).forEach(function(k){
-    var incluir = prefijos.some(function(p){ return k===p || k.startsWith(p); });
-    if(incluir) backup.datos[k] = localStorage.getItem(k);
-  });
-
-  var total = Object.keys(backup.datos).length;
-  var json = JSON.stringify(backup, null, 2);
-  var blob = new Blob([json], {type:'application/json'});
-  var url  = URL.createObjectURL(blob);
-  var a    = document.createElement('a');
-  var fecha = new Date().toLocaleDateString('es-AR').replace(/\//g,'-');
-  a.href = url; a.download = 'WMS_Backup_'+fecha+'.json';
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-  showToast('💾 Backup descargado — '+total+' registros guardados');
-}
-
-function restaurarWMS(event){
-  var file = event.target.files[0];
-  if(!file){ return; }
-  var reader = new FileReader();
-  reader.onload = function(e){
-    try{
-      var backup = JSON.parse(e.target.result);
-      if(!backup.datos || typeof backup.datos !== 'object'){
-        showToast('❌ Archivo inválido — no tiene la estructura esperada');
-        return;
-      }
-      if(!confirm('⚠️ Esto va a REEMPLAZAR los datos actuales con el backup del '+
-        (backup.fecha ? new Date(backup.fecha).toLocaleString('es-AR') : '?')+
-        '.\n\n¿Confirmás?')){ return; }
-
-      var restaurados = 0;
-      Object.keys(backup.datos).forEach(function(k){
-        localStorage.setItem(k, backup.datos[k]);
-        restaurados++;
-      });
-      showToast('✅ '+restaurados+' registros restaurados — recargá la página para ver todo');
-      setTimeout(function(){ location.reload(); }, 2000);
-    } catch(err){
-      showToast('❌ Error al leer el backup: '+err.message);
-    }
-  };
-  reader.readAsText(file);
-  event.target.value = ''; // limpiar input para poder volver a cargar si hace falta
 }
 
 function exportarProductividad(){
@@ -7775,7 +6893,7 @@ function exportarProductividad(){
   const wsRes = [
     ['RESUMEN POR GRUPO'],
     [],
-    ['GRUPO','TOTAL UNIDADES','TOTAL SEMIS','CARGAS','DESCARGAS','DESPACHOS','PEDIDOS','ORDEN/LIMPIEZA','STOCK','CHASIS','TIEMPO TOTAL (min)','PROM. MIN/SEMI'],
+    ['GRUPO','TOTAL UNIDADES','TOTAL SEMIS','CARGAS','DESCARGAS','CHASIS','TIEMPO TOTAL (min)','PROM. MIN/SEMI'],
   ];
   grupos.forEach(g=>{
     const movG = hist.filter(m=>m.grupo===g);
@@ -7785,15 +6903,11 @@ function exportarProductividad(){
     const totalT = movG.reduce((s,m)=>s+(m.durMin||0),0);
     const cargas = movG.filter(m=>m.tipo==='carga').length;
     const descargas = movG.filter(m=>m.tipo==='descarga').length;
-    const despachos = movG.filter(m=>m.tipo==='despacho').length;
-    const pedidos = movG.filter(m=>m.tipo==='pedidos').length;
-    const orden = movG.filter(m=>m.tipo==='orden').length;
-    const stock = movG.filter(m=>m.tipo==='stock').length;
     const chasis = movG.filter(m=>m.tipo==='chasis').length;
-    wsRes.push([g, totalU, totalS, cargas, descargas, despachos, pedidos, orden, stock, chasis, totalT, totalS>0?Math.round(totalT/totalS):0]);
+    wsRes.push([g, totalU, totalS, cargas, descargas, chasis, totalT, totalS>0?Math.round(totalT/totalS):0]);
   });
   const wsR = XLSX.utils.aoa_to_sheet(wsRes);
-  wsR['!cols'] = [{wch:8},{wch:16},{wch:13},{wch:8},{wch:10},{wch:10},{wch:9},{wch:14},{wch:8},{wch:8},{wch:18},{wch:16}];
+  wsR['!cols'] = [{wch:8},{wch:16},{wch:13},{wch:8},{wch:10},{wch:8},{wch:18},{wch:16}];
   XLSX.utils.book_append_sheet(wb, wsR, 'Resumen Grupos');
 
   // === HOJA 3: RANKING DIARIO ===
@@ -7815,44 +6929,6 @@ function exportarProductividad(){
   wsDia.push(['TOTAL',...grupos.map(g=>hist.filter(m=>m.grupo===g).reduce((s,m)=>s+m.unidades,0))]);
   const wsDR = XLSX.utils.aoa_to_sheet(wsDia);
   XLSX.utils.book_append_sheet(wb, wsDR, 'Por Día');
-
-  // === HOJA 4: POR PERSONA / TIEMPOS MUERTOS ===
-  const histGruposMesEx = JSON.parse(localStorage.getItem('grupos_hist')||'[]').filter(h=>{
-    const p = h.fecha.split('/');
-    return p.length===3 && (p[1]+'_'+p[2])===mesKey;
-  });
-  let personaDiasMesEx = 0;
-  const diasPorGrupoEx = {};
-  grupos.forEach(g=>{ diasPorGrupoEx[g]=0; });
-  histGruposMesEx.forEach(h=>{
-    const presentes = h.data.filter(p=>p.presente);
-    personaDiasMesEx += presentes.length;
-    grupos.forEach(g=>{
-      if(presentes.some(p=>(p.grupoHoy||p.grupo)===g)) diasPorGrupoEx[g]++;
-    });
-  });
-  const totalUnidEx = hist.reduce((s,m)=>s+m.unidades,0);
-  const unidPorCabezaMesEx = personaDiasMesEx>0 ? Math.round(totalUnidEx/personaDiasMesEx) : 0;
-
-  const wsCab = [
-    ['PRODUCTIVIDAD POR PERSONA Y TIEMPOS MUERTOS — JORNADA NETA 525 MIN (9,5h - almuerzo/desayuno)'],
-    [],
-    ['UNIDADES/PERSONA DEL MES (independiente del grupo)', unidPorCabezaMesEx],
-    ['PERSONA-DÍAS TRABAJADOS', personaDiasMesEx],
-    [],
-    ['GRUPO','DÍAS TRABAJADOS','TIEMPO REGISTRADO TOTAL (min)','TIEMPO PROM/DÍA (min)','TIEMPO MUERTO PROM/DÍA (min)'],
-  ];
-  grupos.forEach(g=>{
-    const diasG = diasPorGrupoEx[g];
-    if(!diasG) return;
-    const tiempoTotalG = hist.filter(m=>m.grupo===g).reduce((s,m)=>s+(m.durMin||0),0);
-    const tiempoPromG  = Math.round(tiempoTotalG/diasG);
-    const muertoG      = Math.max(0, Math.round(JORNADA_MIN - tiempoPromG));
-    wsCab.push([g, diasG, tiempoTotalG, tiempoPromG, muertoG]);
-  });
-  const wsC = XLSX.utils.aoa_to_sheet(wsCab);
-  wsC['!cols'] = [{wch:8},{wch:16},{wch:24},{wch:18},{wch:22}];
-  XLSX.utils.book_append_sheet(wb, wsC, 'Por Persona');
 
   XLSX.writeFile(wb, `Productividad_${mes.replace(' ','_')}.xlsx`);
   showToast('✅ Informe exportado');
@@ -8171,593 +7247,6 @@ function exportarAlertasDOT(){
   showToast('✅ Alertas exportadas');
 }
 
-// ═══════════════════════════════════════════════════════════════
-// CHECKLIST MÁQUINAS Y CAMIONES
-// ═══════════════════════════════════════════════════════════════
-
-const CHECKLIST_ITEMS_DEFAULT = {
-  maquina: [
-    {grupo:null, nombre:'Carga de batería'},
-    {grupo:null, nombre:'Ruedas'},
-    {grupo:null, nombre:'Luces'},
-    {grupo:null, nombre:'Frenos'},
-    {grupo:null, nombre:'Fluidos'},
-    {grupo:null, nombre:'Bocina / Alarmas'},
-    {grupo:null, nombre:'Uñas / Torre'},
-    {grupo:null, nombre:'Cargador'},
-  ],
-  camion: [
-    {grupo:'SEGURIDAD', nombre:'Cinturón de seguridad'},
-    {grupo:'SEGURIDAD', nombre:'Asientos'},
-    {grupo:'SEGURIDAD', nombre:'Freno de mano y pedal'},
-    {grupo:'SEGURIDAD', nombre:'Extintor'},
-    {grupo:'SEGURIDAD', nombre:'Alarma de retroceso'},
-    {grupo:'SEGURIDAD', nombre:'Espejos laterales'},
-    {grupo:'SEGURIDAD', nombre:'Limpiaparabrisas'},
-    {grupo:'SEGURIDAD', nombre:'Bocina'},
-    {grupo:'SEGURIDAD', nombre:'Manijas y seguros de puertas'},
-    {grupo:'SEGURIDAD', nombre:'Dirección'},
-    {grupo:'SEGURIDAD', nombre:'Botiquín'},
-    {grupo:'SEGURIDAD', nombre:'Cono de seguridad'},
-    {grupo:'LUCES', nombre:'Luces altas'},
-    {grupo:'LUCES', nombre:'Luces bajas'},
-    {grupo:'LUCES', nombre:'Focos de retroceso'},
-    {grupo:'LUCES', nombre:'Freno'},
-    {grupo:'LUCES', nombre:'Luces interior de cabina'},
-    {grupo:'LUCES', nombre:'Viraje'},
-    {grupo:'NIVEL', nombre:'Agua'},
-    {grupo:'NIVEL', nombre:'Aceite'},
-    {grupo:'NIVEL', nombre:'Frenos'},
-    {grupo:'NIVEL', nombre:'Refrigerante'},
-    {grupo:'NIVEL', nombre:'Combustible'},
-    {grupo:'NIVEL', nombre:'Libre de fugas de líquidos'},
-    {grupo:'CUERPO', nombre:'Parabrisas', dano:true},
-    {grupo:'CUERPO', nombre:'Cristales laterales', dano:true},
-    {grupo:'CUERPO', nombre:'Paragolpes', dano:true},
-    {grupo:'CUERPO', nombre:'Caja', dano:true},
-    {grupo:'CUERPO', nombre:'Neumáticos (libras)'},
-    {grupo:'CUERPO', nombre:'Auxilio'},
-    {grupo:'CUERPO', nombre:'Gato hidráulico'},
-    {grupo:'CUERPO', nombre:'Llave de rueda'},
-    {grupo:'DOC', nombre:'Permiso de circulación'},
-    {grupo:'DOC', nombre:'Póliza de seguro'},
-    {grupo:'DOC', nombre:'Documentación del vehículo'},
-    {grupo:'DOC', nombre:'Revisión técnica provincial'},
-    {grupo:'DOC', nombre:'Revisión técnica nacional'},
-    {grupo:'DOC', nombre:'Carnet personal'},
-    {grupo:'DOC', nombre:'Extintor — fecha de vencimiento'},
-  ],
-  porton: [
-    {grupo:null, nombre:'Estado general'},
-  ],
-};
-
-const CHECKLIST_DANO_CODES = {A:'Abolladuras', B:'Faltantes', C:'Trizaduras', D:'Raspones'};
-
-function _checklistTipoLabel(tipo){
-  return tipo==='camion' ? 'Camiones' : tipo==='porton' ? 'Portones' : 'Máquinas';
-}
-function _checklistTipoIcon(tipo){
-  return tipo==='camion' ? '🚚' : tipo==='porton' ? '🚪' : '🏗️';
-}
-
-// Datos base extraídos de MAQUINAS_HALPERN.xlsx (hoja "MAQ CARG"), sin los cargadores de batería
-// sueltos —esos ya están como ítem "Cargador" dentro del checklist de cada máquina.
-const CHECKLIST_SEED_MAQUINAS = [
-  {cod:'A1', ubicacion:'P1', tipoVeh:'Apilador', marca:'BT', anio:2013, serie:'6265827'},
-  {cod:'A2', ubicacion:'P6', tipoVeh:'Autoelevador eléctrico', marca:'Liugung', anio:'', serie:'CLG2000ZHMMT873062'},
-  {cod:'A2', ubicacion:'P10', tipoVeh:'Autoelevador eléctrico', marca:'Toyota', anio:'', serie:'ZFBE20629009'},
-  {cod:'A3', ubicacion:'P2(D)', tipoVeh:'Autoelevador (alquilado)', marca:'EP', anio:'', serie:'EFL181'},
-  {cod:'A3', ubicacion:'Gasoil', tipoVeh:'Autoelevador gasoil', marca:'EP', anio:'', serie:'531140615'},
-  {cod:'J1-037', ubicacion:'P3', tipoVeh:'Reach Jungheinrich', marca:'Jungheinrich', anio:'', serie:'91125390'},
-  {cod:'J2-039', ubicacion:'—', tipoVeh:'Reach Jungheinrich', marca:'Jungheinrich', anio:'', serie:'91142414'},
-  {cod:'J3-040', ubicacion:'P4', tipoVeh:'Reach Jungheinrich', marca:'Jungheinrich', anio:'', serie:'91130681'},
-  {cod:'R1', ubicacion:'P2', tipoVeh:'Reach', marca:'Movmes', anio:'', serie:'24010089'},
-  {cod:'R2', ubicacion:'—', tipoVeh:'Reach', marca:'Movmes', anio:'', serie:'24010078'},
-  {cod:'R3', ubicacion:'P5', tipoVeh:'Reach', marca:'Movmes', anio:'', serie:'24010049'},
-  {cod:'R4', ubicacion:'P7', tipoVeh:'Reach', marca:'Movmes', anio:'', serie:'2302089'},
-  {cod:'R5', ubicacion:'P36', tipoVeh:'Reach', marca:'Movmes', anio:'', serie:'24010090'},
-  {cod:'T2', ubicacion:'P4', tipoVeh:'Traspaleta (alquilada)', marca:'EP', anio:'', serie:'333160186'},
-];
-
-// Datos base extraídos de MAQUINAS_HALPERN.xlsx (hoja "PORTONES HALPERN")
-const CHECKLIST_SEED_PORTONES = [
-  ...Array.from({length:10},(_,i)=>({cod:'SUR-'+(i+1), nombre:'Portón Sur '+(i+1)})),
-  ...Array.from({length:10},(_,i)=>({cod:'NORTE-'+(i+1)+'N', nombre:'Portón Norte '+(i+1)+'N'})),
-  ...Array.from({length:8},(_,i)=>({cod:'ESTE-'+(i+1), nombre:'Portón Este '+(i+1)})),
-  {cod:'NAVE-ENF-NORTE', nombre:'Nave enfrente — Norte'},
-  {cod:'NAVE-ENF-SUR', nombre:'Nave enfrente — Sur'},
-];
-
-function seedChecklistMaquinas(silencioso){
-  const equipos = getChecklistEquipos();
-  const existentes = new Set(equipos.filter(e=>e.tipo==='maquina').map(e=>e.interno+'|'+e.ubicacion));
-  let agregados = 0;
-  CHECKLIST_SEED_MAQUINAS.forEach(m=>{
-    const key = m.cod+'|'+m.ubicacion;
-    if(existentes.has(key)) return;
-    equipos.push({
-      id: 'eq_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
-      tipo:'maquina', nombre: m.tipoVeh+' '+m.cod, interno: m.cod,
-      ubicacion: m.ubicacion, marca: m.marca, anio: m.anio, serie: m.serie
-    });
-    agregados++;
-  });
-  saveChecklistEquipos(equipos);
-  if(!silencioso){
-    showToast(agregados ? `✅ ${agregados} máquinas cargadas` : 'Ya estaban todas cargadas');
-    renderChecklist();
-  }
-  return agregados;
-}
-
-function seedChecklistPortones(silencioso){
-  const equipos = getChecklistEquipos();
-  const existentes = new Set(equipos.filter(e=>e.tipo==='porton').map(e=>e.interno));
-  let agregados = 0;
-  CHECKLIST_SEED_PORTONES.forEach(p=>{
-    if(existentes.has(p.cod)) return;
-    equipos.push({id:'eq_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), tipo:'porton', nombre:p.nombre, interno:p.cod});
-    agregados++;
-  });
-  saveChecklistEquipos(equipos);
-  if(!silencioso){
-    showToast(agregados ? `✅ ${agregados} portones cargados` : 'Ya estaban todos cargados');
-    renderChecklist();
-  }
-  return agregados;
-}
-
-// Primera vez que se abre el módulo: precarga máquinas y portones automáticamente
-// (el mobiliario/flota fija cambia poco). Se ejecuta una sola vez — si después
-// borrás equipos a propósito, no se vuelven a agregar solos.
-function autoSeedChecklistSiHaceFalta(){
-  if(localStorage.getItem('wms_checklist_autoseed_done')) return;
-  seedChecklistMaquinas(true);
-  seedChecklistPortones(true);
-  localStorage.setItem('wms_checklist_autoseed_done','1');
-}
-
-function getChecklistEquipos(){
-  return JSON.parse(localStorage.getItem('wms_checklist_equipos')||'[]');
-}
-function saveChecklistEquipos(arr){
-  localStorage.setItem('wms_checklist_equipos', JSON.stringify(arr));
-}
-function getChecklistItems(tipo){
-  const raw = localStorage.getItem('wms_checklist_items_'+tipo);
-  const items = raw ? JSON.parse(raw) : CHECKLIST_ITEMS_DEFAULT[tipo].slice();
-  // Compatibilidad con el formato viejo (array de strings)
-  return items.map(it => typeof it==='string' ? {grupo:null, nombre:it, dano:false} : it);
-}
-function saveChecklistItems(tipo, items){
-  localStorage.setItem('wms_checklist_items_'+tipo, JSON.stringify(items));
-}
-function getChecklistRegistros(){
-  return JSON.parse(localStorage.getItem('wms_checklist_registros')||'[]');
-}
-function saveChecklistRegistros(arr){
-  localStorage.setItem('wms_checklist_registros', JSON.stringify(arr.slice(0,500)));
-}
-
-function agregarEquipoChecklist(){
-  const tipo = prompt('¿Qué tipo de equipo es?\n\nEscribí "maquina", "camion" o "porton"', 'maquina');
-  if(!tipo || ['maquina','camion','porton'].indexOf(tipo.trim().toLowerCase())<0){
-    if(tipo!==null) showToast('❌ Escribí "maquina", "camion" o "porton"');
-    return;
-  }
-  const nombre = prompt('Nombre o identificación del equipo (ej. "Autoelevador 1", "Camión Ford Cargo", "Portón Sur 3")');
-  if(!nombre || !nombre.trim()) return;
-  const interno = prompt('Interno / patente / código (opcional)') || '';
-
-  const equipos = getChecklistEquipos();
-  equipos.push({
-    id: 'eq_'+Date.now(),
-    tipo: tipo.trim().toLowerCase(),
-    nombre: nombre.trim(),
-    interno: interno.trim()
-  });
-  saveChecklistEquipos(equipos);
-  showToast('✅ Equipo agregado: '+nombre.trim());
-  renderChecklist();
-}
-
-function eliminarEquipoChecklist(id){
-  if(!confirm('¿Eliminar este equipo? El historial de checklists queda guardado igual.')) return;
-  const equipos = getChecklistEquipos().filter(e=>e.id!==id);
-  saveChecklistEquipos(equipos);
-  showToast('🗑️ Equipo eliminado');
-  renderChecklist();
-}
-
-function editarEquipoChecklist(id){
-  const equipos = getChecklistEquipos();
-  const eq = equipos.find(e=>e.id===id);
-  if(!eq) return;
-  const nombre = prompt('Nombre del equipo:', eq.nombre);
-  if(nombre===null) return;
-  if(!nombre.trim()){ showToast('❌ El nombre no puede quedar vacío'); return; }
-  const interno = prompt('Interno / patente / código (opcional):', eq.interno||'');
-  if(interno===null) return;
-  eq.nombre = nombre.trim();
-  eq.interno = interno.trim();
-  saveChecklistEquipos(equipos);
-  showToast('✅ Equipo actualizado');
-  renderChecklist();
-}
-
-function editarItemsChecklist(tipo){
-  const actuales = getChecklistItems(tipo);
-
-  if(tipo==='camion'){
-    const lines = [];
-    let last;
-    actuales.forEach(it=>{
-      if(it.grupo!==last){ lines.push('## '+(it.grupo||'')); last=it.grupo; }
-      lines.push(it.nombre + (it.dano?'*':''));
-    });
-    const texto = prompt('Ítems del checklist de camiones (uno por línea).\nUsá "## NOMBRE" para un encabezado de grupo.\nAgregá "*" al final del ítem si necesita marcar tipo de daño (abolladura/faltante/trizadura/raspón).', lines.join('\n'));
-    if(texto===null) return;
-    const items = [];
-    let grupoActual = null;
-    texto.split('\n').map(s=>s.trim()).filter(Boolean).forEach(l=>{
-      if(l.startsWith('##')){ grupoActual = l.replace('##','').trim() || null; return; }
-      const dano = l.endsWith('*');
-      const nombre = dano ? l.slice(0,-1).trim() : l;
-      if(nombre) items.push({grupo:grupoActual, nombre, dano});
-    });
-    if(!items.length){ showToast('❌ Tiene que quedar al menos un ítem'); return; }
-    saveChecklistItems(tipo, items);
-    showToast('✅ Ítems de camiones actualizados');
-    renderChecklist();
-    return;
-  }
-
-  // máquina / portón: lista simple, un ítem por línea
-  const texto = actuales.map(it=>it.nombre).join('\n');
-  const nuevo = prompt('Ítems del checklist de '+(tipo==='maquina'?'máquinas':'portones')+' (uno por línea):', texto);
-  if(nuevo===null) return;
-  const nombres = nuevo.split('\n').map(s=>s.trim()).filter(Boolean);
-  if(!nombres.length){ showToast('❌ Tiene que quedar al menos un ítem'); return; }
-  saveChecklistItems(tipo, nombres.map(n=>({grupo:null, nombre:n, dano:false})));
-  showToast('✅ Ítems actualizados');
-  renderChecklist();
-}
-
-function abrirFormChecklist(equipoId, subtipo){
-  const equipos = getChecklistEquipos();
-  const eq = equipos.find(e=>e.id===equipoId);
-  if(!eq) return;
-  const items = getChecklistItems(eq.tipo);
-  const necesitaTurno = eq.tipo!=='porton';
-
-  let lastGrupo;
-  const filas = items.map((it,i)=>{
-    const headerHtml = it.grupo!==lastGrupo ? `<div style="font-size:11px;font-weight:700;color:#0071e3;text-transform:uppercase;letter-spacing:.5px;margin-top:10px;margin-bottom:4px">${it.grupo||''}</div>` : '';
-    lastGrupo = it.grupo;
-    const danoHtml = it.dano ? `
-      <div id="cl-dano-${i}" style="display:none;padding:4px 0 8px;flex-wrap:wrap;gap:8px">
-        ${Object.entries(CHECKLIST_DANO_CODES).map(([code,label])=>`
-          <label style="font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer">
-            <input type="checkbox" class="cl-dano-${i}-chk" value="${code}"> ${code} (${label})
-          </label>`).join('')}
-      </div>` : '';
-    return `<div style="padding:6px 0;border-bottom:1px solid #f0f0f0">
-      ${headerHtml}
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="flex:1;font-size:13px;color:#1d1d1f">${it.nombre}</div>
-        <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
-          <input type="radio" name="cl-item-${i}" value="ok" checked onchange="toggleClDano(${i},false)"> ✅ OK
-        </label>
-        <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#d70015">
-          <input type="radio" name="cl-item-${i}" value="falla" onchange="toggleClDano(${i},true)"> ⚠️ Falla
-        </label>
-      </div>
-      ${danoHtml}
-    </div>`;
-  }).join('');
-
-  const turnoHtml = necesitaTurno ? `
-    <div style="display:flex;gap:6px;margin-bottom:10px">
-      <button type="button" id="cl-turno-TM" class="prod-tipo-btn active" onclick="setClTurno('TM')" style="flex:1">🌅 Mañana</button>
-      <button type="button" id="cl-turno-TT" class="prod-tipo-btn" onclick="setClTurno('TT')" style="flex:1">🌇 Tarde</button>
-    </div>` : '';
-  window._clTurno = necesitaTurno ? 'TM' : null;
-
-  const html = `<div id="checklist-form-inner" style="background:#fff;border:2px solid #0071e3;border-radius:12px;padding:14px;margin-bottom:14px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <div>
-        <div style="font-size:14px;font-weight:700;color:#1d1d1f">${eq.nombre} ${eq.interno?'· '+eq.interno:''}</div>
-        <div style="font-size:11px;color:#86868b">Checklist ${subtipo==='diario'?'diario':'por evento'} — ${new Date().toLocaleDateString('es-AR')}</div>
-      </div>
-      <button onclick="cerrarFormChecklist()" style="background:none;border:none;font-size:18px;color:#86868b;cursor:pointer">✕</button>
-    </div>
-    ${turnoHtml}
-    <input type="text" id="cl-responsable" placeholder="Responsable (nombre)" style="width:100%;padding:9px 12px;border:1px solid #d2d2d7;border-radius:10px;font-size:13px;margin-bottom:10px;box-sizing:border-box">
-    <div style="max-height:340px;overflow-y:auto">${filas}</div>
-    <textarea id="cl-obs" placeholder="Observaciones generales (opcional)" style="width:100%;padding:9px 12px;border:1px solid #d2d2d7;border-radius:10px;font-size:13px;margin-top:10px;box-sizing:border-box;min-height:50px"></textarea>
-    <button onclick="guardarChecklistForm('${eq.id}','${subtipo}')" style="width:100%;margin-top:10px;padding:11px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">💾 Guardar checklist</button>
-  </div>`;
-
-  document.getElementById('checklist-form-box').innerHTML = html;
-  window._checklistItemsActuales = items;
-  document.getElementById('checklist-form-inner').scrollIntoView({behavior:'smooth', block:'start'});
-}
-
-function toggleClDano(i, mostrar){
-  const el = document.getElementById('cl-dano-'+i);
-  if(el) el.style.display = mostrar ? 'flex' : 'none';
-}
-
-function setClTurno(t){
-  window._clTurno = t;
-  const btnTM = document.getElementById('cl-turno-TM'), btnTT = document.getElementById('cl-turno-TT');
-  if(btnTM) btnTM.classList.toggle('active', t==='TM');
-  if(btnTT) btnTT.classList.toggle('active', t==='TT');
-}
-
-function cerrarFormChecklist(){
-  document.getElementById('checklist-form-box').innerHTML = '';
-}
-
-function guardarChecklistForm(equipoId, subtipo){
-  const responsable = (document.getElementById('cl-responsable').value||'').trim();
-  if(!responsable){ showToast('❌ Falta el nombre del responsable'); return; }
-  const items = window._checklistItemsActuales||[];
-  const detalle = items.map((it,i)=>{
-    const radios = document.getElementsByName('cl-item-'+i);
-    let estado = 'ok';
-    for(const r of radios){ if(r.checked) estado = r.value; }
-    let danos = [];
-    if(it.dano && estado==='falla'){
-      document.querySelectorAll('.cl-dano-'+i+'-chk').forEach(chk=>{ if(chk.checked) danos.push(chk.value); });
-    }
-    return {grupo: it.grupo, item: it.nombre, estado, danos};
-  });
-  const tieneFalla = detalle.some(d=>d.estado==='falla');
-  const obs = (document.getElementById('cl-obs').value||'').trim();
-
-  const registros = getChecklistRegistros();
-  registros.unshift({
-    id: 'cl_'+Date.now(),
-    equipoId, subtipo,
-    turno: window._clTurno || null,
-    fecha: new Date().toLocaleDateString('es-AR'),
-    hora: new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),
-    responsable, detalle, obs, tieneFalla
-  });
-  saveChecklistRegistros(registros);
-
-  cerrarFormChecklist();
-  showToast(tieneFalla ? '⚠️ Checklist guardado — con fallas reportadas' : '✅ Checklist guardado — todo OK');
-  renderChecklist();
-}
-
-function toggleHistorialEquipo(equipoId){
-  const el = document.getElementById('cl-hist-'+equipoId);
-  if(!el) return;
-  el.style.display = el.style.display==='none' ? 'block' : 'none';
-}
-
-function _parseFechaAR(f){
-  const p = f.split('/').map(Number);
-  return new Date(p[2], p[1]-1, p[0]);
-}
-
-function _estadoEquipoChecklist(eq, registros){
-  const regs = registros.filter(r=>r.equipoId===eq.id); // ya vienen ordenados, más reciente primero
-  if(!regs.length) return {estado:'nunca'};
-  const ultima = regs[0];
-  const dias = Math.floor((Date.now() - _parseFechaAR(ultima.fecha).getTime())/86400000);
-  if(ultima.tieneFalla) return {estado:'falla', dias, ultima};
-  if(dias>=7) return {estado:'vencido', dias, ultima};
-  return {estado:'ok', dias, ultima};
-}
-
-function renderChecklist(){
-  autoSeedChecklistSiHaceFalta();
-  const equipos = getChecklistEquipos();
-  const registros = getChecklistRegistros();
-
-  const alertasBox = document.getElementById('checklist-alertas');
-  if(alertasBox){
-    if(!equipos.length){
-      alertasBox.innerHTML = `<div style="background:#f5f5f7;border-radius:10px;padding:16px;text-align:center;color:#86868b;font-size:13px;margin-bottom:12px">
-        Todavía no hay equipos cargados. Usá "+ Agregar equipo" para empezar.
-      </div>`;
-    } else {
-      const estados = equipos.map(eq=>({eq, ...(_estadoEquipoChecklist(eq, registros))}));
-      const alDia = estados.filter(x=>x.estado==='ok');
-      const conFalla = estados.filter(x=>x.estado==='falla');
-      const vencidos = estados.filter(x=>x.estado==='vencido' || x.estado==='nunca');
-
-      const semaforoHtml = `
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">
-          <div class="prod-res-card"><div class="prod-res-val" style="color:#34c759">${alDia.length}</div><div class="prod-res-lbl">✅ Al día</div></div>
-          <div class="prod-res-card"><div class="prod-res-val" style="color:#d70015">${conFalla.length}</div><div class="prod-res-lbl">⚠️ Con falla</div></div>
-          <div class="prod-res-card"><div class="prod-res-val" style="color:#ff9500">${vencidos.length}</div><div class="prod-res-lbl">🟡 Sin controlar +7d</div></div>
-          <div class="prod-res-card"><div class="prod-res-val">${equipos.length}</div><div class="prod-res-lbl">Total equipos</div></div>
-        </div>`;
-      const avisos = [...conFalla, ...vencidos];
-      const ordenTipo = ['maquina','camion','porton'];
-      const pendHtml = avisos.length ? `<div style="background:#fde8e8;border:1px solid #f5b5b5;border-radius:10px;padding:10px;margin-bottom:12px">
-          <div style="font-size:13px;font-weight:700;color:#d70015;margin-bottom:8px">🚨 Requieren atención</div>
-          ${ordenTipo.map(tipo=>{
-            const deLTipo = avisos.filter(x=>x.eq.tipo===tipo);
-            if(!deLTipo.length) return '';
-            return `<div style="margin-bottom:8px">
-              <div style="font-size:11px;font-weight:700;color:#86868b;text-transform:uppercase;margin-bottom:3px">${_checklistTipoIcon(tipo)} ${_checklistTipoLabel(tipo)} (${deLTipo.length})</div>
-              ${deLTipo.map(x=>x.estado==='falla'
-                ? `<div style="font-size:12px;color:#d70015;padding:3px 0">⚠️ ${x.eq.nombre}${x.eq.interno?' · '+x.eq.interno:''} — falla desde ${x.ultima.fecha}</div>`
-                : `<div style="font-size:12px;color:#856404;padding:3px 0">🟡 ${x.eq.nombre}${x.eq.interno?' · '+x.eq.interno:''} — ${x.estado==='nunca'?'nunca controlado':'hace '+x.dias+' días (últ. '+x.ultima.fecha+')'}</div>`
-              ).join('')}
-            </div>`;
-          }).join('')}
-        </div>` : `<div style="background:#e8f8ee;border:1px solid #b8e6c8;border-radius:10px;padding:10px;margin-bottom:12px;font-size:13px;font-weight:700;color:#1a7a3d">
-          ✅ Todos los equipos controlados esta semana, sin fallas activas
-        </div>`;
-      alertasBox.innerHTML = semaforoHtml + pendHtml;
-    }
-  }
-
-  // ── Lista de equipos agrupada por tipo ──
-  const listaBox = document.getElementById('checklist-lista');
-  if(!listaBox) return;
-  if(!equipos.length){ listaBox.innerHTML=''; return; }
-
-  function tarjetaEquipo(eq){
-    const regsEquipo = registros.filter(r=>r.equipoId===eq.id);
-    const icon = _checklistTipoIcon(eq.tipo);
-    const est = _estadoEquipoChecklist(eq, registros);
-
-    const badge = est.estado==='nunca'
-      ? `<span style="background:#f0f0f0;color:#86868b;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px">NUNCA CONTROLADO</span>`
-      : est.estado==='falla'
-      ? `<span style="background:#fde8e8;color:#d70015;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px">⚠️ FALLA — ${est.ultima.fecha}${est.ultima.turno?' '+est.ultima.turno:''}</span>`
-      : est.estado==='vencido'
-      ? `<span style="background:#fff3cd;color:#856404;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px">🟡 SIN CONTROLAR — hace ${est.dias}d (últ. ${est.ultima.fecha})</span>`
-      : `<span style="background:#e8f8ee;color:#1a7a3d;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px">✅ OK — ${est.ultima.fecha}${est.ultima.turno?' '+est.ultima.turno:''}</span>`;
-
-    const historial = regsEquipo.slice(0,10).map(r=>`
-      <div style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:11px">
-        <div style="display:flex;justify-content:space-between">
-          <span style="font-weight:600;color:${r.tieneFalla?'#d70015':'#1d1d1f'}">${r.fecha} ${r.hora} ${r.turno?'· '+r.turno:''} · ${r.subtipo==='diario'?'Diario':'Evento'} ${r.tieneFalla?'⚠️':'✅'}</span>
-          <span style="color:#86868b">${r.responsable}</span>
-        </div>
-        ${r.detalle.filter(d=>d.estado==='falla').map(d=>`<div style="color:#d70015;margin-top:2px">⚠️ ${d.grupo?d.grupo+' — ':''}${d.item}${d.danos&&d.danos.length?' ('+d.danos.join(', ')+')':''}</div>`).join('')}
-        ${r.obs?`<div style="color:#86868b;margin-top:2px;font-style:italic">${r.obs}</div>`:''}
-      </div>`).join('') || '<div style="font-size:11px;color:#86868b;padding:6px 0">Sin registros todavía</div>';
-
-    return `<div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:12px;margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:700;color:#1d1d1f">${icon} ${eq.nombre} ${eq.interno?'<span style="color:#86868b;font-weight:400">· '+eq.interno+'</span>':''}</div>
-          <div style="margin-top:4px">${badge}</div>
-        </div>
-        <div style="display:flex;gap:4px;flex-shrink:0">
-          <button onclick="editarEquipoChecklist('${eq.id}')" style="background:none;border:none;color:#0071e3;font-size:13px;cursor:pointer">✏️</button>
-          <button onclick="eliminarEquipoChecklist('${eq.id}')" style="background:none;border:none;color:#c0c0c5;font-size:14px;cursor:pointer">✕</button>
-        </div>
-      </div>
-      <div style="display:flex;gap:6px;margin-top:10px">
-        <button onclick="abrirFormChecklist('${eq.id}','diario')" style="flex:1;padding:8px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">📋 Checklist</button>
-
-        <button onclick="abrirFormChecklist('${eq.id}','evento')" style="flex:1;padding:8px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">⚡ Por evento</button>
-        <button onclick="toggleHistorialEquipo('${eq.id}')" style="padding:8px 10px;background:#f5f5f7;color:#86868b;border:none;border-radius:8px;font-size:11px;cursor:pointer">🕒</button>
-      </div>
-      <div id="cl-hist-${eq.id}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid #f0f0f0">${historial}</div>
-    </div>`;
-  }
-
-  const maquinas = equipos.filter(e=>e.tipo==='maquina');
-  const camiones = equipos.filter(e=>e.tipo==='camion');
-  const portones = equipos.filter(e=>e.tipo==='porton');
-
-  let html = '';
-  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px">
-    <span style="font-size:12px;font-weight:700;color:#86868b;text-transform:uppercase">🏗️ Máquinas (${maquinas.length})</span>
-    <div style="display:flex;gap:10px">
-      ${maquinas.length?'':'<button onclick="seedChecklistMaquinas()" style="font-size:11px;color:#0071e3;background:none;border:none;cursor:pointer">📥 Cargar desde planilla</button>'}
-      <button onclick="editarItemsChecklist('maquina')" style="font-size:11px;color:#0071e3;background:none;border:none;cursor:pointer">✏️ Editar ítems</button>
-    </div>
-  </div>`;
-  html += maquinas.length ? maquinas.map(tarjetaEquipo).join('') : `<div style="font-size:12px;color:#86868b;padding:8px 0">Sin máquinas cargadas</div>`;
-
-  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 8px">
-    <span style="font-size:12px;font-weight:700;color:#86868b;text-transform:uppercase">🚚 Camiones (${camiones.length})</span>
-    <button onclick="editarItemsChecklist('camion')" style="font-size:11px;color:#0071e3;background:none;border:none;cursor:pointer">✏️ Editar ítems</button>
-  </div>`;
-  html += camiones.length ? camiones.map(tarjetaEquipo).join('') : `<div style="font-size:12px;color:#86868b;padding:8px 0">Sin camiones cargados — usá "+ Agregar equipo" (no tengo el listado completo de patentes, solo el ejemplo OGO063)</div>`;
-
-  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 8px">
-    <span style="font-size:12px;font-weight:700;color:#86868b;text-transform:uppercase">🚪 Portones (${portones.length})</span>
-    <div style="display:flex;gap:10px">
-      ${portones.length?'':'<button onclick="seedChecklistPortones()" style="font-size:11px;color:#0071e3;background:none;border:none;cursor:pointer">📥 Cargar desde planilla</button>'}
-    </div>
-  </div>`;
-  html += portones.length ? portones.map(tarjetaEquipo).join('') : `<div style="font-size:12px;color:#86868b;padding:8px 0">Sin portones cargados</div>`;
-
-  listaBox.innerHTML = html;
-}
-
-function exportarInformeChecklist(){
-  const equipos = getChecklistEquipos();
-  if(!equipos.length){ showToast('❌ No hay equipos cargados'); return; }
-  const registros = getChecklistRegistros();
-  const hoy = new Date().toLocaleDateString('es-AR');
-  const wb = XLSX.utils.book_new();
-
-  // Hoja Resumen
-  const resumenData = [
-    ['INFORME DE REVISIÓN DE EQUIPOS — '+hoy],
-    [],
-    ['TIPO','EQUIPO','INTERNO','ESTADO HOY','ÚLTIMO CHECKLIST','RESPONSABLE','FALLAS RECIENTES'],
-  ];
-  equipos.forEach(eq=>{
-    const regsEquipo = registros.filter(r=>r.equipoId===eq.id);
-    const ultimo = regsEquipo[0];
-    const regsHoy = regsEquipo.filter(r=>r.fecha===hoy);
-    const estado = !regsHoy.length ? 'PENDIENTE HOY' : regsHoy.some(r=>r.tieneFalla) ? 'CON FALLA' : 'OK';
-    const fallasRecientes = regsEquipo.slice(0,5).filter(r=>r.tieneFalla)
-      .map(r=>r.fecha+': '+r.detalle.filter(d=>d.estado==='falla').map(d=>d.item).join(', '))
-      .join(' | ');
-    resumenData.push([
-      _checklistTipoLabel(eq.tipo), eq.nombre, eq.interno||'',
-      estado, ultimo?ultimo.fecha+' '+ultimo.hora+(ultimo.turno?' ('+ultimo.turno+')':''):'—',
-      ultimo?ultimo.responsable:'—', fallasRecientes||'—'
-    ]);
-  });
-  const wsResumen = XLSX.utils.aoa_to_sheet(resumenData);
-  wsResumen['!cols'] = [{wch:10},{wch:26},{wch:14},{wch:14},{wch:22},{wch:16},{wch:50}];
-  XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen');
-
-  // Hoja Fallas — histórico detallado
-  const fallasData = [
-    ['FALLAS REGISTRADAS — histórico'],
-    [],
-    ['FECHA','HORA','TURNO','TIPO','EQUIPO','INTERNO','GRUPO','ÍTEM','DAÑOS','RESPONSABLE','OBSERVACIONES'],
-  ];
-  registros.filter(r=>r.tieneFalla).forEach(r=>{
-    const eq = equipos.find(e=>e.id===r.equipoId);
-    r.detalle.filter(d=>d.estado==='falla').forEach(d=>{
-      fallasData.push([
-        r.fecha, r.hora, r.turno||'', eq?_checklistTipoLabel(eq.tipo):'', eq?eq.nombre:'(equipo eliminado)', eq?eq.interno:'',
-        d.grupo||'', d.item, (d.danos&&d.danos.length)?d.danos.join(', '):'', r.responsable, r.obs||''
-      ]);
-    });
-  });
-  const wsFallas = XLSX.utils.aoa_to_sheet(fallasData);
-  wsFallas['!cols'] = [{wch:10},{wch:8},{wch:6},{wch:10},{wch:26},{wch:12},{wch:12},{wch:24},{wch:16},{wch:16},{wch:30}];
-  XLSX.utils.book_append_sheet(wb, wsFallas, 'Fallas');
-
-  // Una hoja de historial completo por cada tipo
-  ['maquina','camion','porton'].forEach(tipo=>{
-    const eqsTipo = equipos.filter(e=>e.tipo===tipo);
-    if(!eqsTipo.length) return;
-    const data = [[_checklistTipoLabel(tipo).toUpperCase()+' — HISTORIAL'],[],
-      ['FECHA','HORA','TURNO','EQUIPO','INTERNO','RESULTADO','RESPONSABLE','DETALLE FALLAS','OBSERVACIONES']];
-    registros.filter(r=>{
-      const eq = equipos.find(e=>e.id===r.equipoId);
-      return eq && eq.tipo===tipo;
-    }).forEach(r=>{
-      const eq = equipos.find(e=>e.id===r.equipoId);
-      data.push([
-        r.fecha, r.hora, r.turno||'', eq.nombre, eq.interno||'',
-        r.tieneFalla?'CON FALLA':'OK', r.responsable,
-        r.detalle.filter(d=>d.estado==='falla').map(d=>d.item).join(', '),
-        r.obs||''
-      ]);
-    });
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = [{wch:10},{wch:8},{wch:6},{wch:26},{wch:12},{wch:10},{wch:16},{wch:40},{wch:30}];
-    XLSX.utils.book_append_sheet(wb, ws, _checklistTipoLabel(tipo));
-  });
-
-  XLSX.writeFile(wb, 'Informe_Checklist_'+hoy.replace(/\//g,'-')+'.xlsx');
-  showToast('✅ Informe exportado');
-}
-
-
 
 // === BOTTOM NAV ===
 const NAV_GROUPS = {
@@ -8805,7 +7294,7 @@ let _pwaUnlocked = true;
 function showPwd(view){
   const nombres = {
     stock:'📦 Stock', pedidos:'📋 Pedidos', repo:'🔄 Reposición',
-    dot:'📅 DOTs', dash:'📊 KPIs', inv:'🔢 Inventario',
+    dot:'📅 DOTs', dash:'📊 Dashboard', inv:'🔢 Inventario',
     dif:'⚠️ Diferencias', grupos:'👥 Grupos', prod:'⚡ Productividad'
   };
   document.getElementById('pwd-module-name').textContent = nombres[view]||view;
@@ -9473,8 +7962,7 @@ function confirmarColaPedido(idx){
     nroPed: p.nroPed,
   };
 
-  const _pf = p.fecha.split('/'); // d/m/yyyy (puede venir sin ceros)
-  const dayKey = _pf.length===3 ? 'prod_'+_fechaKeyDDMMYYYY(new Date(+_pf[2], +_pf[1]-1, +_pf[0])) : 'prod_'+p.fecha.replace(/\//g,'-');
+  const dayKey = 'prod_'+p.fecha.replace(/\//g,'-');
   const movsDia = JSON.parse(localStorage.getItem(dayKey)||'[]');
   movsDia.push(mov);
   localStorage.setItem(dayKey, JSON.stringify(movsDia));
@@ -9495,18 +7983,8 @@ function confirmarColaPedido(idx){
       if(art){
         const cantReal = Math.round(item.cant * escala);
         art.stock = Math.max(0, (art.stock||0) - cantReal);
-        // Actualizar unidades en rack — puede haber varias posiciones involucradas
-        if(item.posRackDetalle && item.posRackDetalle.length){
-          let restante = cantReal;
-          item.posRackDetalle.forEach(d=>{
-            if(restante<=0) return;
-            if(!(ASIGN[d.pos] && ASIGN[d.pos].art==item.art)) return;
-            const tomar = Math.min(restante, Math.round(d.cant*escala) || restante, ASIGN[d.pos].unidades||0);
-            ASIGN[d.pos].unidades = Math.max(0, (ASIGN[d.pos].unidades||0) - tomar);
-            restante -= tomar;
-          });
-        } else if(item.posRack && ASIGN[item.posRack] && ASIGN[item.posRack].art==item.art){
-          // Compatibilidad con pedidos ya en cola de antes de este cambio (una sola posición)
+        // Actualizar unidades en rack si tiene posición
+        if(item.posRack && ASIGN[item.posRack] && ASIGN[item.posRack].art==item.art){
           ASIGN[item.posRack].unidades = Math.max(0, (ASIGN[item.posRack].unidades||0) - cantReal);
         }
       }
@@ -9564,56 +8042,6 @@ function renderResumenProd(){
   const porTipo = {};
   hist.forEach(m=>{ porTipo[m.tipo]=(porTipo[m.tipo]||0)+m.unidades; });
 
-  // ── Por cabeza (independiente del grupo) & Tiempos muertos ──
-  const histGruposMes = JSON.parse(localStorage.getItem('grupos_hist')||'[]').filter(h=>{
-    const p = h.fecha.split('/'); // dd/mm/yyyy
-    return p.length===3 && (p[1]+'_'+p[2])===mes;
-  });
-  let personaDiasMes = 0;
-  const diasPorGrupo = {};
-  grupos.forEach(g=>{ diasPorGrupo[g]=0; });
-  histGruposMes.forEach(h=>{
-    const presentes = h.data.filter(p=>p.presente);
-    personaDiasMes += presentes.length;
-    grupos.forEach(g=>{
-      if(presentes.some(p=>(p.grupoHoy||p.grupo)===g)) diasPorGrupo[g]++;
-    });
-  });
-  const unidPorCabezaMes = personaDiasMes>0 ? Math.round(totalUnid/personaDiasMes) : 0;
-
-  // ── Unidades por operario (mes) ──
-  // Para cada persona, cada día que estuvo presente se le atribuye
-  // unidGrupoEseDia / personasPresentesEnEseGrupoEseDia — y se acumula en el mes.
-  const rankPersonaMes = [];
-  getPersonalBase().forEach(pb=>{
-    let totalEst = 0, diasContados = 0;
-    histGruposMes.forEach(h=>{
-      const per = h.data.find(p=>p.nombre===pb.nombre);
-      if(!per || !per.presente) return;
-      const g = per.grupoHoy || per.grupo;
-      const movsDia = hist.filter(m=>m.fecha===h.fecha && m.grupo===g);
-      const uG = movsDia.reduce((s,m)=>s+(m.unidades||0),0);
-      const presG = h.data.filter(p=>p.presente && (p.grupoHoy||p.grupo)===g).length;
-      if(uG>0 && presG>0){ totalEst += uG/presG; diasContados++; }
-    });
-    if(diasContados>0) rankPersonaMes.push({
-      nombre: pb.nombre, grupo: pb.grupo,
-      total: Math.round(totalEst),
-      promDia: Math.round(totalEst/diasContados),
-      dias: diasContados
-    });
-  });
-  rankPersonaMes.sort((a,b)=>b.total-a.total);
-  const maxTotalPersona = rankPersonaMes.length ? (rankPersonaMes[0].total||1) : 1;
-
-  const muertoPorGrupo = {};
-  grupos.forEach(g=>{
-    const diasG = diasPorGrupo[g];
-    if(!diasG){ muertoPorGrupo[g]=null; return; }
-    const tiempoProm = porGrupo[g].tiempo / diasG;
-    muertoPorGrupo[g] = Math.max(0, Math.round(JORNADA_MIN - tiempoProm));
-  });
-
   el.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
       <div class="prod-res-card"><div class="prod-res-val" style="color:#0071e3">${totalUnid.toLocaleString('es-AR')}</div><div style="font-size:10px;color:#86868b">Unidades del mes</div></div>
@@ -9639,44 +8067,9 @@ function renderResumenProd(){
     <div style="font-size:11px;font-weight:600;color:#86868b;margin:10px 0 6px;text-transform:uppercase">Por tipo</div>
     ${Object.entries(porTipo).sort((a,b)=>b[1]-a[1]).map(([tipo,unid])=>`
       <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #e5e5ea;margin-bottom:4px">
-        <span style="font-size:12px;font-weight:500">${tipo==='carga'?'📥 Carga':tipo==='descarga'?'📤 Descarga':tipo==='despacho'?'📋 Despacho':tipo==='pedidos'?'📝 Pedidos':tipo==='orden'?'🧹 Orden/Limpieza':tipo==='stock'?'📦 Stock':'🚗 Chasis'}</span>
+        <span style="font-size:12px;font-weight:500">${tipo==='carga'?'📥 Carga':tipo==='descarga'?'📤 Descarga':tipo==='despacho'?'📋 Despacho':'🚗 Chasis'}</span>
         <span style="font-size:13px;font-weight:700">${unid.toLocaleString('es-AR')} un.</span>
       </div>`).join('')}
-
-    <div style="font-size:11px;font-weight:600;color:#86868b;margin:14px 0 6px;text-transform:uppercase">⚡ Por persona & tiempos muertos <span style="font-weight:400;text-transform:none;color:#b0b0b5">(jornada neta 525min)</span></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
-      <div class="prod-res-card"><div class="prod-res-val" style="color:#ff9500">${unidPorCabezaMes.toLocaleString('es-AR')}</div><div style="font-size:10px;color:#86868b">Un./persona (mes, indep. de grupo)</div></div>
-      <div class="prod-res-card"><div class="prod-res-val">${personaDiasMes}</div><div style="font-size:10px;color:#86868b">Persona-días trabajados</div></div>
-    </div>
-    ${grupos.filter(g=>diasPorGrupo[g]>0).map(g=>{
-      const m = muertoPorGrupo[g];
-      const color = m>90?'#d70015':m>30?'#ff9500':'#34c759';
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 12px;background:#fff;border-radius:8px;border:1px solid #e5e5ea;margin-bottom:4px">
-        <span style="font-size:12px;font-weight:600;color:${GRUPOS_COLORES[g]||'#86868b'}">${GRUPOS_NOMBRES[g]||g}</span>
-        <span style="font-size:11px;color:#86868b"><b style="color:${color}">${m}min</b> muertos/día prom. · ${diasPorGrupo[g]} días</span>
-      </div>`;
-    }).join('')}
-
-    <div style="font-size:11px;font-weight:600;color:#86868b;margin:14px 0 6px;text-transform:uppercase">👤 Unidades por operario (mes)</div>
-    <div style="font-size:10px;color:#86868b;margin-bottom:8px">Estimado: unidades de su grupo ese día ÷ personas presentes ese día, acumulado en el mes</div>
-    ${!rankPersonaMes.length ? '<div class="empty">Sin datos suficientes aún</div>' : rankPersonaMes.map((p,ri)=>{
-      const color = GRUPOS_COLORES[p.grupo]||'#86868b';
-      const pct = Math.round((p.total/maxTotalPersona)*100);
-      const medal = ri===0?'🥇':ri===1?'🥈':ri===2?'🥉':(ri+1);
-      return `<div style="background:#fff;border-radius:8px;border:1px solid #e5e5ea;padding:8px 12px;margin-bottom:5px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <div style="display:flex;align-items:center;gap:6px;min-width:0">
-            <span style="font-size:11px;color:#86868b;width:16px;flex-shrink:0">${medal}</span>
-            <span style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nombre.split(' ').slice(0,2).join(' ')}</span>
-            <span style="font-size:9px;font-weight:700;color:${color};background:${color}18;padding:1px 5px;border-radius:6px;flex-shrink:0">${p.grupo}</span>
-          </div>
-          <span style="font-size:11px;color:#86868b;flex-shrink:0"><b style="color:${color};font-size:13px">${p.total.toLocaleString('es-AR')}</b> un. · ${p.promDia}/día · ${p.dias}d</span>
-        </div>
-        <div style="background:#f5f5f7;border-radius:4px;height:6px;overflow:hidden">
-          <div style="width:${pct}%;height:100%;background:${color};border-radius:4px"></div>
-        </div>
-      </div>`;
-    }).join('')}
   `;
 }
 
@@ -9820,7 +8213,7 @@ function termoStats(){
     if(['TT','TL','TLSB','TT ','TL '].indexOf(uso)>=0) return false;
     if((r.stock||0)<=0) return false;
     if((r.rot_sem||0)>=0.5) return false;
-    if((r.pall||0)>4) return false;
+    if((r.pall||0)>4 || (r.pall||0)<1) return false;
     return true;
   }).map(r=>r.art));
 
@@ -10395,8 +8788,7 @@ if('serviceWorker' in navigator){
 </div>
 
 <div class="nav-submenu" id="sub-dash">
-  <div class="nav-sub-item" id="sub-repo-dash2" onclick="navTo('repo')"><span class="nav-sub-icon">🔄</span><span class="nav-sub-label">Reposición</span></div>
-  <div class="nav-sub-item" id="sub-dash-item2" onclick="navTo('dash')"><span class="nav-sub-icon">📊</span><span class="nav-sub-label">KPIs</span></div>
+  <div class="nav-sub-item" id="sub-dash-item" onclick="navTo('dash')"><span class="nav-sub-icon">📊</span><span class="nav-sub-label">Dashboard</span></div>
 </div>
 
 
@@ -10470,7 +8862,48 @@ if('serviceWorker' in navigator){
 </div>
 </div>
 
+<!-- PENSAMIENTO CRÍTICO / PENDIENTES -->
+<div class="view" id="view-pensa">
+  <div class="pensa-stats">
+    <div class="kpi"><b id="pensa-stat-pend">0</b><span>Pendientes</span></div>
+    <div class="kpi"><b id="pensa-stat-alta">0</b><span>Alta prioridad</span></div>
+    <div class="kpi"><b id="pensa-stat-hecho">0</b><span>Resueltas</span></div>
+  </div>
+
+  <div class="pensa-form">
+    <textarea id="pensa-input" placeholder="Escribí la idea o pendiente..."></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <select id="pensa-cat">
+        <option value="WMS">📦 WMS</option>
+        <option value="HyS">🦺 Higiene y Seguridad</option>
+        <option value="Grupos">👥 Grupos / Equipo</option>
+        <option value="Personal">🎓 Personal</option>
+        <option value="Otro">💡 Otro</option>
+      </select>
+      <select id="pensa-prio">
+        <option value="Media">🟡 Media</option>
+        <option value="Alta">🔴 Alta</option>
+        <option value="Baja">🟢 Baja</option>
+      </select>
+      <button class="btn-primary" style="flex:none;padding:10px 18px" onclick="agregarPensamiento()">+ Agregar</button>
+    </div>
+  </div>
+
+  <div class="pensa-filtros" id="pensa-filtros">
+    <div class="pensa-chip active" data-cat="todas" onclick="filtrarPensamiento('todas',this)">Todas</div>
+    <div class="pensa-chip" data-cat="WMS" onclick="filtrarPensamiento('WMS',this)">📦 WMS</div>
+    <div class="pensa-chip" data-cat="HyS" onclick="filtrarPensamiento('HyS',this)">🦺 HyS</div>
+    <div class="pensa-chip" data-cat="Grupos" onclick="filtrarPensamiento('Grupos',this)">👥 Grupos</div>
+    <div class="pensa-chip" data-cat="Personal" onclick="filtrarPensamiento('Personal',this)">🎓 Personal</div>
+    <div class="pensa-chip" data-cat="Otro" onclick="filtrarPensamiento('Otro',this)">💡 Otro</div>
+    <div class="pensa-chip" id="pensa-chip-resueltas" style="margin-left:auto" onclick="toggleVerResueltas(this)">Ver resueltas</div>
+  </div>
+
+  <div id="pensa-lista"></div>
+</div>
+
 <script>
+
 // ═══════════════════════════════════════════════════════════
 // MÓDULO CARGAS / DESCARGAS
 // ═══════════════════════════════════════════════════════════
@@ -10516,8 +8949,6 @@ function transitoPosicionSugerida(artId, cantEntrada){
   var da = DATA.find(function(r){return r.art===artId;});
   if(!da) return {tipo:'desconocido', pos:'—', detalle:'Art no en DATA'};
 
-  var PALL_MAX_TR = 5; // mismo límite que el motor de rack
-
   var stockFuturo = (da.stock||0) + cantEntrada;
   var mp = da.max_pos||32;
   var pallFuturo = stockFuturo / mp;
@@ -10526,11 +8957,14 @@ function transitoPosicionSugerida(artId, cantEntrada){
   // ── Filtros de exclusión (igual que el motor) ──
   var excluido = /\d+\.5/.test(da.med||'') || (da.prov==='SPEEDWAY') ||
                  ['TT','TL','TLSB'].indexOf((da.uso||'').trim())>=0 ||
-                 (['AT51','AT52','MT51'].indexOf((da.diseno||'').trim())>=0 && da.prov==='KUMHO');
+                 ['AT51','AT52','MT51'].indexOf((da.diseno||'').trim())>=0;
 
-  // ── Buscar en ASIGN posiciones YA asignadas para este artículo ──
-  // (se busca antes del límite de pallets para poder alertar si hay
-  //  que sacarlo del rack en vez de mandarlo directo a bloque)
+  if(excluido || pallFuturo > 6){
+    return {tipo:'bloque', pos: da.bloque||'—',
+            detalle:'Bloque '+( da.bloque||'—'), pallets: pallFuturo.toFixed(1)};
+  }
+
+  // ── PASO 1: buscar en ASIGN posiciones asignadas para este artículo ──
   var posAsign = [];
   Object.entries(ASIGN).forEach(function(e){
     var posId=e[0], v=e[1];
@@ -10540,25 +8974,6 @@ function transitoPosicionSugerida(artId, cantEntrada){
       posAsign.push({id:posId, unidades:0, vacia:true});
   });
 
-  // ── Si ya está en el rack y el ingreso lo hace superar el límite → ALERTA ──
-  if(posAsign.length && (excluido || pallFuturo > PALL_MAX_TR)){
-    var posActuales = posAsign.map(function(p){return p.id;}).join(', ');
-    return {
-      tipo:    'sacar_de_rack',
-      pos:     posActuales,
-      detalle: '⚠️ Con este ingreso pasa a '+pallFuturo.toFixed(1)+' pallets (> '+PALL_MAX_TR+') — sacar de '+posActuales+' y mandar a Bloque '+(da.bloque||'—'),
-      pallets: pallFuturo.toFixed(1),
-      posActuales: posAsign,
-      bloqueDestino: da.bloque||'—',
-    };
-  }
-
-  if(excluido || pallFuturo > PALL_MAX_TR){
-    return {tipo:'bloque', pos: da.bloque||'—',
-            detalle:'Bloque '+( da.bloque||'—'), pallets: pallFuturo.toFixed(1)};
-  }
-
-  // ── El artículo YA está en el rack y sigue calificando → REPONER (misma posición, nunca una nueva) ──
   if(posAsign.length){
     // Priorizar posiciones vacías primero (quedaron vacías por pedidos del día)
     posAsign.sort(function(a,b){
@@ -10573,22 +8988,18 @@ function transitoPosicionSugerida(artId, cantEntrada){
     var vaciaLabel = mejorPos.vacia ? ' ← POSICIÓN VACÍA (prioridad)' : '';
     var posStr = posAsign.map(function(p){return p.id+(p.vacia?'★':'');}).join(', ');
     return {
-      tipo:    'reponer',
+      tipo:    'rack',
       pos:     posStr,
-      detalle: '🔁 Reponer en: '+posStr+vaciaLabel,
+      detalle: 'Rack: '+posStr+vaciaLabel,
       pallets: pallFuturo.toFixed(1),
       exacto:  true,
       posVacia: mejorPos.vacia,
     };
   }
 
-  // ── A partir de acá el artículo NO tiene ninguna posición en el rack todavía ──
-  // (nunca llega hasta acá si posAsign.length>0 — evita que termine con
-  //  el mismo artículo repartido en dos posiciones distintas)
-
   // ── PASO 2: buscar posición vacía existente en ASIGN para cualquier art ──
   // Una posición "vacía" es la que tiene unidades=0 — quedó libre por pedidos
-  if(pallFuturo >= 0 && rot < 5.5){
+  if(pallFuturo >= 1 && rot < 5.5){
     var nivelIdeal = rot<=0?4: rot<1.25?3: rot<2.5?2:1;
 
     // Primero: buscar posiciones en ASIGN con unidades=0 del nivel correcto
@@ -10741,103 +9152,8 @@ function cydConfirmarTransito(){
 function cydConfirmarDesdeTransito(id){
   var lista = transitoGetAll();
   var tr = lista.find(function(t){return t.id===id;});
-  if(!tr){ showToast('❌ Tránsito no encontrado'); return; }
-
-  // Armar opciones de grupos presentes hoy
-  var personal = getGruposHoy();
-  var gruposHoy = [];
-  personal.filter(function(p){return p.presente;}).forEach(function(p){
-    if(gruposHoy.indexOf(p.grupoHoy)<0) gruposHoy.push(p.grupoHoy);
-  });
-  if(!gruposHoy.length) gruposHoy = ['G1','G2','G3'];
-
-  var totalUnEstimado = tr.items.reduce(function(s,r){return s+r.cant;},0);
-
-  var grupoOpts = gruposHoy.map(function(g){
-    return '<button type="button" onclick="cydRecepcionSelGrupo(this,\''+g+'\')" id="rec-gbtn-'+g+'" '+
-      'style="padding:7px 12px;border:1.5px solid #d2d2d7;border-radius:8px;background:#fff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">'+
-      (GRUPOS_NOMBRES[g]||g)+'</button>';
-  }).join('');
-
-  var modalHtml =
-    '<div id="cyd-modal-recepcion-op" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box">'+
-    '<div style="background:#fff;border-radius:16px;padding:20px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.35);max-height:90vh;overflow-y:auto">'+
-    '<div style="font-size:15px;font-weight:700;margin-bottom:4px">✅ Confirmar recepción</div>'+
-    '<div style="font-size:12px;color:#86868b;margin-bottom:14px">'+tr.tipoIcon+' '+(tr.tipoLabel||'')+' · '+tr.items.length+' arts · ~'+totalUnEstimado.toLocaleString('es-AR')+' un.</div>'+
-
-    '<div style="font-size:11px;font-weight:700;color:#86868b;letter-spacing:.4px;margin-bottom:6px">EQUIPO DE DESCARGA</div>'+
-    '<div id="rec-grupos-btns" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'+grupoOpts+'</div>'+
-
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'+
-      '<div>'+
-        '<div style="font-size:11px;color:#86868b;margin-bottom:3px">Inicio</div>'+
-        '<input id="rec-inicio" type="time" style="width:100%;padding:8px 6px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">'+
-      '</div>'+
-      '<div>'+
-        '<div style="font-size:11px;color:#86868b;margin-bottom:3px">Fin</div>'+
-        '<input id="rec-fin" type="time" style="width:100%;padding:8px 6px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">'+
-      '</div>'+
-      '<div>'+
-        '<div style="font-size:11px;color:#86868b;margin-bottom:3px">Dársena</div>'+
-        '<input id="rec-darsena" type="text" placeholder="Nro..." style="width:100%;padding:8px 6px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">'+
-      '</div>'+
-    '</div>'+
-
-    '<div style="margin-bottom:12px">'+
-      '<div style="font-size:11px;color:#86868b;margin-bottom:3px">Observaciones</div>'+
-      '<textarea id="rec-obs" placeholder="Diferencias, demoras, novedades..." rows="2" style="width:100%;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;outline:none;resize:none;box-sizing:border-box"></textarea>'+
-    '</div>'+
-
-    '<div style="display:flex;gap:8px">'+
-      '<button onclick="document.getElementById(\'cyd-modal-recepcion-op\').remove()" style="flex:1;padding:10px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>'+
-      '<button onclick="cydEjecutarRecepcion(\''+id+'\')" style="flex:2;padding:10px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">✅ Confirmar recepción</button>'+
-    '</div>'+
-    '</div></div>';
-
-  document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-  // Preseleccionar hora actual
-  var ahora = new Date();
-  var hh = ahora.getHours().toString().padStart(2,'0');
-  var mm = ahora.getMinutes().toString().padStart(2,'0');
-  var inicioEl = document.getElementById('rec-inicio');
-  if(inicioEl) inicioEl.value = hh+':'+mm;
-
-  // Preseleccionar primer grupo
-  window._recGrupoSel = gruposHoy[0]||'G1';
-  cydRecepcionSelGrupo(document.getElementById('rec-gbtn-'+window._recGrupoSel), window._recGrupoSel);
-}
-
-function cydRecepcionSelGrupo(btn, g){
-  window._recGrupoSel = g;
-  var btns = document.getElementById('rec-grupos-btns');
-  if(btns) btns.querySelectorAll('button').forEach(function(b){
-    b.style.background='#fff'; b.style.borderColor='#d2d2d7'; b.style.color='#1d1d1f';
-  });
-  if(btn){ btn.style.background=GRUPOS_COLORES[g]||'#34c759'; btn.style.borderColor=GRUPOS_COLORES[g]||'#34c759'; btn.style.color='#fff'; }
-}
-
-function cydEjecutarRecepcion(id){
-  var lista = transitoGetAll();
-  var tr = lista.find(function(t){return t.id===id;});
   if(!tr){showToast('❌ Tránsito no encontrado'); return;}
-
-  var grupoSel = window._recGrupoSel || 'G1';
-  var inicio   = (document.getElementById('rec-inicio')||{}).value||'';
-  var fin      = (document.getElementById('rec-fin')||{}).value||'';
-  var darsena  = (document.getElementById('rec-darsena')||{}).value||'';
-  var obs      = (document.getElementById('rec-obs')||{}).value||'';
-
-  var durMin = 0;
-  if(inicio && fin){
-    var ih=parseInt(inicio.split(':')[0]||0), im=parseInt(inicio.split(':')[1]||0);
-    var fh=parseInt(fin.split(':')[0]||0),   fm=parseInt(fin.split(':')[1]||0);
-    durMin = (fh*60+fm)-(ih*60+im);
-    if(durMin<0) durMin=0;
-  }
-
-  var modalEl = document.getElementById('cyd-modal-recepcion-op');
-  if(modalEl) modalEl.remove();
+  if(!confirm('¿Confirmar recepción de '+tr.tipoIcon+' '+tr.tipoLabel+' — '+tr.items.length+' arts? Esto suma el stock real.')) return;
 
   var fecha = new Date().toLocaleDateString('es-AR');
   var fechaISO = new Date().toISOString().split('T')[0];
@@ -10897,38 +9213,8 @@ function cydEjecutarRecepcion(id){
   transitoBadge();
   cydRenderTransito();
   var totalUn = tr.items.reduce(function(s,r){return s+r.cant;},0);
-
-  // Registrar en productividad con datos operativos completos (grupo, dársena, inicio/fin, durMin)
-  try {
-    var hora = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-    var tipoMov = tr.flujo === 'descarga' ? 'descarga' : 'carga'; // respeta el módulo de origen (Carga o Descarga)
-    var mov = {
-      fecha: fecha, hora: hora,
-      tipo: tipoMov,
-      grupo: grupoSel,
-      unidades: totalUn,
-      semis: 1,
-      destino: tr.tipoLabel+(tr.nroContenedor?' '+tr.nroContenedor:''),
-      darsena: darsena,
-      inicio: inicio,
-      fin: fin,
-      durMin: durMin,
-      obs: obs,
-      auto: false,
-      transitoId: id
-    };
-    var dayKey = getProdKey();
-    var movsDia = _leerMovsConFallback('prod_', new Date());
-    movsDia.push(mov);
-    localStorage.setItem(dayKey, JSON.stringify(movsDia));
-    var mes = _fechaKeyDDMMYYYY().slice(3).replace('-','_');
-    var histKey = 'prod_hist_'+mes;
-    var hist = JSON.parse(localStorage.getItem(histKey)||'[]');
-    hist.push(mov);
-    localStorage.setItem(histKey, JSON.stringify(hist));
-  } catch(e){ console.warn('registrarMovProd recepción error', e); }
-
-  showToast('✅ Recepción confirmada — '+totalUn+' un. sumadas al stock · rack actualizado'+(durMin>0?' · '+durMin+' min':''));
+  registrarMovProd('carga', totalUn, tr.tipoLabel+(tr.nroContenedor?' '+tr.nroContenedor:''));
+  showToast('✅ Recepción confirmada — '+totalUn+' un. sumadas al stock · rack actualizado');
 }
 
 function cydEliminarTransito(id){
@@ -10966,7 +9252,7 @@ function cydExportarPlanilla(id){
     var stockNuevo = (r.stockActual||0) + r.cant;
     var cantStr = '+'+r.cant;
     var cantColor = '#34c759';
-    var destColor = sug.tipo==='rack' ? '#0071e3' : sug.tipo==='reponer' ? '#34c759' : sug.tipo==='sacar_de_rack' ? '#d70015' : '#ff9500';
+    var destColor = sug.tipo==='rack' ? '#0071e3' : '#ff9500';
     var rango = (typeof RANGOS !== 'undefined' && RANGOS[String(r.art)]) ? RANGOS[String(r.art)] : '—';
     var dot = (function(){
       try{
@@ -11187,7 +9473,7 @@ function cydRenderTransito(){
       } else {
         // INGRESO: igual que antes
         var sug = r.sugerencia||{};
-        var colorDest = sug.tipo==='rack'?'#0071e3':sug.tipo==='reponer'?'#34c759':sug.tipo==='sacar_de_rack'?'#d70015':'#ff9500';
+        var colorDest = sug.tipo==='rack'?'#0071e3':'#ff9500';
         html += '<tr style="'+bg+'">';
         html += '<td style="padding:4px 8px;font-weight:600">'+r.art+'</td>';
         html += '<td style="padding:4px 8px">'+r.med+'</td>';
@@ -11609,28 +9895,17 @@ function cydGetHist(tipo){
 }
 
 // Obtener despachos confirmados del tránsito como historial de salidas
-function _esARaISO(fechaStr){
-  // Convierte 'd/m/yyyy' (toLocaleDateString es-AR) a 'yyyy-mm-dd'
-  if(!fechaStr) return '';
-  var p = fechaStr.split('/');
-  if(p.length!==3) return '';
-  var dd = ('0'+p[0]).slice(-2), mm = ('0'+p[1]).slice(-2), yyyy = p[2];
-  return yyyy+'-'+mm+'-'+dd;
-}
-
 function cydGetHistSalidas(){
   try{
     return transitoGetAll()
       .filter(function(t){ return t.flujo==='salida' && t.estado==='confirmado'; })
       .map(function(t){
-        var fechaMostrada = t.fechaConfirmacion||t.fecha;
         return {
           id: t.id,
           tipo: 'salida',
-          fecha: fechaMostrada,
+          fecha: t.fechaConfirmacion||t.fecha,
           hora: t.horaConfirmacion||t.hora,
-          // Si hay fechaConfirmacion, esa manda sobre el fechaISO viejo (que es de cuando se CREÓ el tránsito)
-          fechaISO: t.fechaConfirmacion ? (_esARaISO(t.fechaConfirmacion)||t.fechaISO||'') : (t.fechaISO||''),
+          fechaISO: t.fechaISO||'',
           nroRem: t.nroContenedor||'',
           cliente: t.destino||'',
           tte: t.tte||'',
@@ -11676,22 +9951,19 @@ function cydRenderHistorial(){
 
   function enPeriodo(h){
     if(periodo==='todo') return true;
-    // Extraer año/mes/día como ENTEROS, sin pasar por new Date(string) que es ambiguo/frágil
-    var y, m, d;
-    if(h.fechaISO && /^\d{4}-\d{2}-\d{2}/.test(h.fechaISO)){
-      y = +h.fechaISO.slice(0,4); m = +h.fechaISO.slice(5,7); d = +h.fechaISO.slice(8,10);
-    } else {
-      var p = (h.fecha||'').split('/'); // formato es-AR: d/m/yyyy
-      if(p.length!==3) return true;
-      d = parseInt(p[0],10); m = parseInt(p[1],10); y = parseInt(p[2],10);
+    // Intentar fechaISO primero, luego fecha en formato es-AR
+    var iso = h.fechaISO;
+    var d;
+    if(iso){ d = new Date(iso+'T00:00:00'); }
+    else {
+      // formato dd/mm/yyyy
+      var p = (h.fecha||'').split('/');
+      d = p.length===3 ? new Date(p[2],p[1]-1,p[0]) : new Date(h.fecha);
     }
-    if(!y || !m || !d) return true;
-    var fechaObj = new Date(y, m-1, d);
-    if(isNaN(fechaObj)) return true;
-    var hoyObj = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-    if(periodo==='hoy') return fechaObj.getTime()===hoyObj.getTime();
-    if(periodo==='semana'){ var s=new Date(hoyObj); s.setDate(s.getDate()-7); return fechaObj>=s; }
-    if(periodo==='mes'){    var mm=new Date(hoyObj); mm.setMonth(mm.getMonth()-1); return fechaObj>=mm; }
+    if(isNaN(d)) return true;
+    if(periodo==='hoy') return d.toDateString()===ahora.toDateString();
+    if(periodo==='semana'){ var s=new Date(ahora); s.setDate(s.getDate()-7); return d>=s; }
+    if(periodo==='mes'){    var m=new Date(ahora); m.setMonth(m.getMonth()-1); return d>=m; }
     return true;
   }
 
@@ -12001,6 +10273,152 @@ function cydExportar(){
 }
 
 function initCyDesc(){ cydTab('carga'); transitoBadge(); }
+
+// ═══════════════════════════════════════════════════════════
+// MÓDULO PENSAMIENTO CRÍTICO / PENDIENTES
+// ═══════════════════════════════════════════════════════════
+var _pensaFiltroCat = 'todas';
+var _pensaVerResueltas = false;
+
+function getPensamientos(){
+  return JSON.parse(localStorage.getItem('wms_pensamiento')||'[]');
+}
+function savePensamientos(arr){
+  localStorage.setItem('wms_pensamiento', JSON.stringify(arr));
+}
+
+function agregarPensamiento(){
+  var input = document.getElementById('pensa-input');
+  var texto = input.value.trim();
+  if(!texto){ showToast('Escribí algo primero'); return; }
+  var cat = document.getElementById('pensa-cat').value;
+  var prio = document.getElementById('pensa-prio').value;
+  var arr = getPensamientos();
+  arr.unshift({
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    titulo: texto,
+    categoria: cat,
+    prioridad: prio,
+    estado: 'pendiente',
+    desarrollo: '',
+    fecha: new Date().toLocaleDateString('es-AR'),
+    fechaHecho: null
+  });
+  savePensamientos(arr);
+  input.value = '';
+  renderPensamiento();
+  showToast('💡 Idea guardada');
+}
+
+function toggleEstadoPensamiento(id){
+  var arr = getPensamientos();
+  var it = arr.find(function(x){return x.id===id;});
+  if(!it) return;
+  if(it.estado==='pendiente'){
+    it.estado='hecho';
+    it.fechaHecho = new Date().toLocaleDateString('es-AR');
+  } else {
+    it.estado='pendiente';
+    it.fechaHecho = null;
+  }
+  savePensamientos(arr);
+  renderPensamiento();
+}
+
+function eliminarPensamiento(id){
+  if(!confirm('¿Eliminar esta idea/pendiente?')) return;
+  var arr = getPensamientos().filter(function(x){return x.id!==id;});
+  savePensamientos(arr);
+  renderPensamiento();
+}
+
+function toggleDesarrollo(id){
+  var el = document.getElementById('pensa-dev-'+id);
+  if(!el) return;
+  el.style.display = (el.style.display==='none') ? 'block' : 'none';
+}
+
+function guardarDesarrollo(id, valor){
+  var arr = getPensamientos();
+  var it = arr.find(function(x){return x.id===id;});
+  if(!it) return;
+  it.desarrollo = valor;
+  savePensamientos(arr);
+}
+
+function filtrarPensamiento(cat, btn){
+  _pensaFiltroCat = cat;
+  document.querySelectorAll('#pensa-filtros .pensa-chip').forEach(function(c){
+    if(c.id!=='pensa-chip-resueltas') c.classList.remove('active');
+  });
+  if(btn) btn.classList.add('active');
+  renderPensamiento();
+}
+
+function toggleVerResueltas(btn){
+  _pensaVerResueltas = !_pensaVerResueltas;
+  btn.classList.toggle('active', _pensaVerResueltas);
+  renderPensamiento();
+}
+
+var _catLabel = {WMS:'📦 WMS', HyS:'🦺 HyS', Grupos:'👥 Grupos', Personal:'🎓 Personal', Otro:'💡 Otro'};
+var _prioLabel = {Alta:'🔴 Alta', Media:'🟡 Media', Baja:'🟢 Baja'};
+var _prioOrden = {Alta:0, Media:1, Baja:2};
+
+function renderPensamiento(){
+  var arr = getPensamientos();
+
+  var pend = arr.filter(function(x){return x.estado==='pendiente';});
+  var altas = pend.filter(function(x){return x.prioridad==='Alta';});
+  var hechos = arr.filter(function(x){return x.estado==='hecho';});
+  document.getElementById('pensa-stat-pend').textContent = pend.length;
+  document.getElementById('pensa-stat-alta').textContent = altas.length;
+  document.getElementById('pensa-stat-hecho').textContent = hechos.length;
+
+  var lista = arr.filter(function(x){
+    if(_pensaFiltroCat!=='todas' && x.categoria!==_pensaFiltroCat) return false;
+    if(!_pensaVerResueltas && x.estado==='hecho') return false;
+    return true;
+  });
+
+  lista.sort(function(a,b){
+    if(a.estado!==b.estado) return a.estado==='hecho'?1:-1;
+    var pa = _prioOrden[a.prioridad], pb = _prioOrden[b.prioridad];
+    if(pa!==pb) return pa-pb;
+    return 0;
+  });
+
+  var cont = document.getElementById('pensa-lista');
+  if(!lista.length){
+    cont.innerHTML = '<div class="pensa-empty">🧠 No hay ideas cargadas todavía.<br>Escribí la primera arriba.</div>';
+    return;
+  }
+
+  var html = '';
+  lista.forEach(function(it){
+    var esHecho = it.estado==='hecho';
+    var prioCls = it.prioridad==='Alta'?'prio-alta':(it.prioridad==='Baja'?'prio-baja':'prio-media');
+    html += '<div class="pensa-card'+(esHecho?' hecho':'')+'">';
+    html += '<div class="pensa-top">';
+    html += '<div class="pensa-check'+(esHecho?' hecho':'')+'" onclick="toggleEstadoPensamiento(\''+it.id+'\')">'+(esHecho?'✓':'')+'</div>';
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div class="pensa-titulo">'+it.titulo.replace(/</g,'&lt;')+'</div>';
+    html += '<div class="pensa-meta">';
+    html += '<span class="pensa-tag cat">'+_catLabel[it.categoria]+'</span>';
+    html += '<span class="pensa-tag '+prioCls+'">'+_prioLabel[it.prioridad]+'</span>';
+    html += '<span class="pensa-fecha">'+(esHecho?('✔ '+it.fechaHecho):('📝 '+it.fecha))+'</span>';
+    html += '</div>';
+    html += '<div class="pensa-acciones">';
+    html += '<button onclick="toggleDesarrollo(\''+it.id+'\')">✎ Desarrollar</button>';
+    html += '<button class="del" onclick="eliminarPensamiento(\''+it.id+'\')">🗑 Eliminar</button>';
+    html += '</div>';
+    html += '<div class="pensa-desarrollo" id="pensa-dev-'+it.id+'" style="display:none">';
+    html += '<textarea placeholder="Desarrollá acá la idea con más detalle..." onchange="guardarDesarrollo(\''+it.id+'\', this.value)">'+(it.desarrollo||'').replace(/</g,'&lt;')+'</textarea>';
+    html += '</div>';
+    html += '</div></div></div>';
+  });
+  cont.innerHTML = html;
+}
 </script>
 
 
