@@ -1353,6 +1353,80 @@ function recalcularCond(art){
   art.cond = (art.rot_pall_mes||0) > (art.pall||0) ? 'bajo stock' : 'sobrestock';
 }
 
+// ───────────────────────────────────────────────────────────────
+// Sugerencias de ubicación por cruce de umbral de 1 pallet.
+// Si un despacho deja el stock < 1 pallet → sugerir puntera.
+// Si un ingreso lo lleva a ≥ 1 pallet → sugerir sacarlo de puntera y llevarlo a bloque.
+// ───────────────────────────────────────────────────────────────
+function pallEquivalente(art, stock){
+  var artKey = String(art.art);
+  var base = (typeof PALL_BASE!=='undefined' && PALL_BASE[artKey] && PALL_BASE[artKey].p_rack) ? PALL_BASE[artKey].p_rack : (art.max_pos||32);
+  if(!base) base = 32;
+  return stock / base;
+}
+
+function getSugerenciasUbicacion(){ return JSON.parse(localStorage.getItem('wms_sugerencias_ubicacion')||'[]'); }
+function saveSugerenciasUbicacion(arr){ localStorage.setItem('wms_sugerencias_ubicacion', JSON.stringify(arr.slice(0,200))); }
+
+function chequearCambioUbicacion(art, stockAntes, stockDespues){
+  if(stockAntes===stockDespues) return null;
+  var pAntes = pallEquivalente(art, stockAntes);
+  var pDespues = pallEquivalente(art, stockDespues);
+  var tipo = null;
+  if(pAntes>=1 && pDespues<1 && stockDespues>0) tipo = 'puntera';
+  else if(pAntes<1 && pDespues>=1) tipo = 'bloque';
+  if(!tipo) return null;
+
+  var sug = getSugerenciasUbicacion();
+  sug.unshift({
+    art: art.art, med: art.med, diseno: art.diseno, prov: art.prov,
+    tipo: tipo, stock: stockDespues,
+    fecha: new Date().toLocaleDateString('es-AR'),
+    hora: new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})
+  });
+  saveSugerenciasUbicacion(sug);
+  return tipo;
+}
+
+function descartarSugerenciaUbicacion(idx){
+  var sug = getSugerenciasUbicacion();
+  sug.splice(idx,1);
+  saveSugerenciasUbicacion(sug);
+  renderSugerenciasUbicacion();
+}
+
+function limpiarSugerenciasUbicacion(){
+  if(!confirm('¿Descartar todas las sugerencias de ubicación?')) return;
+  saveSugerenciasUbicacion([]);
+  renderSugerenciasUbicacion();
+}
+
+function renderSugerenciasUbicacion(){
+  var box = document.getElementById('sugerencias-ubic-box');
+  if(!box) return;
+  var sug = getSugerenciasUbicacion();
+  if(!sug.length){ box.innerHTML=''; return; }
+
+  var html = '<div style="background:#fff;border:1px solid #0071e3;border-radius:10px;padding:10px 12px;margin-bottom:10px">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+  html += '<span style="font-size:12px;font-weight:700;color:#0071e3">📍 '+sug.length+' sugerencia'+(sug.length>1?'s':'')+' de ubicación pendiente'+(sug.length>1?'s':'')+'</span>';
+  html += '<button onclick="limpiarSugerenciasUbicacion()" style="border:none;background:none;color:#86868b;font-size:11px;cursor:pointer">Descartar todas</button>';
+  html += '</div>';
+  sug.forEach(function(s, idx){
+    var esPuntera = s.tipo==='puntera';
+    html += '<div style="display:flex;align-items:center;gap:8px;background:#f5f5f7;border-radius:8px;padding:8px;margin-bottom:6px">';
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="font-size:12px;font-weight:600">'+s.med+' '+s.diseno+' <span style="color:#86868b;font-weight:400">('+s.art+')</span></div>';
+    html += '<div style="font-size:11px;color:'+(esPuntera?'#0071e3':'#856404')+'">'+(esPuntera?'🔚 Quedan '+s.stock+' un. — llevar a puntera':'📦 Llegaron a '+s.stock+' un. — sacar de puntera y llevar a bloque')+'</div>';
+    html += '</div>';
+    html += '<button onclick="descartarSugerenciaUbicacion('+idx+')" style="border:none;background:#e5e5ea;color:#1d1d1f;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer">✓ Listo</button>';
+    html += '</div>';
+  });
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+
 // Aplicar rotación real al arrancar
 (function(){
   // 1. Base embebida — actualiza rot, rot6 Y rot_sem
@@ -4705,6 +4779,7 @@ function confirmarDespacho(){
   const fecha = new Date().toLocaleDateString('es-AR');
   const hora = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
   const repoSugerido = [];
+  let sugUbicCount = 0;
 
   _confirmItems.forEach(item=>{
     // Descontar del rack_stock y re-ejecutar motor si quedan posiciones libres
@@ -4713,10 +4788,12 @@ function confirmarDespacho(){
     // NUEVO: Descontar de DATA (stock real)
     const dataArt = DATA.find(r=>r.art===item.art);
     if(dataArt){
+      const stockAntesDespacho = dataArt.stock||0;
       dataArt.stock = Math.max(0, (dataArt.stock||0) - item.cantReal);
       dataArt.pall = Math.floor(dataArt.stock / (dataArt.max_pos||32));
       recalcularCond(dataArt);
       saveDataStock();
+      if(chequearCambioUbicacion(dataArt, stockAntesDespacho, dataArt.stock)) sugUbicCount++;
 
       // TRIGGER REPOSICIÓN: si el stock bajó a menos de 1 pallet → sugerir reponer
       const minStock = dataArt.max_pos || 32;
@@ -4780,6 +4857,7 @@ function confirmarDespacho(){
   let msg = '✅ Despacho confirmado';
   if(diferencias.length) msg += ' · '+diferencias.length+' diferencias';
   if(repoSugerido.length) msg += ' · ⚠️ '+repoSugerido.length+' arts. para reponer';
+  if(sugUbicCount) msg += ' · 📍 '+sugUbicCount+' sugerencia'+(sugUbicCount>1?'s':'')+' de ubicación';
   showToast(msg);
 
   // Si hay diferencias abrir pestaña
@@ -9277,6 +9355,7 @@ if('serviceWorker' in navigator){
 
 <!-- PUNTERAS -->
 <div class="view" id="view-punteras">
+  <div id="sugerencias-ubic-box"></div>
   <div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:14px;margin-bottom:12px">
     <div style="font-size:14px;font-weight:700;margin-bottom:4px">🔚 Punteras — stock &lt; 1 pallet</div>
     <div style="font-size:12px;color:#86868b;margin-bottom:10px">4 punteras (pasillos 4, 5, 7 y 8) · 7 parrillas c/u · 28 parrillas en total · cada parrilla admite varios artículos mezclados, hasta <span id="punt-cap-label">6</span> unidades · asignación 100% manual, vos elegís la posición de cada artículo</div>
@@ -10216,12 +10295,15 @@ function cydConfirmar(tipo){
 
   if(tipo === 'carga'){
     // Sumar stock
+    var sugUbicCarga = 0;
     _cydItems.forEach(function(r){
       var da = DATA.find(function(d){return d.art===r.art;});
       if(da){
+        var stockAntesCarga = da.stock||0;
         da.stock = (da.stock||0) + r.cant;
         da.pall  = Math.floor(da.stock / (da.max_pos||32));
         recalcularCond(da);
+        if(chequearCambioUbicacion(da, stockAntesCarga, da.stock)) sugUbicCarga++;
       }
     });
     saveDataStock();
@@ -10240,16 +10322,19 @@ function cydConfirmar(tipo){
     // Reevaluar rack
     reevaluarRack();
 
-    showToast('✅ Carga confirmada — '+_cydItems.length+' arts · '+_cydItems.reduce(function(s,r){return s+r.cant;},0)+' un.');
+    showToast('✅ Carga confirmada — '+_cydItems.length+' arts · '+_cydItems.reduce(function(s,r){return s+r.cant;},0)+' un.'+(sugUbicCarga?' · 📍 '+sugUbicCarga+' sugerencia'+(sugUbicCarga>1?'s':'')+' de ubicación':''));
 
   } else {
     // DESCARGA = ingreso de mercadería → SUMA stock
+    var sugUbicDesc = 0;
     _cydItems.forEach(function(r){
       var da = DATA.find(function(d){return d.art===r.art;});
       if(da){
+        var stockAntesDesc = da.stock||0;
         da.stock = (da.stock||0) + r.cant;
         da.pall  = Math.floor(da.stock / (da.max_pos||32));
         recalcularCond(da);
+        if(chequearCambioUbicacion(da, stockAntesDesc, da.stock)) sugUbicDesc++;
       }
     });
     saveDataStock();
@@ -10264,7 +10349,7 @@ function cydConfirmar(tipo){
 
     reevaluarRack();
 
-    showToast('✅ Descarga confirmada — '+_cydItems.reduce(function(s,r){return s+r.cant;},0)+' un. sumadas al stock');
+    showToast('✅ Descarga confirmada — '+_cydItems.reduce(function(s,r){return s+r.cant;},0)+' un. sumadas al stock'+(sugUbicDesc?' · 📍 '+sugUbicDesc+' sugerencia'+(sugUbicDesc>1?'s':'')+' de ubicación':''));
   }
 
   // Limpiar
@@ -10861,6 +10946,7 @@ function candidatosParaPuntera(){
 }
 
 function renderPunteras(){
+  renderSugerenciasUbicacion();
   document.getElementById('punt-cap-label').textContent = CAP_PARRILLA_UNIDADES;
   const punteras = getPunteras();
   const grid = document.getElementById('punteras-grid');
