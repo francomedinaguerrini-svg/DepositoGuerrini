@@ -3304,6 +3304,16 @@ function renderCandidatosEnNave(){
   // Candidatos al rack que no entraron (sin lugar)
   const res = window._motorResumen || {};
   const sinLugar = res.sinUbicacionArts || [];
+  const sinLugarSet = new Set(sinLugar.map(function(a){return String(a.art);}));
+
+  // Motivo real por el que un artículo quedó afuera del rack
+  const ROT_MAX_MOTOR = 5.5, PALL_MAX_MOTOR = 6;
+  function motivoSinRack(r){
+    if((r.pall||0) > PALL_MAX_MOTOR) return 'Supera '+PALL_MAX_MOTOR+' pallets (máx. que admite el motor)';
+    if((r.rot_sem||0) >= ROT_MAX_MOTOR) return 'Rotación semanal alta para el motor ('+(r.rot_sem||0).toFixed(2)+')';
+    if(sinLugarSet.has(String(r.art))) return 'Rack sin lugar (límite 80% alcanzado)';
+    return 'Candidato válido — falta correr "Reevaluar"';
+  }
 
   // También buscar artículos que califican pero nunca fueron asignados (rack lleno desde el arranque)
   const EXCLUIR_PROV = ['SPEEDWAY'];
@@ -3393,7 +3403,7 @@ function renderCandidatosEnNave(){
     html += '<span style="background:'+color+';color:#fff;padding:1px 6px;border-radius:6px;font-size:10px">'+zona+'</span>';
     html += 'Zona '+zona+' — '+arts.length+' artículos</div>';
     html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">';
-    html += '<tr style="background:#f5f5f7"><th style="padding:4px 6px;text-align:left">Art</th><th style="padding:4px 6px;text-align:left">Medida</th><th style="padding:4px 6px;text-align:left">Diseño</th><th style="padding:4px 6px;text-align:right">Rot/sem</th><th style="padding:4px 6px;text-align:right">Pallets</th><th style="padding:4px 6px;text-align:left">Bloque</th></tr>';
+    html += '<tr style="background:#f5f5f7"><th style="padding:4px 6px;text-align:left">Art</th><th style="padding:4px 6px;text-align:left">Medida</th><th style="padding:4px 6px;text-align:left">Diseño</th><th style="padding:4px 6px;text-align:right">Rot/sem</th><th style="padding:4px 6px;text-align:right">Pallets</th><th style="padding:4px 6px;text-align:left">Bloque</th><th style="padding:4px 6px;text-align:left">Motivo</th></tr>';
     arts.forEach(function(r){
       html += '<tr style="border-bottom:1px solid #f0f0f0">';
       html += '<td style="padding:4px 6px;font-weight:600">'+r.art+'</td>';
@@ -3402,6 +3412,7 @@ function renderCandidatosEnNave(){
       html += '<td style="padding:4px 6px;text-align:right;color:'+color+';font-weight:700">'+(r.rot_sem||0).toFixed(2)+'</td>';
       html += '<td style="padding:4px 6px;text-align:right">'+(r.pall||0)+'</td>';
       html += '<td style="padding:4px 6px;color:#86868b">'+(r.bloque||'—')+'</td>';
+      html += '<td style="padding:4px 6px;color:#86868b;font-size:10px">'+motivoSinRack(r)+'</td>';
       html += '</tr>';
     });
     html += '</table></div></div>';
@@ -5104,6 +5115,51 @@ function imprimirMapa(){
   ws['!pageSetup'] = {orientation:'landscape'};
   XLSX.utils.book_append_sheet(wb, ws, 'Mapa Racks');
 
+  // Hoja: STOCK TOTAL — todo el stock, indicando si está en rack y por qué no si no lo está
+  const enRackFull = new Set(Object.values(ASIGN).filter(v=>v&&v.art).map(v=>String(v.art)));
+  const posPorArt = {};
+  Object.entries(ASIGN).forEach(([pos,v])=>{ if(v&&v.art) posPorArt[String(v.art)] = pos; });
+  const resFull = window._motorResumen || {};
+  const sinLugarFullSet = new Set((resFull.sinUbicacionArts||[]).map(a=>String(a.art)));
+  const BLOQUES_RACK_FULL = ['2N/3N','2S/2N','1N','1S'];
+
+  function motivoNoRackCompleto(r){
+    if((r.stock||0) <= 0) return 'Sin stock';
+    if(/\d+\.5/.test(r.med||'')) return 'Medida de camión (.5) — no aplica a rack';
+    if(r.prov==='SPEEDWAY') return 'Proveedor Speedway — excluido del rack';
+    if(['TT','TL','TLSB'].indexOf((r.uso||'').trim())>=0) return 'Uso agrícola — excluido del rack';
+    if(['AT51','AT52','MT51'].indexOf((r.diseno||'').trim())>=0) return 'Diseño de alta rotación — excluido siempre del rack';
+    if(r.bloque){
+      const bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
+      if(bs.some(b=>BLOQUES_RACK_FULL.indexOf(b.trim())>=0)) return 'Ya está en zona física de rack (bloque 1-2)';
+    }
+    if((r.pall||0) > 6) return 'Supera 6 pallets (máx. que admite el motor)';
+    if((r.pall||0) < 1) return 'Menos de 1 pallet — no amerita rack';
+    if((r.rot_sem||0) >= 5.5) return 'Rotación semanal alta — no es candidato a rack';
+    if(sinLugarFullSet.has(String(r.art))) return 'Candidato válido — rack sin lugar (límite 80%)';
+    return 'Candidato válido — falta correr "Reevaluar"';
+  }
+
+  const wsStock = [
+    ['STOCK TOTAL — WMS Depósito Halpern — '+new Date().toLocaleDateString('es-AR')],
+    ['Total artículos: '+DATA.length],
+    [],
+    ['ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','STOCK','PALLETS','ROT/SEM','EN RACK','POSICIÓN','BLOQUE (NAVE)','MOTIVO SI NO ESTÁ EN RACK'],
+    ...DATA.map(r=>{
+      const enRack = enRackFull.has(String(r.art));
+      return [
+        r.art, r.med, r.diseno, r.prov, r.stock||0, r.pall||0, (r.rot_sem||0).toFixed(2),
+        enRack?'SÍ':'NO',
+        enRack?(posPorArt[String(r.art)]||''):'',
+        r.bloque||'',
+        enRack?'':motivoNoRackCompleto(r)
+      ];
+    })
+  ];
+  const wsS = XLSX.utils.aoa_to_sheet(wsStock);
+  wsS['!cols'] = [{wch:8},{wch:14},{wch:12},{wch:12},{wch:9},{wch:8},{wch:8},{wch:8},{wch:14},{wch:12},{wch:38}];
+  XLSX.utils.book_append_sheet(wb, wsS, 'Stock Total');
+
   // Hoja de alertas
   const alertas = getAlertasReposicion();
   if(alertas.length){
@@ -5120,6 +5176,15 @@ function imprimirMapa(){
   const EXCLUIR_USO2  = ['TT','TL','TLSB','TT ','TL '];
   const BLOQUES_RACK2 = ['2N/3N','2S/2N','1N','1S'];
   const enRack2 = new Set(Object.values(ASIGN).filter(v=>v&&v.art).map(v=>String(v.art)));
+  const resExp = window._motorResumen || {};
+  const sinLugarExpSet = new Set((resExp.sinUbicacionArts||[]).map(a=>String(a.art)));
+  const ROT_MAX_MOTOR2 = 5.5, PALL_MAX_MOTOR2 = 6;
+  function motivoSinRackExp(r){
+    if((r.pall||0) > PALL_MAX_MOTOR2) return 'Supera '+PALL_MAX_MOTOR2+' pallets (máx. motor)';
+    if((r.rot_sem||0) >= ROT_MAX_MOTOR2) return 'Rotación semanal alta para el motor';
+    if(sinLugarExpSet.has(String(r.art))) return 'Rack sin lugar (límite 80%)';
+    return 'Candidato válido — falta correr Reevaluar';
+  }
   const candidatosNave = DATA.filter(r=>{
     if(enRack2.has(String(r.art))) return false;
     if(/\d+\.5/.test(r.med||'')) return false;
@@ -5153,15 +5218,15 @@ function imprimirMapa(){
       ['CANDIDATOS EN NAVE SIN LUGAR EN RACK — '+new Date().toLocaleDateString('es-AR')],
       ['Total: '+candidatosNave.length+' artículos · Criterio: rot < 5/sem · pall ≤ 12'],
       [],
-      ['ZONA','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','ROT/SEM','ROT/MES','PALLETS','STOCK','BLOQUE','CONDICIÓN'],
+      ['ZONA','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','ROT/SEM','ROT/MES','PALLETS','STOCK','BLOQUE','CONDICIÓN','MOTIVO'],
       ...candidatosNave.map(r=>[
         zonaNav(r), r.art, r.med, r.diseno, r.prov,
         (r.rot_sem||0).toFixed(2), (r.rot||0).toFixed(1),
-        r.pall||0, r.stock||0, r.bloque||'', r.cond||''
+        r.pall||0, r.stock||0, r.bloque||'', r.cond||'', motivoSinRackExp(r)
       ])
     ];
     const wsN = XLSX.utils.aoa_to_sheet(wsNave);
-    wsN['!cols'] = [{wch:10},{wch:8},{wch:14},{wch:12},{wch:12},{wch:9},{wch:9},{wch:8},{wch:8},{wch:12},{wch:12}];
+    wsN['!cols'] = [{wch:10},{wch:8},{wch:14},{wch:12},{wch:12},{wch:9},{wch:9},{wch:8},{wch:8},{wch:12},{wch:12},{wch:32}];
     XLSX.utils.book_append_sheet(wb, wsN, 'En nave sin rack');
   }
 
