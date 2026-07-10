@@ -536,6 +536,11 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 .pensa-stats .kpi{flex:1;text-align:center;padding:10px}
 .pensa-stats .kpi b{display:block;font-size:20px;color:#1d1d1f}
 .pensa-stats .kpi span{font-size:11px;color:#86868b}
+.inv-tipo-row{display:flex;gap:6px;justify-content:center;margin-top:8px;flex-wrap:wrap}
+.inv-tipo-chip{padding:5px 10px;border-radius:16px;border:1px solid #d2d2d7;font-size:11px;font-weight:600;background:#fff;color:#86868b;cursor:pointer}
+.inv-tipo-chip[data-tipo="Cruce"].active{background:#fff3cd;color:#a8710a;border-color:#a8710a}
+.inv-tipo-chip[data-tipo="Sobrante"].active{background:#e8f8ee;color:#248a3d;border-color:#248a3d}
+.inv-tipo-chip[data-tipo="Faltante"].active{background:#fdeaea;color:#d70015;border-color:#d70015}
 .btn-danger{flex:1;padding:12px;background:#ffd6d9;color:#d70015;border:none;border-radius:10px;font-size:15px;font-weight:500;cursor:pointer}
 .btn-secondary{width:100%;padding:12px;background:#f5f5f7;border:none;border-radius:10px;font-size:15px;font-weight:500;cursor:pointer;margin-top:8px}
 .search-result-item{padding:10px;border-radius:8px;border:1px solid #e5e5ea;margin-bottom:6px;cursor:pointer;background:#fff}
@@ -999,7 +1004,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 
     <!-- Filtros -->
     <div style="display:flex;gap:8px;margin-bottom:10px">
-      <input type="text" id="inv-buscar" placeholder="🔍 Buscar diseño, medida..." 
+      <input type="text" id="inv-buscar" placeholder="🔍 Buscar diseño, medida o artículo..." 
         oninput="renderInventario()" autocomplete="off"
         style="flex:1;padding:9px 12px;border:1px solid #d2d2d7;border-radius:10px;font-size:13px;background:#fff;outline:none">
       <select id="inv-filtro" onchange="renderInventario()" 
@@ -4631,6 +4636,9 @@ function confirmarDespacho(){
   }
 }
 
+let _diffEditing = null; // "batchIdx-itemIdx" en edición
+let _diffTipoTemp = {};
+
 function renderDiferencias(){
   const histDif = JSON.parse(localStorage.getItem('wms_dif')||'[]');
   const lista = document.getElementById('diff-lista');
@@ -4638,25 +4646,117 @@ function renderDiferencias(){
     lista.innerHTML='<div class="diff-empty">Sin diferencias registradas</div>';
     return;
   }
-  lista.innerHTML = histDif.map(d=>`
+  lista.innerHTML = histDif.map((d,bi)=>`
     <div class="diff-card">
       <div class="diff-card-header">
         <span class="diff-fecha">${d.fecha} ${d.hora}</span>
         <span class="diff-cliente">${d.destino} · ${d.items.length} dif.</span>
       </div>
-      ${d.items.map(r=>`
-        <div class="diff-row">
-          <div style="flex:1;min-width:0">
-            <div style="font-size:12px;font-weight:600">${r.med} ${r.diseno}</div>
-            <div style="font-size:11px;color:#86868b">${r.prov} · ${r.posRack||r.bloque||'—'}</div>
-          </div>
-          <div style="text-align:right;flex-shrink:0">
-            <div style="font-size:12px">Pedido: <strong>${r.cantPedida}</strong></div>
-            <div style="font-size:12px">Despachado: <strong>${r.cantReal}</strong></div>
-            <div style="font-size:12px;font-weight:700;color:${r.diff<0?'#d70015':'#1c7c2c'}">${r.diff>0?'+':''}${r.diff}</div>
-          </div>
-        </div>`).join('')}
+      ${d.items.map((r,ii)=>renderDiffLinea(r,bi,ii)).join('')}
     </div>`).join('');
+}
+
+function renderDiffLinea(r,bi,ii){
+  const key = bi+'-'+ii;
+  const editando = _diffEditing===key;
+  const resuelto = r.estado==='resuelto';
+
+  if(editando){
+    return `<div class="diff-row" style="flex-direction:column;align-items:stretch;gap:8px">
+      <div style="font-size:12px;font-weight:600">${r.med} ${r.diseno}</div>
+      <div style="font-size:11px;color:#86868b">${r.prov} · ${r.posRack||r.bloque||'—'}</div>
+      <div style="display:flex;gap:14px;align-items:flex-end">
+        <div>
+          <div style="font-size:10px;color:#86868b">Sistema/Pedido</div>
+          <div style="font-size:14px;font-weight:600">${r.cantPedida}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#86868b">Real (editable)</div>
+          <input type="number" id="diffedit-real-${key}" value="${r.cantReal}" style="width:80px;padding:6px 8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px">
+        </div>
+      </div>
+      <div class="inv-tipo-row" id="diffedit-tipo-${key}" style="justify-content:flex-start">
+        <button class="inv-tipo-chip ${r.tipo==='Cruce'?'active':''}" data-tipo="Cruce" onclick="_diffSetTipo('${key}','Cruce')">🔀 Cruce</button>
+        <button class="inv-tipo-chip ${r.tipo==='Sobrante'?'active':''}" data-tipo="Sobrante" onclick="_diffSetTipo('${key}','Sobrante')">📈 Sobrante</button>
+        <button class="inv-tipo-chip ${r.tipo==='Faltante'?'active':''}" data-tipo="Faltante" onclick="_diffSetTipo('${key}','Faltante')">📉 Faltante</button>
+      </div>
+      <textarea id="diffedit-nota-${key}" placeholder="Acción tomada / nota..." style="width:100%;border:1px solid #d2d2d7;border-radius:8px;padding:8px;font-size:12px;font-family:inherit;min-height:50px;box-sizing:border-box">${(r.nota||'').replace(/</g,'&lt;')}</textarea>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#1d1d1f">
+        <input type="checkbox" id="diffedit-resuelto-${key}" ${resuelto?'checked':''}> Marcar como resuelto
+      </label>
+      <div style="display:flex;gap:8px">
+        <button onclick="guardarEdicionDiff(${bi},${ii})" style="flex:1;padding:9px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">Guardar</button>
+        <button onclick="cancelarEdicionDiff()" style="flex:1;padding:9px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:8px;font-size:12px;cursor:pointer">Cancelar</button>
+        <button onclick="eliminarLineaDiff(${bi},${ii})" style="padding:9px 14px;background:#ffd6d9;color:#d70015;border:none;border-radius:8px;font-size:12px;cursor:pointer">🗑</button>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="diff-row" style="${resuelto?'opacity:.55':''}">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12px;font-weight:600">${r.med} ${r.diseno}${resuelto?' <span style="color:#248a3d;font-weight:700;font-size:10px">· ✔ Resuelto</span>':''}</div>
+      <div style="font-size:11px;color:#86868b">${r.prov} · ${r.posRack||r.bloque||'—'}</div>
+      ${r.tipo?`<span class="pensa-tag" style="margin-top:4px;display:inline-block;background:${r.tipo==='Cruce'?'#fff3cd':r.tipo==='Sobrante'?'#e8f8ee':'#fdeaea'};color:${r.tipo==='Cruce'?'#a8710a':r.tipo==='Sobrante'?'#248a3d':'#d70015'}">${r.tipo==='Cruce'?'🔀':r.tipo==='Sobrante'?'📈':'📉'} ${r.tipo}</span>`:''}
+      ${r.nota?`<div style="font-size:11px;color:#48484a;margin-top:4px;font-style:italic">📝 ${r.nota.replace(/</g,'&lt;')}</div>`:''}
+    </div>
+    <div style="text-align:right;flex-shrink:0">
+      <div style="font-size:12px">Pedido: <strong>${r.cantPedida}</strong></div>
+      <div style="font-size:12px">Real: <strong>${r.cantReal}</strong></div>
+      <div style="font-size:12px;font-weight:700;color:${r.diff<0?'#d70015':'#1c7c2c'}">${r.diff>0?'+':''}${r.diff}</div>
+      <button onclick="editarLineaDiff('${key}')" style="margin-top:4px;border:none;background:none;color:#0071e3;font-size:11px;font-weight:600;cursor:pointer">✎ Editar</button>
+    </div>
+  </div>`;
+}
+
+function editarLineaDiff(key){
+  _diffEditing = key;
+  renderDiferencias();
+}
+
+function cancelarEdicionDiff(){
+  _diffEditing = null;
+  renderDiferencias();
+}
+
+function _diffSetTipo(key, tipo){
+  _diffTipoTemp[key] = tipo;
+  const row = document.getElementById('diffedit-tipo-'+key);
+  if(row) row.querySelectorAll('.inv-tipo-chip').forEach(b=>b.classList.toggle('active', b.dataset.tipo===tipo));
+}
+
+function guardarEdicionDiff(bi, ii){
+  const key = bi+'-'+ii;
+  const histDif = JSON.parse(localStorage.getItem('wms_dif')||'[]');
+  const item = histDif[bi] && histDif[bi].items[ii];
+  if(!item) return;
+  const nuevoReal = parseInt(document.getElementById('diffedit-real-'+key).value);
+  const nota = (document.getElementById('diffedit-nota-'+key).value||'').trim();
+  const resuelto = document.getElementById('diffedit-resuelto-'+key).checked;
+  const tipo = _diffTipoTemp[key] || item.tipo;
+
+  item.cantReal = isNaN(nuevoReal)?item.cantReal:nuevoReal;
+  item.diff = item.cantReal - item.cantPedida;
+  item.tipo = tipo;
+  item.nota = nota;
+  item.estado = resuelto?'resuelto':'pendiente';
+
+  localStorage.setItem('wms_dif', JSON.stringify(histDif));
+  delete _diffTipoTemp[key];
+  _diffEditing = null;
+  renderDiferencias();
+  showToast('✅ Diferencia actualizada');
+}
+
+function eliminarLineaDiff(bi, ii){
+  if(!confirm('¿Eliminar esta línea de diferencia?')) return;
+  const histDif = JSON.parse(localStorage.getItem('wms_dif')||'[]');
+  if(!histDif[bi]) return;
+  histDif[bi].items.splice(ii,1);
+  if(histDif[bi].items.length===0) histDif.splice(bi,1);
+  localStorage.setItem('wms_dif', JSON.stringify(histDif));
+  _diffEditing = null;
+  renderDiferencias();
+  showToast('🗑️ Línea eliminada');
 }
 
 function limpiarDiferencias(){
@@ -4706,7 +4806,7 @@ function renderInventario(){
 
   // Filtrar por búsqueda
   if(q) lista=lista.filter(d=>d.diseno.toLowerCase().includes(q)||
-    DATA.filter(r=>r.diseno===d.diseno).some(r=>r.med.toLowerCase().includes(q)));
+    DATA.filter(r=>r.diseno===d.diseno).some(r=>r.med.toLowerCase().includes(q)||String(r.art).toLowerCase().includes(q)));
 
   // Filtrar por tipo
   if(filtro==='bajo') lista=lista.filter(d=>d.bajo>0);
@@ -4779,6 +4879,7 @@ function seleccionarDiseno(diseno){
         bloqueNave: tieneNave?r.bloque:'',
         sistema: r.stock||0, // stock TOTAL del artículo (rack + nave), no solo lo asignado en rack
         contado: null,
+        tipoDif: null,
       };
     }).sort((a,b)=>b.art.rot-a.art.rot);
   }
@@ -4819,6 +4920,11 @@ function renderConteoDiseno(diseno){
           ${diff===0?'✓ OK':diff>0?'+'+diff:diff}
         </div>
       </div>
+      <div class="inv-tipo-row" id="ictipo-${i}" style="display:${diff!==0?'flex':'none'}">
+        <button class="inv-tipo-chip ${item.tipoDif==='Cruce'?'active':''}" data-tipo="Cruce" onclick="setTipoDif(${i},'Cruce')">🔀 Cruce</button>
+        <button class="inv-tipo-chip ${item.tipoDif==='Sobrante'?'active':''}" data-tipo="Sobrante" onclick="setTipoDif(${i},'Sobrante')">📈 Sobrante</button>
+        <button class="inv-tipo-chip ${item.tipoDif==='Faltante'?'active':''}" data-tipo="Faltante" onclick="setTipoDif(${i},'Faltante')">📉 Faltante</button>
+      </div>
     </div>`;
   });
 
@@ -4828,12 +4934,27 @@ function renderConteoDiseno(diseno){
 }
 
 function cambiarConteoV2(idx, delta){
-  _invItemsActivos[idx].contado = Math.max(0, (_invItemsActivos[idx].contado !== null ? _invItemsActivos[idx].contado : _invItemsActivos[idx].sistema) + delta);
+  const item = _invItemsActivos[idx];
+  item.contado = Math.max(0, (item.contado !== null ? item.contado : item.sistema) + delta);
   const num=document.getElementById('icn-'+idx);
   const diff=document.getElementById('icd-'+idx);
-  if(num) num.textContent=_invItemsActivos[idx].contado;
-  const d=_invItemsActivos[idx].contado - _invItemsActivos[idx].sistema;
+  if(num) num.textContent=item.contado;
+  const d=item.contado - item.sistema;
   if(diff){diff.className='inv-count-diff '+(d===0?'ok':'mal');diff.textContent=d===0?'✓ OK':d>0?'+'+d:d;}
+  const tipoRow = document.getElementById('ictipo-'+idx);
+  if(tipoRow){
+    tipoRow.style.display = d===0?'none':'flex';
+    if(d===0){
+      item.tipoDif = null;
+      tipoRow.querySelectorAll('.inv-tipo-chip').forEach(b=>b.classList.remove('active'));
+    }
+  }
+}
+
+function setTipoDif(idx, tipo){
+  _invItemsActivos[idx].tipoDif = tipo;
+  const tipoRow = document.getElementById('ictipo-'+idx);
+  if(tipoRow) tipoRow.querySelectorAll('.inv-tipo-chip').forEach(b=>b.classList.toggle('active', b.dataset.tipo===tipo));
 }
 
 function confirmarConteoDiseno(){
@@ -4847,6 +4968,7 @@ function confirmarConteoDiseno(){
         prov:item.art.prov, posRack:item.posRack||'',
         bloque:item.bloqueNave||'',
         cantPedida:item.sistema, cantReal:val, diff:val-item.sistema,
+        tipo: item.tipoDif || (val>item.sistema?'Sobrante':'Faltante'),
       });
     }
   });
