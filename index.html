@@ -1475,14 +1475,14 @@ function renderSugerenciasUbicacion(){
 })();
 
 const FRENTES = [
-  {id:"4N",label:"4 Norte",modulos:14,niveles:[1,2,3,4]},
   {id:"4S",label:"4 Sur",  modulos:14,niveles:[1,2,3,4]},
-  {id:"5N",label:"5 Norte",modulos:14,niveles:[1,2,3,4]},
+  {id:"4N",label:"4 Norte",modulos:14,niveles:[1,2,3,4]},
   {id:"5S",label:"5 Sur",  modulos:14,niveles:[1,2,3,4]},
-  {id:"6N",label:"6 Norte",modulos:14,niveles:[1,2,3,4]},
+  {id:"5N",label:"5 Norte",modulos:14,niveles:[1,2,3,4]},
   {id:"6S",label:"6 Sur",  modulos:14,niveles:[1,2,3,4]},
-  {id:"7N",label:"7 Norte",modulos:14,niveles:[1,2,3,4]},
+  {id:"6N",label:"6 Norte",modulos:14,niveles:[1,2,3,4]},
   {id:"7S",label:"7 Sur",  modulos:14,niveles:[1,2,3,4]},
+  {id:"7N",label:"7 Norte",modulos:14,niveles:[1,2,3,4]},
 ];
 
 let sortKey='rot', sortDir=-1;
@@ -2277,6 +2277,14 @@ function renderMapa(){
   let html='';
   FRENTES.forEach((f,fi)=>{
     if(fi===5) html+='<div class="pasillo-label">── PASILLO CENTRAL ──</div>';
+
+    // Insertar la puntera correspondiente ANTES del frente Sur de cada pasillo
+    // (físicamente la puntera N queda entre el Norte del pasillo anterior y el Sur del pasillo N)
+    if(f.id==='4S') html += renderBloquePuntera('4'); // sin 3N como ancla, queda al principio
+    if(f.id==='5S') html += renderBloquePuntera('5'); // entre 4N y 5S
+    if(f.id==='6S') html += renderBloquePuntera('6'); // entre 5N y 6S
+    if(f.id==='7S') html += renderBloquePuntera('7'); // entre 6N y 7S
+
     const totalPos=f.niveles.length*f.modulos;
     const asignCount=Object.keys(ASIGN).filter(k=>k.startsWith(f.id+'-')&&ASIGN[k]).length;
     html+=`<div class="frente-block" id="fb-${f.id}">
@@ -2310,12 +2318,11 @@ function renderMapa(){
       html+='</div></div>';
     });
     html+='</div></div>';
-
-    // Insertar bloques de Punteras junto al pasillo correspondiente
-    if(f.id==='4S') html += renderBloquePuntera('4');
-    if(f.id==='5S') html += renderBloquePuntera('5');
-    if(f.id==='7S'){ html += renderBloquePuntera('7'); html += renderBloquePuntera('8'); }
   });
+  // Los pasillos 8 y 9 no tienen frente propio en el Mapa de Racks (solo hay 4-7),
+  // así que sus punteras van al final, después de la última fila (7 Norte).
+  html += renderBloquePuntera('8');
+  html += renderBloquePuntera('9');
   container.innerHTML=html;
   renderAlertas();
   renderCobertura();
@@ -9373,7 +9380,7 @@ if('serviceWorker' in navigator){
   <div id="sugerencias-ubic-box"></div>
   <div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:14px;margin-bottom:12px">
     <div style="font-size:14px;font-weight:700;margin-bottom:4px">🔚 Punteras — stock &lt; 1 pallet</div>
-    <div style="font-size:12px;color:#86868b;margin-bottom:10px">4 punteras (pasillos 4, 5, 7 y 8) · 7 parrillas c/u · 28 parrillas en total · cada parrilla admite varios artículos mezclados, hasta <span id="punt-cap-label">6</span> unidades · asignación 100% manual, vos elegís la posición de cada artículo</div>
+    <div style="font-size:12px;color:#86868b;margin-bottom:10px">6 punteras (pasillos 4, 5, 6, 7, 8 y 9) · 7 parrillas c/u · 42 parrillas en total · cada parrilla admite varios artículos mezclados, hasta <span id="punt-cap-label">6</span> unidades · asignación 100% manual, vos elegís la posición de cada artículo</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button onclick="limpiarPunteras()" style="padding:10px 16px;background:#ffd6d9;color:#d70015;border:none;border-radius:10px;font-size:14px;cursor:pointer">🗑️ Vaciar todo</button>
     </div>
@@ -10938,10 +10945,10 @@ function renderPensamiento(){
 }
 
 // ═══════════════════════════════════════════════════════════
-// MÓDULO PUNTERAS — 4 zonas (pasillos 4,5,7,8) x 7 parrillas c/u
+// MÓDULO PUNTERAS — 6 zonas (pasillos 4,5,6,7,8,9) x 7 parrillas c/u
 // Cada parrilla admite varios artículos mezclados hasta CAP_PARRILLA_UNIDADES.
 // ═══════════════════════════════════════════════════════════
-var PUNTERA_ZONAS = ['4','5','7','8'];
+var PUNTERA_ZONAS = ['4','5','6','7','8','9'];
 var PARRILLAS_X_ZONA = 7;
 var CAP_PARRILLA_UNIDADES = 30; // ajustado según medidas reales de la parrilla (213x119x110 cm, apiladas)
 var _punteraActiva = null;
