@@ -9415,6 +9415,16 @@ if('serviceWorker' in navigator){
 
   <div id="hys-alertas"></div>
   <div id="hys-form-box"></div>
+
+  <div style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <span style="font-size:13px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px">📋 Resumen de Seguridad del Día</span>
+      <button onclick="mostrarInformeDiaTexto()" style="padding:6px 12px;background:#1d1d1f;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">📋 Generar informe del día</button>
+    </div>
+    <div id="hys-resumen-dia"></div>
+    <div id="hys-informe-dia-box"></div>
+  </div>
+
   <div id="hys-lista"></div>
 
   <div style="margin-top:22px;padding-top:16px;border-top:1px solid #e5e5ea">
@@ -11891,7 +11901,115 @@ function toggleHistorialEquipoHys(equipoId){
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MATAFUEGOS POR BLOQUE — datos del plano "Distribución Bloques Halpern"
+// RESUMEN DE SEGURIDAD DEL DÍA — puertas de emergencia, nichos hidrantes,
+// elementos de seguridad general. Matafuegos se calcula solo desde la
+// tabla por bloque (arriba). Esto es editable a mano, guarda en localStorage.
+// ═══════════════════════════════════════════════════════════════
+var HYS_RESUMEN_KEY = 'wms_hys_resumen_dia';
+function getResumenDia(){
+  var raw = localStorage.getItem(HYS_RESUMEN_KEY);
+  var def = {
+    puertas:{total:5, ok:5, obs:''},
+    nichos:{total:5, ok:5, obs:''},
+    elementos:{estado:'OK', obs:''}
+  };
+  if(!raw) return def;
+  try{ var d = JSON.parse(raw); return Object.assign(def, d); }catch(e){ return def; }
+}
+function saveResumenDia(d){ localStorage.setItem(HYS_RESUMEN_KEY, JSON.stringify(d)); }
+function updateResumenDia(grupo, campo, value){
+  var d = getResumenDia();
+  if(!d[grupo]) d[grupo] = {};
+  d[grupo][campo] = (campo==='total'||campo==='ok') ? parseInt(value,10)||0 : value;
+  saveResumenDia(d);
+  renderResumenDia();
+}
+
+function renderResumenDia(){
+  var cont = document.getElementById('hys-resumen-dia');
+  if(!cont) return;
+  var d = getResumenDia();
+  var mf = getMatafuegosBloques();
+  var counts = {vencido:0,proximo:0,vigente:0,sinmata:0};
+  mf.forEach(function(r){ counts[estadoMatafuegoBloque(r)]++; });
+
+  function tarjeta(icono, titulo, cuerpoHtml, colorBorde){
+    return `<div style="background:#fff;border:1px solid ${colorBorde||'#e5e5ea'};border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:700;color:#1d1d1f;margin-bottom:6px">${icono} ${titulo}</div>
+      ${cuerpoHtml}
+    </div>`;
+  }
+
+  var matafuegosBody = `<div style="font-size:12px;color:#3a3a3c">
+      Total: <b>${mf.length}</b> ·
+      <span style="color:${MATAFUEGO_ESTADO_COLOR.vigente}">Vigentes: <b>${counts.vigente}</b></span> ·
+      <span style="color:${MATAFUEGO_ESTADO_COLOR.proximo}">Próximos: <b>${counts.proximo}</b></span> ·
+      <span style="color:${MATAFUEGO_ESTADO_COLOR.vencido}">Vencidos: <b>${counts.vencido}</b></span> ·
+      <span style="color:${MATAFUEGO_ESTADO_COLOR.sinmata}">Sin matafuego: <b>${counts.sinmata}</b></span>
+    </div>
+    <div style="font-size:10px;color:#86868b;margin-top:4px">Se calcula solo desde la tabla de matafuegos por bloque de más abajo.</div>`;
+
+  var puertasBody = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:11px;color:#86868b">Total <input type="number" min="0" value="${d.puertas.total}" onchange="updateResumenDia('puertas','total',this.value)" style="width:50px;padding:4px 6px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px;margin-left:4px"></label>
+      <label style="font-size:11px;color:#86868b">En OK <input type="number" min="0" value="${d.puertas.ok}" onchange="updateResumenDia('puertas','ok',this.value)" style="width:50px;padding:4px 6px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px;margin-left:4px"></label>
+      <input type="text" placeholder="Observación (opcional)" value="${d.puertas.obs||''}" onchange="updateResumenDia('puertas','obs',this.value)" style="flex:1;min-width:140px;padding:5px 8px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px">
+    </div>`;
+
+  var nichosBody = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:11px;color:#86868b">Total <input type="number" min="0" value="${d.nichos.total}" onchange="updateResumenDia('nichos','total',this.value)" style="width:50px;padding:4px 6px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px;margin-left:4px"></label>
+      <label style="font-size:11px;color:#86868b">En OK <input type="number" min="0" value="${d.nichos.ok}" onchange="updateResumenDia('nichos','ok',this.value)" style="width:50px;padding:4px 6px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px;margin-left:4px"></label>
+      <input type="text" placeholder="Observación (opcional)" value="${d.nichos.obs||''}" onchange="updateResumenDia('nichos','obs',this.value)" style="flex:1;min-width:140px;padding:5px 8px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px">
+    </div>`;
+
+  var elementosBody = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select onchange="updateResumenDia('elementos','estado',this.value)" style="padding:5px 8px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px">
+        <option value="OK" ${d.elementos.estado==='OK'?'selected':''}>OK</option>
+        <option value="CON PROBLEMA" ${d.elementos.estado==='CON PROBLEMA'?'selected':''}>Con problema</option>
+      </select>
+      <input type="text" placeholder="Observación (opcional)" value="${d.elementos.obs||''}" onchange="updateResumenDia('elementos','obs',this.value)" style="flex:1;min-width:140px;padding:5px 8px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px">
+    </div>
+    <div style="font-size:10px;color:#86868b;margin-top:4px">Cascos, chalecos, guantes, señalética, botiquín, etc. — un estado general del resto de los elementos de seguridad.</div>`;
+
+  cont.innerHTML =
+    tarjeta('🧯','Matafuegos', matafuegosBody) +
+    tarjeta('🚨','Puertas de emergencia', puertasBody) +
+    tarjeta('🔥','Nichos hidrantes', nichosBody) +
+    tarjeta('🦺','Elementos de seguridad', elementosBody);
+}
+
+function mostrarInformeDiaTexto(){
+  var d = getResumenDia();
+  var mf = getMatafuegosBloques();
+  var counts = {vencido:0,proximo:0,vigente:0,sinmata:0};
+  mf.forEach(function(r){ counts[estadoMatafuegoBloque(r)]++; });
+  var hoy = new Date().toLocaleDateString('es-AR');
+
+  var texto = `INFORME DE HIGIENE Y SEGURIDAD — ${hoy}\n\n`
+    + `🧯 Matafuegos: ${mf.length} en total — ${counts.vigente} vigentes, ${counts.proximo} próximos a vencer, ${counts.vencido} vencidos, ${counts.sinmata} sin matafuego/con problema\n`
+    + `🚨 Puertas de emergencia: ${d.puertas.total} — ${d.puertas.ok} en estado OK${d.puertas.ok<d.puertas.total?' ('+(d.puertas.total-d.puertas.ok)+' con problema)':''}${d.puertas.obs?' · '+d.puertas.obs:''}\n`
+    + `🔥 Nichos hidrantes: ${d.nichos.total} — ${d.nichos.ok} en estado OK${d.nichos.ok<d.nichos.total?' ('+(d.nichos.total-d.nichos.ok)+' con problema)':''}${d.nichos.obs?' · '+d.nichos.obs:''}\n`
+    + `🦺 Elementos de seguridad: ${d.elementos.estado}${d.elementos.obs?' · '+d.elementos.obs:''}\n`;
+
+  if(counts.vencido>0){
+    texto += `\n⚠️ Hay ${counts.vencido} matafuego(s) vencido(s) — revisar la tabla de matafuegos por bloque para el detalle.`;
+  }
+
+  var box = document.getElementById('hys-informe-dia-box');
+  if(!box) return;
+  box.innerHTML = `<div style="background:#fff;border:2px solid #1d1d1f;border-radius:12px;padding:14px;margin-top:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:700">📋 Informe del día — listo para copiar</div>
+      <button onclick="document.getElementById('hys-informe-dia-box').innerHTML=''" style="background:none;border:none;font-size:16px;color:#86868b;cursor:pointer">✕</button>
+    </div>
+    <textarea id="hys-informe-dia-texto" readonly style="width:100%;min-height:160px;padding:10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;font-family:monospace;box-sizing:border-box;white-space:pre-wrap">${texto}</textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="navigator.clipboard.writeText(document.getElementById('hys-informe-dia-texto').value);showToast('✅ Copiado al portapapeles')" style="flex:1;padding:10px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">📋 Copiar</button>
+    </div>
+  </div>`;
+  box.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+
 // Cada matafuego tiene C.C (control de carga) y P.H (prueba hidráulica),
 // formato mm/aa. Datos iniciales transcriptos del plano escaneado;
 // editable a mano acá porque la letra manuscrita tiene números dudosos (⚠).
@@ -12192,6 +12310,7 @@ function renderHys(){
 
   const listaBox = document.getElementById('hys-lista');
   renderMatafuegosBloques();
+  renderResumenDia();
   if(!listaBox) return;
   if(!equipos.length){ listaBox.innerHTML=''; return; }
 
