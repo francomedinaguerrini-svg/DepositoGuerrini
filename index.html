@@ -620,6 +620,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     <div class="tab-row2-group">👥 Equipo</div>
     <div class="tab-row2-item" id="row2tab-grupos" onclick="switchTab('grupos',this)">👥 Grupos</div>
     <div class="tab-row2-item" id="row2tab-dot" onclick="switchTab('dot',this)">📅 DOTs</div>
+    <div class="tab-row2-item" id="row2tab-viaticos" onclick="switchTab('viaticos',this)">🧾 Viáticos</div>
 
     <div class="tab-row2-group">📊 Gestión</div>
     <div class="tab-row2-item" id="row2tab-dash" onclick="switchTab('dash',this)">📊 Dashboard</div>
@@ -1765,6 +1766,7 @@ function switchTab(name,btn){
   if(name==='punteras') renderPunteras();
   if(name==='checklist') renderChecklist();
   if(name==='hys') renderHys();
+  if(name==='viaticos') renderViaticos();
 }
 
 // --- UPDATE ---
@@ -9437,6 +9439,16 @@ if('serviceWorker' in navigator){
   </div>
 </div>
 
+<!-- VIÁTICOS -->
+<div class="view" id="view-viaticos">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+    <span style="font-size:13px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px">🧾 Rendición de Viáticos</span>
+    <button onclick="abrirNuevaRendicionViatico()" style="padding:6px 12px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">+ Nueva rendición</button>
+  </div>
+  <div id="viaticos-form-box"></div>
+  <div id="viaticos-lista"></div>
+</div>
+
 <script>
 
 
@@ -11073,7 +11085,8 @@ function renderDetalleParrilla(id, punteras){
       html += '<div style="font-size:10px;color:#86868b">Art '+it.art+(art?' · '+art.prov:'')+'</div>';
       html += '</div>';
       html += '<div style="font-size:13px;font-weight:700">'+it.unidades+' un.</div>';
-      html += '<button onclick="quitarDeParrilla(\''+id+'\','+idx+')" style="border:none;background:#ffd6d9;color:#d70015;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer">🗑</button>';
+      html += '<button onclick="descontarDeParrilla(\''+id+'\','+idx+')" style="border:none;background:#fff3d6;color:#9a6b00;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;margin-right:4px" title="Descontar unidades (ej. por salida de un pedido)">➖ Descontar</button>';
+      html += '<button onclick="quitarDeParrilla(\''+id+'\','+idx+')" style="border:none;background:#ffd6d9;color:#d70015;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer" title="Eliminar el renglón completo">🗑</button>';
       html += '</div>';
     });
   }
@@ -11116,6 +11129,31 @@ function agregarAParrilla(id){
   savePunteras(punteras);
   renderPunteras();
   showToast('✅ Agregado a '+id);
+}
+
+function descontarDeParrilla(id, idx){
+  const punteras = getPunteras();
+  const items = punteras[id] || [];
+  const it = items[idx];
+  if(!it) return;
+
+  const art = DATA.find(r=>String(r.art)===String(it.art));
+  const nombreArt = art ? (art.med+' '+art.diseno) : it.art;
+
+  const cantStr = prompt('¿Cuántas unidades descontás de "'+nombreArt+'" (hay '+it.unidades+' un.)?\n\nUsalo para descontar lo que sale por un pedido/despacho.', it.unidades);
+  if(cantStr===null) return; // canceló
+  const cant = parseInt(cantStr)||0;
+  if(cant<=0){ showToast('Ingresá una cantidad válida'); return; }
+  if(cant>it.unidades){ showToast('⚠️ No podés descontar más de lo que hay ('+it.unidades+' un.)'); return; }
+
+  it.unidades -= cant;
+  if(it.unidades<=0){
+    items.splice(idx,1);
+  }
+  punteras[id] = items;
+  savePunteras(punteras);
+  renderPunteras();
+  showToast('✅ Descontadas '+cant+' un. de '+nombreArt+(it.unidades<=0?' (renglón vaciado)':' — quedan '+it.unidades));
 }
 
 function quitarDeParrilla(id, idx){
@@ -12455,6 +12493,264 @@ function exportarInformeHys(){
 
   XLSX.writeFile(wb, 'Informe_HigieneSeguridad_'+hoy.replace(/\//g,'-')+'.xlsx');
   showToast('✅ Informe exportado');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDICIÓN DE VIÁTICOS
+// Cabecera: fecha, nombre, destino, salida, regreso.
+// Filas de gasto: locación, km, combustible (litros/importe), hotel, comidas, peajes, otros.
+// Totales por columna + entregado a rendir + total gastos + a reintegrar.
+// ═══════════════════════════════════════════════════════════════
+var VIATICOS_KEY = 'wms_viaticos';
+
+function getRendicionesViaticos(){
+  var raw = localStorage.getItem(VIATICOS_KEY);
+  if(!raw) return [];
+  try{ return JSON.parse(raw); }catch(e){ return []; }
+}
+function saveRendicionesViaticos(data){ localStorage.setItem(VIATICOS_KEY, JSON.stringify(data)); }
+
+function _filaViaticoVacia(){
+  return {locacion:'', km:0, litros:0, combImporte:0, hotel:0, comidas:0, peajes:0, otros:0};
+}
+
+function abrirNuevaRendicionViatico(){
+  var data = getRendicionesViaticos();
+  var id = 'v_'+Date.now();
+  var nueva = {
+    id: id,
+    fecha: new Date().toLocaleDateString('es-AR'),
+    nombre: '', destino: '', salida: '', regreso: '',
+    entregado: 0,
+    filas: [_filaViaticoVacia()]
+  };
+  data.unshift(nueva);
+  saveRendicionesViaticos(data);
+  renderViaticos();
+  abrirEditorRendicionViatico(id);
+}
+
+function eliminarRendicionViatico(id){
+  if(!confirm('¿Eliminar esta rendición de viáticos? No se puede deshacer.')) return;
+  var data = getRendicionesViaticos().filter(function(r){return r.id!==id;});
+  saveRendicionesViaticos(data);
+  document.getElementById('viaticos-form-box').innerHTML = '';
+  renderViaticos();
+  showToast('🗑️ Rendición eliminada');
+}
+
+function calcularTotalesViatico(r){
+  var t = {km:0, litros:0, combImporte:0, hotel:0, comidas:0, peajes:0, otros:0};
+  r.filas.forEach(function(f){
+    t.km += Number(f.km)||0;
+    t.litros += Number(f.litros)||0;
+    t.combImporte += Number(f.combImporte)||0;
+    t.hotel += Number(f.hotel)||0;
+    t.comidas += Number(f.comidas)||0;
+    t.peajes += Number(f.peajes)||0;
+    t.otros += Number(f.otros)||0;
+  });
+  t.totalGastos = t.combImporte + t.hotel + t.comidas + t.peajes + t.otros;
+  t.aReintegrar = (Number(r.entregado)||0) - t.totalGastos;
+  return t;
+}
+
+function actualizarCabeceraViatico(id, campo, valor){
+  var data = getRendicionesViaticos();
+  var r = data.find(function(x){return x.id===id;});
+  if(!r) return;
+  r[campo] = (campo==='entregado') ? (parseFloat(valor)||0) : valor;
+  saveRendicionesViaticos(data);
+  renderViaticos();
+  abrirEditorRendicionViatico(id, true);
+}
+
+function agregarFilaViatico(id){
+  var data = getRendicionesViaticos();
+  var r = data.find(function(x){return x.id===id;});
+  if(!r) return;
+  r.filas.push(_filaViaticoVacia());
+  saveRendicionesViaticos(data);
+  abrirEditorRendicionViatico(id, true);
+}
+
+function eliminarFilaViatico(id, idx){
+  var data = getRendicionesViaticos();
+  var r = data.find(function(x){return x.id===id;});
+  if(!r) return;
+  if(r.filas.length<=1){ showToast('Tiene que quedar al menos una fila'); return; }
+  r.filas.splice(idx,1);
+  saveRendicionesViaticos(data);
+  abrirEditorRendicionViatico(id, true);
+}
+
+function actualizarFilaViatico(id, idx, campo, valor){
+  var data = getRendicionesViaticos();
+  var r = data.find(function(x){return x.id===id;});
+  if(!r) return;
+  var esNumero = ['km','litros','combImporte','hotel','comidas','peajes','otros'].indexOf(campo)>=0;
+  r.filas[idx][campo] = esNumero ? (parseFloat(valor)||0) : valor;
+  saveRendicionesViaticos(data);
+  renderViaticos();
+  abrirEditorRendicionViatico(id, true);
+}
+
+function cerrarEditorRendicionViatico(){
+  var box = document.getElementById('viaticos-form-box');
+  if(box) box.innerHTML = '';
+}
+
+function _fmtMoneda(n){
+  return '$ '+(Number(n)||0).toLocaleString('es-AR',{minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function abrirEditorRendicionViatico(id, mantenerScroll){
+  var data = getRendicionesViaticos();
+  var r = data.find(function(x){return x.id===id;});
+  if(!r) return;
+  var box = document.getElementById('viaticos-form-box');
+  if(!box) return;
+  var t = calcularTotalesViatico(r);
+
+  var filasHtml = r.filas.map(function(f, idx){
+    return `<tr style="border-bottom:1px solid #f0f0f0">
+      <td style="padding:4px"><input value="${f.locacion}" placeholder="Locación" onchange="actualizarFilaViatico('${id}',${idx},'locacion',this.value)" style="width:100px;padding:5px 6px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px"></td>
+      <td style="padding:4px"><input type="number" value="${f.km}" onchange="actualizarFilaViatico('${id}',${idx},'km',this.value)" style="width:60px;padding:5px 6px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px"></td>
+      <td style="padding:4px"><input type="number" value="${f.litros}" onchange="actualizarFilaViatico('${id}',${idx},'litros',this.value)" style="width:60px;padding:5px 6px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px"></td>
+      <td style="padding:4px"><input type="number" value="${f.combImporte}" onchange="actualizarFilaViatico('${id}',${idx},'combImporte',this.value)" style="width:70px;padding:5px 6px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px"></td>
+      <td style="padding:4px"><input type="number" value="${f.hotel}" onchange="actualizarFilaViatico('${id}',${idx},'hotel',this.value)" style="width:70px;padding:5px 6px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px"></td>
+      <td style="padding:4px"><input type="number" value="${f.comidas}" onchange="actualizarFilaViatico('${id}',${idx},'comidas',this.value)" style="width:70px;padding:5px 6px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px"></td>
+      <td style="padding:4px"><input type="number" value="${f.peajes}" onchange="actualizarFilaViatico('${id}',${idx},'peajes',this.value)" style="width:70px;padding:5px 6px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px"></td>
+      <td style="padding:4px"><input type="number" value="${f.otros}" onchange="actualizarFilaViatico('${id}',${idx},'otros',this.value)" style="width:70px;padding:5px 6px;border:1px solid #d2d2d7;border-radius:6px;font-size:12px"></td>
+      <td style="padding:4px"><button onclick="eliminarFilaViatico('${id}',${idx})" style="background:none;border:none;color:#d70015;font-size:14px;cursor:pointer">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  box.innerHTML = `<div id="viatico-editor-inner" style="background:#fff;border:2px solid #0071e3;border-radius:12px;padding:16px;margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:15px;font-weight:700">🧾 Rendición de Viáticos</div>
+      <button onclick="cerrarEditorRendicionViatico()" style="background:none;border:none;font-size:18px;color:#86868b;cursor:pointer">✕</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div><label style="font-size:11px;color:#86868b">Fecha</label>
+        <input value="${r.fecha}" onchange="actualizarCabeceraViatico('${id}','fecha',this.value)" style="width:100%;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box"></div>
+      <div><label style="font-size:11px;color:#86868b">Nombre y apellido</label>
+        <input value="${r.nombre}" onchange="actualizarCabeceraViatico('${id}','nombre',this.value)" style="width:100%;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+      <div><label style="font-size:11px;color:#86868b">Destino</label>
+        <input value="${r.destino}" onchange="actualizarCabeceraViatico('${id}','destino',this.value)" style="width:100%;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box"></div>
+      <div><label style="font-size:11px;color:#86868b">Salida</label>
+        <input value="${r.salida}" placeholder="fecha/hora" onchange="actualizarCabeceraViatico('${id}','salida',this.value)" style="width:100%;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box"></div>
+      <div><label style="font-size:11px;color:#86868b">Regreso</label>
+        <input value="${r.regreso}" placeholder="fecha/hora" onchange="actualizarCabeceraViatico('${id}','regreso',this.value)" style="width:100%;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box"></div>
+    </div>
+
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:680px">
+      <thead><tr style="text-align:left;color:#86868b;font-size:10px;text-transform:uppercase">
+        <th style="padding:4px">Locación</th><th style="padding:4px">Km</th><th style="padding:4px">Litros</th><th style="padding:4px">Combustible $</th><th style="padding:4px">Hotel</th><th style="padding:4px">Comidas</th><th style="padding:4px">Peajes</th><th style="padding:4px">Otros</th><th style="padding:4px"></th>
+      </tr></thead>
+      <tbody>${filasHtml}</tbody>
+      <tfoot>
+        <tr style="font-weight:700;background:#f5f5f7">
+          <td style="padding:6px 4px">TOTALES</td>
+          <td style="padding:6px 4px">${t.km}</td>
+          <td style="padding:6px 4px">${t.litros}</td>
+          <td style="padding:6px 4px">${_fmtMoneda(t.combImporte)}</td>
+          <td style="padding:6px 4px">${_fmtMoneda(t.hotel)}</td>
+          <td style="padding:6px 4px">${_fmtMoneda(t.comidas)}</td>
+          <td style="padding:6px 4px">${_fmtMoneda(t.peajes)}</td>
+          <td style="padding:6px 4px">${_fmtMoneda(t.otros)}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>
+    <button onclick="agregarFilaViatico('${id}')" style="margin-top:8px;padding:7px 12px;background:#f5f5f7;color:#0071e3;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">+ Agregar fila</button>
+
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid #e5e5ea;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div>
+        <label style="font-size:11px;color:#86868b">Entregado a rendir ($)</label>
+        <input type="number" value="${r.entregado}" onchange="actualizarCabeceraViatico('${id}','entregado',this.value)" style="width:100%;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;font-size:14px;font-weight:700;box-sizing:border-box">
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:#86868b">Total gastos $</div>
+        <div style="font-size:18px;font-weight:700;color:#1d1d1f">${_fmtMoneda(t.totalGastos)}</div>
+      </div>
+    </div>
+    <div style="margin-top:10px;padding:10px 14px;background:${t.aReintegrar>=0?'#eafaf0':'#fff0f0'};border-radius:8px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:12px;color:#3a3a3c">${t.aReintegrar>=0?'A reintegrar al empleado':'El empleado debe devolver'}</span>
+      <span style="font-size:16px;font-weight:700;color:${t.aReintegrar>=0?'#1e8e3e':'#d70015'}">${_fmtMoneda(Math.abs(t.aReintegrar))}</span>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="exportarRendicionViatico('${id}')" style="flex:1;padding:11px;background:#1d1d1f;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">📊 Exportar Excel</button>
+      <button onclick="eliminarRendicionViatico('${id}')" style="padding:11px 16px;background:#fff0f0;color:#d70015;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">🗑️</button>
+    </div>
+  </div>`;
+  if(!mantenerScroll){
+    var el = document.getElementById('viatico-editor-inner');
+    if(el && el.scrollIntoView) el.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+}
+
+function renderViaticos(){
+  var cont = document.getElementById('viaticos-lista');
+  if(!cont) return;
+  var data = getRendicionesViaticos();
+  if(!data.length){
+    cont.innerHTML = '<div style="font-size:12px;color:#86868b;padding:20px 0;text-align:center">Todavía no hay rendiciones cargadas. Usá "+ Nueva rendición" para empezar.</div>';
+    return;
+  }
+  cont.innerHTML = data.map(function(r){
+    var t = calcularTotalesViatico(r);
+    return `<div onclick="abrirEditorRendicionViatico('${r.id}')" style="background:#fff;border:1px solid #e5e5ea;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#1d1d1f">${r.nombre||'(sin nombre)'} — ${r.destino||'(sin destino)'}</div>
+          <div style="font-size:11px;color:#86868b;margin-top:2px">${r.fecha} ${r.salida?'· Salida '+r.salida:''} ${r.regreso?'· Regreso '+r.regreso:''}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:14px;font-weight:700;color:#1d1d1f">${_fmtMoneda(t.totalGastos)}</div>
+          <div style="font-size:10px;color:${t.aReintegrar>=0?'#1e8e3e':'#d70015'}">${t.aReintegrar>=0?'A reintegrar':'A devolver'}: ${_fmtMoneda(Math.abs(t.aReintegrar))}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function exportarRendicionViatico(id){
+  var data = getRendicionesViaticos();
+  var r = data.find(function(x){return x.id===id;});
+  if(!r) return;
+  var t = calcularTotalesViatico(r);
+  var aoa = [
+    ['RENDICIÓN DE VIÁTICOS'],
+    ['FECHA:', r.fecha],
+    ['NOMBRE Y APELLIDO:', r.nombre],
+    ['DESTINO:', r.destino],
+    ['SALIDA:', r.salida],
+    ['REGRESO:', r.regreso],
+    [],
+    ['LOCACIÓN','KILÓMETRO','LITROS','COMBUSTIBLE $','HOTEL','COMIDAS','PEAJES','OTROS'],
+  ];
+  r.filas.forEach(function(f){
+    aoa.push([f.locacion, f.km, f.litros, f.combImporte, f.hotel, f.comidas, f.peajes, f.otros]);
+  });
+  aoa.push(['TOTALES POR COLUMNA', t.km, t.litros, t.combImporte, t.hotel, t.comidas, t.peajes, t.otros]);
+  aoa.push([]);
+  aoa.push(['ENTREGADO A RENDIR', r.entregado]);
+  aoa.push(['TOTAL GASTOS $', t.totalGastos]);
+  aoa.push([t.aReintegrar>=0?'A REINTEGRAR':'A DEVOLVER', Math.abs(t.aReintegrar)]);
+
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:20},{wch:12},{wch:10},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12}];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Rendición');
+  XLSX.writeFile(wb, 'Rendicion_Viaticos_'+(r.nombre||'sinnombre').replace(/\s+/g,'_')+'_'+r.fecha.replace(/\//g,'-')+'.xlsx');
+  showToast('✅ Rendición exportada');
 }
 
 </script>
