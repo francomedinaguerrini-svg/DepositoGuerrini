@@ -2321,10 +2321,9 @@ function renderMapa(){
     });
     html+='</div></div>';
   });
-  // Los pasillos 8 y 9 no tienen frente propio en el Mapa de Racks (solo hay 4-7),
-  // así que sus punteras van al final, después de la última fila (7 Norte).
+  // El pasillo 8 no tiene frente propio en el Mapa de Racks (solo hay 4-7),
+  // así que su puntera va al final, después de la última fila (7 Norte).
   html += renderBloquePuntera('8');
-  html += renderBloquePuntera('9');
   container.innerHTML=html;
   renderAlertas();
   renderCobertura();
@@ -2345,10 +2344,10 @@ function renderBloquePuntera(zona){
     const items = punteras[id] || [];
     if(items.length) conAlgo++;
     const usado = capacidadUsada(items);
-    const pct = Math.min(100, Math.round((usado/CAP_PARRILLA_UNIDADES)*100));
+    const pct = CAP_PARRILLA_UNIDADES ? Math.min(100, Math.round((usado/CAP_PARRILLA_UNIDADES)*100)) : (items.length?100:0);
     html += `<div class="punt-card ${items.length?'':'vacia'}" onclick="irAParrillaDesdeMapa('${id}')">
       <div class="punt-id">${id}</div>
-      <div class="punt-cant">${items.length} art. · ${usado}/${CAP_PARRILLA_UNIDADES} un.</div>
+      <div class="punt-cant">${items.length} art. · ${usado} un.${CAP_PARRILLA_UNIDADES?'/'+CAP_PARRILLA_UNIDADES:''}</div>
       <div class="punt-bar"><div class="punt-bar-fill" style="width:${pct}%"></div></div>
     </div>`;
   }
@@ -3768,7 +3767,46 @@ function esCamion(item){
   catch{ return false; }
 }
 
+// Busca si un artículo tiene unidades cargadas en alguna puntera.
+// Devuelve el total y en qué parrilla(s) está, para mostrarlo y descontarlo.
+function buscarEnPunteras(art){
+  var punteras = getPunteras();
+  var total = 0;
+  var ubicaciones = [];
+  Object.keys(punteras).forEach(function(id){
+    var it = (punteras[id]||[]).find(function(x){ return String(x.art)===String(art); });
+    if(it && it.unidades>0){
+      total += it.unidades;
+      ubicaciones.push(id+' ('+it.unidades+')');
+    }
+  });
+  return {total:total, ubicaciones:ubicaciones};
+}
+
+// Descuenta de las punteras cuando se prepara/despacha un pedido.
+// Reparte entre las parrillas donde esté el artículo hasta cubrir "cant".
+function descontarPunteraPorPedido(art, cant){
+  var punteras = getPunteras();
+  var descontado = 0;
+  Object.keys(punteras).forEach(function(id){
+    if(descontado>=cant) return;
+    var items = punteras[id]||[];
+    var idx = items.findIndex(function(x){ return String(x.art)===String(art); });
+    if(idx===-1) return;
+    var it = items[idx];
+    var desc = Math.min(cant-descontado, it.unidades||0);
+    it.unidades -= desc;
+    if(it.deRack) it.deRack = Math.max(0, Math.min(it.deRack, it.unidades));
+    descontado += desc;
+    if(it.unidades<=0) items.splice(idx,1);
+    punteras[id] = items;
+  });
+  if(descontado>0) savePunteras(punteras);
+  return descontado;
+}
+
 function procesarPedido(pedido){
+  const conPuntera = [];
   const conRack = [];
   const conBloque = [];
   const sinUbic = [];
@@ -3795,8 +3833,15 @@ function procesarPedido(pedido){
     const posRack = posRackN1||posRackN2||posRackN3||posRackN4;
     item.posRack = posRack?posRack[0]:'';
 
-    // Lógica simple: si está en rack → rack, si no → bloque
-    if(item.posRack){
+    // ¿Está en alguna puntera? Si tiene stock ahí, es lo más rápido de agarrar
+    // (ya está en la punta del pasillo), así que va primero en prioridad.
+    const enPuntera = buscarEnPunteras(item.art);
+    item.puntera = enPuntera.total>0 ? enPuntera.ubicaciones.join(' + ') : '';
+
+    // Prioridad: puntera > rack > bloque > sin ubicación
+    if(item.puntera){
+      conPuntera.push(item);
+    } else if(item.posRack){
       conRack.push(item);
     } else if(item.bloque){
       conBloque.push(item);
@@ -3808,18 +3853,19 @@ function procesarPedido(pedido){
   // Ordenar rack por posición
   conRack.sort((a,b)=>a.posRack.localeCompare(b.posRack));
 
-  renderPedido(conRack, conBloque, sinUbic, pedido);
+  renderPedido(conPuntera, conRack, conBloque, sinUbic, pedido);
 }
 
-function renderPedido(conRack, conBloque, sinUbic, todos){
+function renderPedido(conPuntera, conRack, conBloque, sinUbic, todos){
   const totalArts = todos.length;
   const totalUnid = todos.reduce((s,r)=>s+r.cant,0);
-  const pctRack = totalArts?Math.round((conRack.length/totalArts)*100):0;
 
   function mkRow(item, tipo){
     const esBuscar = item.posRack === 'BUSCAR EN RACK';
     const esBajo = item.cond === 'bajo stock';
-    const ubic = tipo==='rack'
+    const ubic = tipo==='puntera'
+      ? `<span class="ped-ubic-puntera" style="font-size:10px;font-weight:600;color:#7a3fb0;background:#f2e6ff;padding:2px 6px;border-radius:4px">🔚 ${item.puntera}</span>`
+      : tipo==='rack'
       ? esBuscar
         ? `<span style="font-size:10px;font-weight:600;color:#86868b;background:#f0f0f0;padding:2px 6px;border-radius:4px">🔍 BUSCAR EN RACK</span>`
         : `<span class="ped-ubic-rack">🔵 ${item.posRack}</span>`
@@ -3840,6 +3886,7 @@ function renderPedido(conRack, conBloque, sinUbic, todos){
   }
 
   const allRows = [
+    ...conPuntera.map(r=>mkRow(r,'puntera')),
     ...conRack.map(r=>mkRow(r,'rack')),
     ...conBloque.map(r=>mkRow(r,'bloque')),
     ...sinUbic.map(r=>mkRow(r,'sinubic')),
@@ -3847,10 +3894,20 @@ function renderPedido(conRack, conBloque, sinUbic, todos){
 
   document.getElementById('ped-resultado').innerHTML = `
     <div class="ped-summary">
+      <div class="ped-sum-card"><div class="ped-sum-val" style="color:#7a3fb0">${conPuntera.length}</div><div class="ped-sum-lbl">En puntera</div></div>
       <div class="ped-sum-card"><div class="ped-sum-val" style="color:#0071e3">${conRack.length}</div><div class="ped-sum-lbl">En rack</div></div>
       <div class="ped-sum-card"><div class="ped-sum-val" style="color:#856404">${conBloque.length}</div><div class="ped-sum-lbl">En bloques</div></div>
       <div class="ped-sum-card"><div class="ped-sum-val">${totalUnid.toLocaleString('es-AR')}</div><div class="ped-sum-lbl">Unidades</div></div>
     </div>
+
+    ${conPuntera.length>0?`
+    <div class="ped-section-title" style="color:#7a3fb0">🔚 PUNTERA — Preparar primero (${conPuntera.length} arts.)</div>
+    <div class="ped-table-wrap">
+      <table class="ped-table">
+        <thead><tr><th>ART.</th><th>DESCRIPCIÓN</th><th>PUNTERA</th><th style="text-align:right">CANT.</th><th style="text-align:right">STOCK</th></tr></thead>
+        <tbody>${conPuntera.map(r=>mkRow(r,'puntera')).join('')}</tbody>
+      </table>
+    </div>`:''}
 
     ${conRack.length>0?`
     <div class="ped-section-title" style="color:#0071e3">🔵 RACK — Preparar primero (${conRack.length} arts.)</div>
@@ -3887,7 +3944,7 @@ function renderPedido(conRack, conBloque, sinUbic, todos){
   `;
 
   // Store for export
-  window._pedidoActual = {rack:conRack, bloque:conBloque, sin:sinUbic, todos};
+  window._pedidoActual = {puntera:conPuntera, rack:conRack, bloque:conBloque, sin:sinUbic, todos};
 
   // Add to cola de pedidos automatically
   agregarPedidoCola(window._pedidoActual);
@@ -3934,7 +3991,8 @@ function exportarPedido(){
   if(!nroPedEl.value) nroPedEl.value = generarNroPedido();
   const nroPedido = nroPedEl.value;
 
-  let {rack,bloque,sin} = window._pedidoActual;
+  let {puntera,rack,bloque,sin} = window._pedidoActual;
+  puntera = puntera || [];
 
   // Re-aplicar orden lógico al exportar
   rack = [...rack].sort((a,b)=>getPosOrder(a.posRack||'')-getPosOrder(b.posRack||''));
@@ -3948,7 +4006,7 @@ function exportarPedido(){
   }
   bloque = [...bloque].sort((a,b)=>getBloqueOrderExp(a.bloque||'')-getBloqueOrderExp(b.bloque||''));
 
-  const todos = [...rack,...bloque,...sin];
+  const todos = [...puntera,...rack,...bloque,...sin];
 
   const wb = XLSX.utils.book_new();
 
@@ -3965,6 +4023,11 @@ function exportarPedido(){
   ];
 
   let paso = 1;
+  // Separador puntera (reusa la columna "UBIC. RACK" para mostrar la parrilla)
+  if(puntera.length>0){
+    wsData.push(['--- PUNTERA ---','','','','','','','','','']);
+    puntera.forEach(r=>wsData.push([paso++, r.art, r.med+' '+r.diseno, r.prov, r.cant, r.stock||0, '🔚 '+(r.puntera||''), '', r.cond||'', '']));
+  }
   // Separador rack
   if(rack.length>0){
     wsData.push(['--- RACK ---','','','','','','','','','']);
@@ -4190,9 +4253,11 @@ function pedidoEnviarTransito(){
   var ahora = new Date();
   var repoSugerido = [];
 
-  // Descontar stock real (rack + DATA) al momento de enviar a tránsito
+  // Descontar stock real (puntera + rack + DATA) al momento de enviar a tránsito
   todos.forEach(function(item){
-    descontarRackPorPedido(item.art, item.cant);
+    var deP = descontarPunteraPorPedido(item.art, item.cant);
+    var restante = item.cant - deP;
+    if(restante>0) descontarRackPorPedido(item.art, restante);
 
     var dataArt = DATA.find(function(r){ return r.art===item.art; });
     if(dataArt){
@@ -4252,7 +4317,7 @@ function pedidoEnviarTransito(){
         stock: r.stock||0,
         posRack: r.posRack||'',
         bloque:  r.bloque||'',
-        tipo: r.posRack ? 'rack' : 'bloque',
+        tipo: r.puntera ? 'puntera' : (r.posRack ? 'rack' : 'bloque'),
         rangos: r.rangos||[]
       };
     })
@@ -4736,8 +4801,8 @@ function abrirConfirmacion(){
     pedDestinoEl.value = dest;
   }
 
-  const {rack, bloque, sin} = window._pedidoActual;
-  const todos = [...rack, ...bloque, ...sin];
+  const {puntera, rack, bloque, sin} = window._pedidoActual;
+  const todos = [...(puntera||[]), ...rack, ...bloque, ...sin];
 
   // Preparar items con cantidad editable
   _confirmItems = todos.map(r=>({
@@ -4767,7 +4832,7 @@ function renderConfirmacion(){
           <div class="conf-info">
             <div class="conf-med">${r.med} ${r.diseno}</div>
             <div class="conf-sub">${r.prov}</div>
-            ${r.posRack&&r.posRack!=='BUSCAR EN RACK'?`<span class="conf-ubic">${r.posRack}</span>`:`<span style="font-size:10px;color:#856404;background:#fff3cd;padding:2px 6px;border-radius:4px">${r.bloque||'—'}</span>`}
+            ${r.puntera?`<span style="font-size:10px;color:#7a3fb0;background:#f2e6ff;padding:2px 6px;border-radius:4px">🔚 ${r.puntera}</span>`:r.posRack&&r.posRack!=='BUSCAR EN RACK'?`<span class="conf-ubic">${r.posRack}</span>`:`<span style="font-size:10px;color:#856404;background:#fff3cd;padding:2px 6px;border-radius:4px">${r.bloque||'—'}</span>`}
           </div>
           <div class="conf-qty">
             <button class="conf-qty-btn menos" onclick="cambiarCantReal(${i},-1)">−</button>
@@ -4806,8 +4871,10 @@ function confirmarDespacho(){
   let sugUbicCount = 0;
 
   _confirmItems.forEach(item=>{
-    // Descontar del rack_stock y re-ejecutar motor si quedan posiciones libres
-    descontarRackPorPedido(item.art, item.cantReal);
+    // Descontar primero de la puntera (si tenía stock ahí), el resto del rack_stock
+    const deP = descontarPunteraPorPedido(item.art, item.cantReal);
+    const restanteRack = item.cantReal - deP;
+    if(restanteRack>0) descontarRackPorPedido(item.art, restanteRack);
 
     // NUEVO: Descontar de DATA (stock real)
     const dataArt = DATA.find(r=>r.art===item.art);
@@ -8142,7 +8209,8 @@ function imprimirPedido(){
   if(!nroPedEl.value) nroPedEl.value = generarNroPedido();
   const nroPedido = nroPedEl.value;
 
-  let {rack, bloque, sin} = window._pedidoActual;
+  let {puntera, rack, bloque, sin} = window._pedidoActual;
+  puntera = puntera || [];
 
   // Ordenar
   rack = [...rack].sort((a,b)=>getPosOrder(a.posRack||'')-getPosOrder(b.posRack||''));
@@ -8155,10 +8223,10 @@ function imprimirPedido(){
   }
   bloque = [...bloque].sort((a,b)=>getBloqueOrderPrint(a.bloque||'')-getBloqueOrderPrint(b.bloque||''));
 
-  const totalCant = [...rack,...bloque,...sin].reduce((s,r)=>s+r.cant,0);
+  const totalCant = [...puntera,...rack,...bloque,...sin].reduce((s,r)=>s+r.cant,0);
 
   let paso = 1;
-  function filas(items, esRack){
+  function filas(items, tipoUbic){
     return items.map(r=>`
       <tr>
         <td style="text-align:center;color:#86868b;font-size:7px">${paso++}</td>
@@ -8168,7 +8236,7 @@ function imprimirPedido(){
         <td>${r.prov||''}</td>
         <td style="text-align:center;font-weight:700;font-size:10px">${r.cant}</td>
         <td style="text-align:center;color:${(r.stock||0)<r.cant?'#d70015':'#1d1d1f'}">${r.stock||0}</td>
-        <td style="color:#0071e3;font-weight:600">${esRack?(r.posRack||''):(r.bloque||'')}</td>
+        <td style="color:#0071e3;font-weight:600">${tipoUbic==='puntera'?(r.puntera||''):tipoUbic==='rack'?(r.posRack||''):(r.bloque||'')}</td>
         <td style="color:${r.cond==='bajo stock'?'#d70015':'#86868b'}">${r.cond||''}</td>
         <td style="border-left:1px solid #d2d2d7;min-width:22px;min-height:16px"></td>
         <td style="border-left:1px solid #d2d2d7;min-width:22px;min-height:16px"></td>
@@ -8261,16 +8329,17 @@ function imprimirPedido(){
     </tr>
   </thead>
   <tbody>
-    ${rack.length>0?`<tr class="sep"><td colspan="8">📦 RACK — ${rack.length} artículos · Preparar primero</td></tr>${filas(rack,true)}`:''}
-    ${bloque.length>0?`<tr class="sep blq"><td colspan="8">🏭 BLOQUES — ${bloque.length} artículos</td></tr>${filas(bloque,false)}`:''}
-    ${sin.length>0?`<tr class="sep" style="background:#86868b"><td colspan="8">Sin ubicación — ${sin.length} artículos</td></tr>${filas(sin,false)}`:''}
+    ${puntera.length>0?`<tr class="sep" style="background:#7a3fb0"><td colspan="8">🔚 PUNTERA — ${puntera.length} artículos · Preparar primero</td></tr>${filas(puntera,'puntera')}`:''}
+    ${rack.length>0?`<tr class="sep"><td colspan="8">📦 RACK — ${rack.length} artículos · Preparar primero</td></tr>${filas(rack,'rack')}`:''}
+    ${bloque.length>0?`<tr class="sep blq"><td colspan="8">🏭 BLOQUES — ${bloque.length} artículos</td></tr>${filas(bloque,'bloque')}`:''}
+    ${sin.length>0?`<tr class="sep" style="background:#86868b"><td colspan="8">Sin ubicación — ${sin.length} artículos</td></tr>${filas(sin,'bloque')}`:''}
     <tr class="total"><td colspan="3">TOTAL</td><td style="text-align:center;font-size:13px">${totalCant}</td><td colspan="4"></td></tr>
   </tbody>
 </table>
 
 <div class="footer">
   <span>WMS Depósito Halpern · ${new Date().toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
-  <span>${rack.length+bloque.length+sin.length} artículos en total</span>
+  <span>${puntera.length+rack.length+bloque.length+sin.length} artículos en total</span>
 </div>
 
 ${('<scr')+'ipt>setTimeout(function(){window.print();},500);<'+'/scr'+'ipt>'}
@@ -8311,8 +8380,9 @@ function agregarPedidoCola(pedido){
   const nroPed = document.getElementById('ped-nropedido')?.value || generarNroPedido();
   const destino = document.getElementById('ped-destino')?.value || '';
   const tipo = _modoPedido==='chasis'?'CHASIS':'FLETE ORIGEN';
-  const totalUnid = [...pedido.rack,...pedido.bloque,...pedido.sin].reduce((s,r)=>s+r.cant,0);
-  const totalArts = pedido.rack.length + pedido.bloque.length + pedido.sin.length;
+  const puntera = pedido.puntera || [];
+  const totalUnid = [...puntera,...pedido.rack,...pedido.bloque,...pedido.sin].reduce((s,r)=>s+r.cant,0);
+  const totalArts = puntera.length + pedido.rack.length + pedido.bloque.length + pedido.sin.length;
 
   cola.push({
     id: Date.now(),
@@ -8451,16 +8521,23 @@ function confirmarColaPedido(idx){
 
   // ── DESCONTAR STOCK ──
   if(p.pedidoData){
-    const items = [...(p.pedidoData.rack||[]),...(p.pedidoData.bloque||[]),...(p.pedidoData.sin||[])];
+    const puntera = p.pedidoData.puntera || [];
+    const items = [...puntera, ...(p.pedidoData.rack||[]), ...(p.pedidoData.bloque||[]), ...(p.pedidoData.sin||[])];
     const escala = p.unidReal / Math.max(1, items.reduce((s,r)=>s+r.cant,0));
     items.forEach(item=>{
       const art = DATA.find(r=>r.art==item.art);
       if(art){
         const cantReal = Math.round(item.cant * escala);
         art.stock = Math.max(0, (art.stock||0) - cantReal);
-        // Actualizar unidades en rack si tiene posición
-        if(item.posRack && ASIGN[item.posRack] && ASIGN[item.posRack].art==item.art){
-          ASIGN[item.posRack].unidades = Math.max(0, (ASIGN[item.posRack].unidades||0) - cantReal);
+        // Descontar primero de la puntera (si tenía stock ahí), el resto del rack
+        const deP = descontarPunteraPorPedido(item.art, cantReal);
+        const restante = cantReal - deP;
+        if(restante>0){
+          if(item.posRack && ASIGN[item.posRack] && ASIGN[item.posRack].art==item.art){
+            ASIGN[item.posRack].unidades = Math.max(0, (ASIGN[item.posRack].unidades||0) - restante);
+          } else {
+            descontarRackPorPedido(item.art, restante);
+          }
         }
       }
     });
@@ -9382,7 +9459,7 @@ if('serviceWorker' in navigator){
   <div id="sugerencias-ubic-box"></div>
   <div style="background:#fff;border-radius:12px;border:1px solid #e5e5ea;padding:14px;margin-bottom:12px">
     <div style="font-size:14px;font-weight:700;margin-bottom:4px">🔚 Punteras — stock &lt; 1 pallet</div>
-    <div style="font-size:12px;color:#86868b;margin-bottom:10px">6 punteras (pasillos 4, 5, 6, 7, 8 y 9) · 7 parrillas c/u · 42 parrillas en total · cada parrilla admite varios artículos mezclados, hasta <span id="punt-cap-label">6</span> unidades · asignación 100% manual, vos elegís la posición de cada artículo</div>
+    <div style="font-size:12px;color:#86868b;margin-bottom:10px">5 punteras (pasillos 4, 5, 6, 7 y 8) · 7 parrillas c/u · 35 parrillas en total · cada parrilla admite varios artículos mezclados, hasta <span id="punt-cap-label">35</span> unidades · asignación 100% manual, vos elegís la posición de cada artículo</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button onclick="limpiarPunteras()" style="padding:10px 16px;background:#ffd6d9;color:#d70015;border:none;border-radius:10px;font-size:14px;cursor:pointer">🗑️ Vaciar todo</button>
     </div>
@@ -9420,6 +9497,17 @@ if('serviceWorker' in navigator){
 
   <div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <span style="font-size:13px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px">🗺️ Mapa de Nave — Bloques, Portones y Puertas</span>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;font-size:10px;color:#86868b">
+      <span>🧯 Franja izquierda = peor estado de matafuegos del bloque</span>
+      <span>🚪/🚨 = estado del portón/puerta (verde OK · rojo falla · ámbar sin controlar · gris nunca controlado)</span>
+    </div>
+    <div id="hys-mapa-nave"></div>
+  </div>
+
+  <div style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
       <span style="font-size:13px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px">📋 Resumen de Seguridad del Día</span>
       <button onclick="mostrarInformeDiaTexto()" style="padding:6px 12px;background:#1d1d1f;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">📋 Generar informe del día</button>
     </div>
@@ -9432,7 +9520,7 @@ if('serviceWorker' in navigator){
   <div style="margin-top:22px;padding-top:16px;border-top:1px solid #e5e5ea">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
       <span style="font-size:13px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px">🧯 Matafuegos por bloque — vencimientos</span>
-      <button onclick="if(confirm('¿Restaurar los datos originales del plano escaneado? Se pierden las correcciones cargadas.')){ localStorage.removeItem('wms_matafuegos_bloques'); renderMatafuegosBloques(); showToast('🔄 Restaurado desde el plano original'); }" style="padding:6px 12px;background:#f5f5f7;color:#1d1d1f;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">↺ Restaurar del plano</button>
+      <button onclick="if(confirm('¿Restaurar los datos originales del plano escaneado? Se pierden las correcciones cargadas.')){ localStorage.removeItem('wms_matafuegos_bloques'); renderMatafuegosBloques(); renderMapaNaveHys(); showToast('🔄 Restaurado desde el plano original'); }" style="padding:6px 12px;background:#f5f5f7;color:#1d1d1f;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">↺ Restaurar del plano</button>
     </div>
     <div id="hys-matafuego-edit-box"></div>
     <div id="hys-matafuegos-bloques"></div>
@@ -10976,12 +11064,12 @@ function renderPensamiento(){
 }
 
 // ═══════════════════════════════════════════════════════════
-// MÓDULO PUNTERAS — 6 zonas (pasillos 4,5,6,7,8,9) x 7 parrillas c/u
-// Cada parrilla admite varios artículos mezclados hasta CAP_PARRILLA_UNIDADES.
+// MÓDULO PUNTERAS — 5 zonas (pasillos 4,5,6,7,8) x 7 parrillas c/u
+// Cada parrilla admite varios artículos mezclados, hasta 35 unidades (a pedido del usuario).
 // ═══════════════════════════════════════════════════════════
-var PUNTERA_ZONAS = ['4','5','6','7','8','9'];
+var PUNTERA_ZONAS = ['4','5','6','7','8'];
 var PARRILLAS_X_ZONA = 7;
-var CAP_PARRILLA_UNIDADES = 30; // ajustado según medidas reales de la parrilla (213x119x110 cm, apiladas)
+var CAP_PARRILLA_UNIDADES = 35; // tope real: 5 zonas x 7 parrillas x 35 un. = 1225
 var _punteraActiva = null;
 
 function getParrillaIds(){
@@ -11031,10 +11119,23 @@ function candidatosParaPuntera(){
 
 function renderPunteras(){
   renderSugerenciasUbicacion();
-  document.getElementById('punt-cap-label').textContent = CAP_PARRILLA_UNIDADES;
+  const capLabel = document.getElementById('punt-cap-label');
+  if(capLabel) capLabel.textContent = CAP_PARRILLA_UNIDADES ? CAP_PARRILLA_UNIDADES : 'sin límite';
   const punteras = getPunteras();
   const grid = document.getElementById('punteras-grid');
   let html = '';
+
+  // Aviso si quedó stock cargado en la ex-Puntera 9 (zona sacada del módulo)
+  const huerfanas = Object.keys(punteras).filter(k=>k.startsWith('P9-') && (punteras[k]||[]).length);
+  if(huerfanas.length){
+    const totalArts = huerfanas.reduce((s,k)=>s+punteras[k].length,0);
+    const totalUn = huerfanas.reduce((s,k)=>s+capacidadUsada(punteras[k]),0);
+    const keysJs = "['"+huerfanas.join("','")+"']";
+    html += `<div style="background:#fff3cd;border:1px solid #ffe08a;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#856404">
+      ⚠️ La Puntera 9 se sacó del módulo pero todavía tiene ${totalArts} artículo(s) cargados (${totalUn} un.) en ${huerfanas.length} parrilla(s) — no se borraron, solo dejaron de mostrarse. Movelos a otra puntera o
+      <button onclick="if(confirm('¿Vaciar definitivamente los datos de la ex-Puntera 9?')){ var p=getPunteras(); ${keysJs}.forEach(function(k){delete p[k];}); savePunteras(p); renderPunteras(); showToast('🗑️ Ex-Puntera 9 vaciada'); }" style="background:none;border:none;color:#856404;text-decoration:underline;font-weight:700;cursor:pointer;padding:0;font-size:12px">borralos</button>.
+    </div>`;
+  }
 
   PUNTERA_ZONAS.forEach(function(zona){
     html += '<div class="punt-zona-header">🔚 Puntera pasillo '+zona+'</div>';
@@ -11043,11 +11144,11 @@ function renderPunteras(){
       const id = 'P'+zona+'-'+i;
       const items = punteras[id] || [];
       const usado = capacidadUsada(items);
-      const pct = Math.min(100, Math.round((usado/CAP_PARRILLA_UNIDADES)*100));
+      const pct = CAP_PARRILLA_UNIDADES ? Math.min(100, Math.round((usado/CAP_PARRILLA_UNIDADES)*100)) : (items.length?100:0);
       const activa = _punteraActiva===id;
       html += `<div class="punt-card ${items.length?'':'vacia'} ${activa?'activa':''}" onclick="abrirParrilla('${id}')">
         <div class="punt-id">${id}</div>
-        <div class="punt-cant">${items.length} art. · ${usado}/${CAP_PARRILLA_UNIDADES} un.</div>
+        <div class="punt-cant">${items.length} art. · ${usado} un.${CAP_PARRILLA_UNIDADES?'/'+CAP_PARRILLA_UNIDADES:''}</div>
         <div class="punt-bar"><div class="punt-bar-fill" style="width:${pct}%"></div></div>
       </div>`;
     }
@@ -11069,10 +11170,10 @@ function abrirParrilla(id){
 function renderDetalleParrilla(id, punteras){
   const items = punteras[id] || [];
   const usado = capacidadUsada(items);
-  const libre = Math.max(0, CAP_PARRILLA_UNIDADES - usado);
+  const libre = CAP_PARRILLA_UNIDADES ? Math.max(0, CAP_PARRILLA_UNIDADES - usado) : Infinity;
 
   let html = '<div class="punt-detalle">';
-  html += '<div style="font-size:13px;font-weight:700;margin-bottom:8px">'+id+' — '+usado+'/'+CAP_PARRILLA_UNIDADES+' unidades</div>';
+  html += '<div style="font-size:13px;font-weight:700;margin-bottom:8px">'+id+' — '+usado+(CAP_PARRILLA_UNIDADES?'/'+CAP_PARRILLA_UNIDADES:'')+' unidades</div>';
 
   if(!items.length){
     html += '<div style="font-size:12px;color:#86868b;margin-bottom:8px">Sin artículos asignados todavía.</div>';
@@ -11081,22 +11182,27 @@ function renderDetalleParrilla(id, punteras){
       const art = DATA.find(r=>String(r.art)===String(it.art));
       html += '<div class="punt-item-row">';
       html += '<div style="flex:1;min-width:0">';
+      const deRack = it.deRack||0;
+      const deBloque = Math.max(0, it.unidades - deRack);
+      let origenTxt = '';
+      if(deRack>0 && deBloque>0) origenTxt = '🗄️ '+deRack+' rack · 📦 '+deBloque+' bloque';
+      else if(deRack>0) origenTxt = '🗄️ del rack';
+      else origenTxt = '📦 del bloque';
       html += '<div style="font-size:12px;font-weight:600">'+(art?art.med+' '+art.diseno:it.art)+'</div>';
-      html += '<div style="font-size:10px;color:#86868b">Art '+it.art+(art?' · '+art.prov:'')+'</div>';
+      html += '<div style="font-size:10px;color:#86868b">Art '+it.art+(art?' · '+art.prov:'')+' · '+origenTxt+'</div>';
       html += '</div>';
       html += '<div style="font-size:13px;font-weight:700">'+it.unidades+' un.</div>';
       html += '<button onclick="descontarDeParrilla(\''+id+'\','+idx+')" style="border:none;background:#fff3d6;color:#9a6b00;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;margin-right:4px" title="Descontar unidades (ej. por salida de un pedido)">➖ Descontar</button>';
-      html += '<button onclick="quitarDeParrilla(\''+id+'\','+idx+')" style="border:none;background:#ffd6d9;color:#d70015;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer" title="Eliminar el renglón completo">🗑</button>';
+      html += '<button onclick="quitarDeParrilla(\''+id+'\','+idx+')" style="border:none;background:#ffd6d9;color:#d70015;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer" title="Eliminar el renglón completo (devuelve al rack lo que haya salido de ahí)">🗑</button>';
       html += '</div>';
     });
   }
 
   html += '<div class="punt-add-form">';
   html += '<input type="text" id="punt-add-art-'+id+'" placeholder="Código de artículo...">';
-  html += '<input type="number" id="punt-add-cant-'+id+'" placeholder="Cant." min="1" max="'+libre+'" value="'+(libre>0?1:0)+'">';
-  html += '<button class="btn-primary" style="flex:none;padding:8px 14px" onclick="agregarAParrilla(\''+id+'\')" '+(libre<=0?'disabled':'')+'>+ Agregar</button>';
+  html += '<input type="number" id="punt-add-cant-'+id+'" placeholder="Cant." min="1"'+(isFinite(libre)?' max="'+libre+'"':'')+' value="1">';
+  html += '<button class="btn-primary" style="flex:none;padding:8px 14px" onclick="agregarAParrilla(\''+id+'\')">+ Agregar</button>';
   html += '</div>';
-  if(libre<=0) html += '<div style="font-size:11px;color:#d70015;margin-top:6px">⚠️ Parrilla llena — sin capacidad disponible</div>';
   html += '<div style="font-size:10px;color:#86868b;margin-top:8px">Tip: los candidatos con más rotación están en el panel de Mapa Racks → 🔚 candidatos a puntera</div>';
   html += '</div>';
   return html;
@@ -11116,19 +11222,35 @@ function agregarAParrilla(id){
   const punteras = getPunteras();
   const items = punteras[id] || [];
   const usado = capacidadUsada(items);
-  if(usado + cant > CAP_PARRILLA_UNIDADES){
+  if(CAP_PARRILLA_UNIDADES && usado + cant > CAP_PARRILLA_UNIDADES){
     showToast('⚠️ Supera la capacidad de la parrilla ('+(CAP_PARRILLA_UNIDADES-usado)+' disponibles)');
     return;
   }
 
+  // Si el artículo tiene unidades en el rack, se descuentan de ahí (se está
+  // moviendo físicamente a la puntera). Lo que no alcance a cubrir el rack
+  // se asume que sale del bloque (no hay stock por bloque para descontar).
+  const deRack = descontarRackPorPedido(art.art, cant);
+  if(deRack > 0){ renderMapa(); renderReposicion(); }
+
   const existente = items.find(it=>String(it.art)===artCode);
-  if(existente) existente.unidades += cant;
-  else items.push({art:artCode, unidades:cant});
+  if(existente){
+    existente.unidades += cant;
+    existente.deRack = (existente.deRack||0) + deRack;
+  } else {
+    items.push({art:artCode, unidades:cant, deRack:deRack});
+  }
 
   punteras[id] = items;
   savePunteras(punteras);
   renderPunteras();
-  showToast('✅ Agregado a '+id);
+
+  const deBloque = cant - deRack;
+  let msg = '✅ Agregado a '+id+' — ';
+  if(deRack>0 && deBloque>0) msg += deRack+' un. del rack + '+deBloque+' un. del bloque';
+  else if(deRack>0) msg += deRack+' un. descontadas del rack';
+  else msg += cant+' un. del bloque (no estaba en rack)';
+  showToast(msg);
 }
 
 function descontarDeParrilla(id, idx){
@@ -11140,13 +11262,16 @@ function descontarDeParrilla(id, idx){
   const art = DATA.find(r=>String(r.art)===String(it.art));
   const nombreArt = art ? (art.med+' '+art.diseno) : it.art;
 
-  const cantStr = prompt('¿Cuántas unidades descontás de "'+nombreArt+'" (hay '+it.unidades+' un.)?\n\nUsalo para descontar lo que sale por un pedido/despacho.', it.unidades);
+  const cantStr = prompt('¿Cuántas unidades descontás de "'+nombreArt+'" (hay '+it.unidades+' un.)?\n\nUsalo para descontar lo que sale por un pedido/despacho — esas unidades salen del depósito y NO vuelven al rack.', it.unidades);
   if(cantStr===null) return; // canceló
   const cant = parseInt(cantStr)||0;
   if(cant<=0){ showToast('Ingresá una cantidad válida'); return; }
   if(cant>it.unidades){ showToast('⚠️ No podés descontar más de lo que hay ('+it.unidades+' un.)'); return; }
 
   it.unidades -= cant;
+  // Acotar deRack a lo que realmente queda en la puntera, así un descuento
+  // parcial (salida real por pedido) nunca deja "de más" para devolver al rack.
+  if(it.deRack) it.deRack = Math.max(0, Math.min(it.deRack, it.unidades));
   if(it.unidades<=0){
     items.splice(idx,1);
   }
@@ -11159,10 +11284,29 @@ function descontarDeParrilla(id, idx){
 function quitarDeParrilla(id, idx){
   const punteras = getPunteras();
   const items = punteras[id] || [];
+  const it = items[idx];
+  if(!it) return;
+
+  const art = DATA.find(r=>String(r.art)===String(it.art));
+  const nombreArt = art ? (art.med+' '+art.diseno) : it.art;
+  const deRack = it.deRack||0;
+
+  const msgConfirm = deRack>0
+    ? '¿Eliminar este renglón de "'+nombreArt+'" ('+it.unidades+' un.)? Se van a devolver '+deRack+' un. al rack.'
+    : '¿Eliminar este renglón de "'+nombreArt+'" ('+it.unidades+' un.)?';
+  if(!confirm(msgConfirm)) return;
+
+  if(deRack>0){
+    reponerRackPorAjuste(it.art, deRack);
+    renderMapa();
+    renderReposicion();
+  }
+
   items.splice(idx,1);
   punteras[id] = items;
   savePunteras(punteras);
   renderPunteras();
+  showToast(deRack>0 ? '🗑️ Renglón eliminado — '+deRack+' un. devueltas al rack' : '🗑️ Renglón eliminado');
 }
 
 function limpiarPunteras(){
@@ -11682,7 +11826,7 @@ function renderChecklist(){
         ${r.obs?`<div style="color:#86868b;margin-top:2px;font-style:italic">${r.obs}</div>`:''}
       </div>`).join('') || '<div style="font-size:11px;color:#86868b;padding:6px 0">Sin registros todavía</div>';
 
-    return `<div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:12px;margin-bottom:8px">
+    return `<div id="eqcard-${eq.id}" style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:12px;margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:700;color:#1d1d1f">${icon} ${eq.nombre} ${eq.interno?'<span style="color:#86868b;font-weight:400">· '+eq.interno+'</span>':''}</div>
@@ -12139,12 +12283,208 @@ function estadoMatafuegoBloque(row){
 }
 var MATAFUEGO_ESTADO_LABEL = {vencido:'Vencido', proximo:'Próximo', vigente:'Vigente', sinmata:'Sin matafuego'};
 var MATAFUEGO_ESTADO_COLOR = {vencido:'#d70015', proximo:'#c98a1a', vigente:'#1e8e3e', sinmata:'#7a3fb0'};
+
+// ═══════════════════════════════════════════════════════════════
+// MAPA DE NAVE — HyS (bloques Sur/Norte, portones y puertas de emergencia)
+// Reutiliza la misma lógica visual del "Plano de Nave" (bloque-card,
+// nave-row, nave-side-label) pero coloreado según estado de HyS en vez
+// de stock/rotación.
+// ═══════════════════════════════════════════════════════════════
+
+// Peor estado de matafuegos por lado+bloque
+function _mfEstadoBloques(){
+  var data = getMatafuegosBloques();
+  var stats = {};
+  var orden = {vigente:0, proximo:1, sinmata:2, vencido:3};
+  data.forEach(function(r){
+    var key = r.lado+'-'+r.bloque;
+    if(!stats[key]) stats[key] = {items:[], peor:'vigente'};
+    stats[key].items.push(r);
+  });
+  Object.keys(stats).forEach(function(k){
+    var peor = 'vigente';
+    stats[k].items.forEach(function(r){
+      var e = estadoMatafuegoBloque(r);
+      if(orden[e] > orden[peor]) peor = e;
+    });
+    stats[k].peor = peor;
+  });
+  return stats;
+}
+
+// Interpreta el código interno de un portón (SUR-3, NORTE-7N) para
+// ubicarlo en la grilla de bloques. Este/Frente quedan afuera de la grilla.
+function _parsePortonUbicacion(interno){
+  var s = String(interno||'').trim();
+  var m = /^SUR-(\d+)$/.exec(s);
+  if(m) return {lado:'Sur', bloque:parseInt(m[1],10)};
+  m = /^NORTE-(\d+)N$/.exec(s);
+  if(m) return {lado:'Norte', bloque:parseInt(m[1],10)};
+  return null;
+}
+
+function _colorEstadoEquipo(est){
+  if(!est) return '#c7c7cc';
+  if(est.estado==='falla') return '#d70015';
+  if(est.estado==='nunca') return '#86868b';
+  if(est.estado==='vencido') return '#c98a1a';
+  return '#1a7a3d';
+}
+
+function _portonesPorUbicacion(){
+  var equipos = getChecklistEquipos().filter(function(e){ return e.tipo==='porton'; });
+  var registros = getChecklistRegistros();
+  var map = {}, otros = [];
+  equipos.forEach(function(eq){
+    var ub = _parsePortonUbicacion(eq.interno);
+    var est = _estadoEquipoChecklist(eq, registros);
+    if(ub){ map[ub.lado+'-'+ub.bloque] = {eq:eq, est:est}; }
+    else { otros.push({eq:eq, est:est}); }
+  });
+  return {map:map, otros:otros};
+}
+
+function _puertasPorUbicacion(){
+  var equipos = getChecklistEquipos().filter(function(e){ return e.tipo==='puerta'; });
+  var registros = getChecklistRegistros();
+  var map = {}, sinUbicar = [];
+  equipos.forEach(function(eq){
+    var est = _estadoEquipoChecklist(eq, registros);
+    if(eq.lado && eq.bloque){
+      var key = eq.lado+'-'+eq.bloque;
+      if(!map[key]) map[key] = [];
+      map[key].push({eq:eq, est:est});
+    } else {
+      sinUbicar.push({eq:eq, est:est});
+    }
+  });
+  return {map:map, sinUbicar:sinUbicar};
+}
+
+function asignarUbicacionPuerta(id){
+  var lado = prompt('¿Lado de la nave? Escribí "Sur" o "Norte"','Sur');
+  if(lado===null) return;
+  lado = lado.trim();
+  lado = lado.charAt(0).toUpperCase()+lado.slice(1).toLowerCase();
+  if(lado!=='Sur' && lado!=='Norte'){ showToast('❌ Escribí "Sur" o "Norte"'); return; }
+  var bloqueStr = prompt('¿Número de bloque? (1 al 10)','1');
+  if(bloqueStr===null) return;
+  var bloque = parseInt(bloqueStr,10);
+  if(isNaN(bloque) || bloque<1 || bloque>10){ showToast('❌ Bloque inválido (1 al 10)'); return; }
+  var equipos = getChecklistEquipos();
+  var eq = equipos.find(function(e){ return e.id===id; });
+  if(!eq) return;
+  eq.lado = lado; eq.bloque = bloque;
+  saveChecklistEquipos(equipos);
+  showToast('📍 Ubicada en Bloque '+bloque+' '+lado);
+  renderHys();
+}
+
+function irAMatafuegosBloque(lado, bloque){
+  _matafuegosFiltro.lado = lado;
+  _matafuegosFiltro.estado = '';
+  _matafuegosFiltro.q = String(bloque);
+  renderMatafuegosBloques();
+  var cont = document.getElementById('hys-matafuegos-bloques');
+  if(cont) cont.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function irAEquipoHys(view, equipoId){
+  function resaltar(){
+    var el = document.getElementById('eqcard-'+equipoId);
+    if(!el) return;
+    el.scrollIntoView({behavior:'smooth', block:'center'});
+    el.style.transition = 'background .3s';
+    el.style.background = '#fff6d6';
+    setTimeout(function(){ el.style.background = '#fff'; }, 1300);
+  }
+  if(view==='checklist'){
+    navTo('checklist');
+    renderChecklist();
+  }
+  setTimeout(resaltar, 150);
+}
+
+function renderMapaNaveHys(){
+  var cont = document.getElementById('hys-mapa-nave');
+  if(!cont) return;
+
+  var mf = _mfEstadoBloques();
+  var portonInfo = _portonesPorUbicacion();
+  var puertaInfo = _puertasPorUbicacion();
+
+  function chipPorton(p){
+    var c = _colorEstadoEquipo(p.est);
+    return '<span onclick="event.stopPropagation();irAEquipoHys(\'checklist\',\''+p.eq.id+'\')" '
+      + 'style="cursor:pointer;display:inline-flex;align-items:center;gap:3px;background:'+c+'1f;color:'+c+';border-radius:8px;padding:2px 6px;font-size:10px;font-weight:700">🚪 '+p.eq.interno+'</span>';
+  }
+  function chipPuerta(p){
+    var c = _colorEstadoEquipo(p.est);
+    return '<span onclick="event.stopPropagation();irAEquipoHys(\'hys\',\''+p.eq.id+'\')" '
+      + 'style="cursor:pointer;display:inline-flex;align-items:center;gap:3px;background:'+c+'1f;color:'+c+';border-radius:8px;padding:2px 6px;font-size:10px;font-weight:700">🚨 '+p.eq.nombre+'</span>';
+  }
+
+  function celda(lado, bloque, label){
+    var key = lado+'-'+bloque;
+    var mfEntry = mf[key];
+    var mfColor = mfEntry ? MATAFUEGO_ESTADO_COLOR[mfEntry.peor] : '#e5e5ea';
+    var mfCount = mfEntry ? mfEntry.items.length : 0;
+    var mfVenc = mfEntry ? mfEntry.items.filter(function(r){ return estadoMatafuegoBloque(r)==='vencido'; }).length : 0;
+
+    var portonEntry = portonInfo.map[key];
+    var puertasEntry = puertaInfo.map[key] || [];
+    var chips = (portonEntry?chipPorton(portonEntry):'') + puertasEntry.map(chipPuerta).join('');
+    if(!chips) chips = '<span style="font-size:10px;color:#c7c7cc">— sin portón/puerta asignada —</span>';
+
+    return '<div class="bloque-card" style="border-left:4px solid '+mfColor+';cursor:pointer" onclick="irAMatafuegosBloque(\''+lado+'\','+bloque+')">'
+      + '<div class="bloque-name">'+label+'</div>'
+      + '<div class="bloque-arts">🧯 '+mfCount+' matafuego'+(mfCount===1?'':'s')+(mfVenc?' · <span style="color:#d70015;font-weight:700">'+mfVenc+' vencido'+(mfVenc===1?'':'s')+'</span>':'')+'</div>'
+      + '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:3px">'+chips+'</div>'
+      + '</div>';
+  }
+
+  var html = '<div class="nave-grid"><div class="nave-pasillo">🚛 MUELLES DE DESCARGA</div>';
+  for(var b=10;b>=1;b--){
+    html += '<div class="nave-row">';
+    html += '<div class="nave-side-label">S</div>';
+    html += celda('Sur', b, 'Bloque '+b+' Sur');
+    html += '<div class="nave-side-label">N</div>';
+    html += celda('Norte', b, 'Bloque '+b+' Norte');
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Portones Este / Frente (no entran en la grilla de bloques Sur-Norte)
+  if(portonInfo.otros.length){
+    html += '<div style="margin-top:14px">'
+      + '<div style="font-size:11px;font-weight:700;color:#86868b;text-transform:uppercase;margin-bottom:6px">🚪 Portones Este / Frente</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:6px">'
+      + portonInfo.otros.map(chipPorton).join('')
+      + '</div></div>';
+  }
+
+  // Puertas de emergencia sin ubicar en el mapa
+  if(puertaInfo.sinUbicar.length){
+    html += '<div style="margin-top:14px">'
+      + '<div style="font-size:11px;font-weight:700;color:#86868b;text-transform:uppercase;margin-bottom:6px">🚨 Puertas de emergencia sin ubicar</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:6px">'
+      + puertaInfo.sinUbicar.map(function(p){
+          var c = _colorEstadoEquipo(p.est);
+          return '<span style="display:inline-flex;align-items:center;gap:4px;background:'+c+'1f;color:'+c+';border-radius:8px;padding:3px 8px;font-size:11px;font-weight:600">🚨 '+p.eq.nombre
+            + ' <button onclick="asignarUbicacionPuerta(\''+p.eq.id+'\')" style="background:none;border:none;color:#0071e3;font-size:11px;cursor:pointer;padding:0">📍 Ubicar</button></span>';
+        }).join('')
+      + '</div></div>';
+  }
+
+  cont.innerHTML = html;
+}
+
 var _matafuegosFiltro = {lado:'', estado:'', q:''};
 
 function updateMatafuegoField(id, field, value){
   var data = getMatafuegosBloques();
   var row = data.find(function(r){return r.id===id;});
-  if(row){ row[field]=value; saveMatafuegosBloques(data); renderMatafuegosBloques(); }
+  if(row){ row[field]=value; saveMatafuegosBloques(data); renderMatafuegosBloques(); renderMapaNaveHys(); }
 }
 function setMatafuegosFiltro(field, value){
   _matafuegosFiltro[field] = value;
@@ -12215,6 +12555,7 @@ function guardarEditorMatafuego(id){
   cerrarEditorMatafuego();
   showToast('✅ Matafuego actualizado');
   renderMatafuegosBloques();
+  renderMapaNaveHys();
 }
 
 function cerrarEditorMatafuego(){
@@ -12228,6 +12569,7 @@ function agregarMatafuegoBloque(){
   data.push({id:nextId, lado:'Sur', bloque:1, numero:'', cc:'', ph:'', obs:'', dudoso:false});
   saveMatafuegosBloques(data);
   renderMatafuegosBloques();
+  renderMapaNaveHys();
   abrirEditorMatafuego(nextId);
 }
 
@@ -12305,6 +12647,8 @@ function renderHys(){
   const equipos = getChecklistEquipos().filter(e=>_checklistEsHigieneSeguridad(e.tipo));
   const registros = getChecklistRegistros();
 
+  renderMapaNaveHys();
+
   const alertasBox = document.getElementById('hys-alertas');
   if(alertasBox){
     if(!equipos.length){
@@ -12375,11 +12719,12 @@ function renderHys(){
         ${r.obs?`<div style="color:#86868b;margin-top:2px;font-style:italic">${r.obs}</div>`:''}
       </div>`).join('') || '<div style="font-size:11px;color:#86868b;padding:6px 0">Sin registros todavía</div>';
 
-    return `<div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:12px;margin-bottom:8px">
+    return `<div id="eqcard-${eq.id}" style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:12px;margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:700;color:#1d1d1f">${icon} ${eq.nombre} ${eq.interno?'<span style="color:#86868b;font-weight:400">· '+eq.interno+'</span>':''}</div>
           <div style="margin-top:4px">${badge}</div>
+          ${eq.tipo==='puerta' ? `<div style="margin-top:4px;font-size:11px;color:#86868b">📍 ${eq.lado&&eq.bloque?('Bloque '+eq.bloque+' '+eq.lado):'Sin ubicar en el mapa'} <button onclick="asignarUbicacionPuerta('${eq.id}')" style="margin-left:4px;background:none;border:none;color:#0071e3;font-size:11px;font-weight:600;cursor:pointer">✏️ ${eq.lado&&eq.bloque?'Cambiar':'Ubicar'}</button></div>` : ''}
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0">
           <button onclick="editarEquipoChecklist('${eq.id}')" style="background:none;border:none;color:#0071e3;font-size:13px;cursor:pointer">✏️</button>
