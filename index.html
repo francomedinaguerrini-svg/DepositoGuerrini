@@ -3013,7 +3013,8 @@ function generarMotorAsignacion(){
     sinUbicacionArts: sinUbicacion, // array completo para el informe
     posLibres:    Object.values(posPorNivel).reduce(function(s,a){return s+a.filter(function(p){return p.libre;}).length;},0),
     compartidas:  Object.values(asign).filter(function(v){return v.compartidos&&v.compartidos.length>0;}).length,
-    alertasRepo:  alertasRepo.length
+    alertasRepo:  alertasRepo.length,
+    fuente: 'motor', fecha: new Date().toLocaleString('es-AR')
   };
 
   return asign;
@@ -3288,15 +3289,22 @@ function reevaluarRack(){
     return;
   }
 
-  // PASO 3: candidatos en nave que no están en rack
+  // PASO 3: candidatos en nave que no están en rack ni en puntera
   var enRack = new Set(Object.values(ASIGN).filter(function(v){return v&&v.art;}).map(function(v){return String(v.art);}));
+  var enPunteraReeval = articulosAsignadosSet(getPunteras(), null);
   var candidatosNave = DATA.filter(function(r){
     if(enRack.has(String(r.art))) return false;
+    if(enPunteraReeval.has(String(r.art))) return false;
     return califica(r);
   });
 
   if(candidatosNave.length === 0 && liberadas === 0){
     showToast('✅ Todo en orden — sin cambios necesarios');
+    window._motorResumen = {
+      asignados: Object.values(ASIGN).filter(function(v){return v&&v.art;}).length,
+      sinUbicacion: 0, sinUbicacionArts: [],
+      fuente: 'reevaluar', fecha: new Date().toLocaleString('es-AR')
+    };
     renderMapa();
     renderCandidatosEnNave();
     return;
@@ -3344,6 +3352,11 @@ function reevaluarRack(){
 
   if(posLibres === 0){
     showToast('✅ Rack lleno — sin posiciones libres · '+liberadas+' liberadas pero ya ocupadas');
+    window._motorResumen = {
+      asignados: Object.values(ASIGN).filter(function(v){return v&&v.art;}).length,
+      sinUbicacion: candidatosNave.length, sinUbicacionArts: candidatosNave,
+      fuente: 'reevaluar', fecha: new Date().toLocaleString('es-AR')
+    };
     saveAsign();
     renderMapa();
     renderCandidatosEnNave();
@@ -3434,6 +3447,12 @@ function reevaluarRack(){
   saveAsign();
   renderMapa();
   renderCandidatosEnNave();
+
+  window._motorResumen = {
+    asignados: Object.values(ASIGN).filter(function(v){return v&&v.art;}).length,
+    sinUbicacion: sinUbicacion2.length, sinUbicacionArts: sinUbicacion2,
+    fuente: 'reevaluar', fecha: new Date().toLocaleString('es-AR')
+  };
 
   var msg = '🔄 Reevaluación: ';
   if(liberadas) msg += liberadas+' liberadas · ';
@@ -3731,39 +3750,13 @@ function renderCandidatosPunteras(){
   const box = document.getElementById('alertas-box');
   if(!box) return;
 
-  const EXCLUIR_PROV = ['SPEEDWAY'];
-  const EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
-  const BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
-
-  const enRack = new Set(Object.values(ASIGN).filter(v=>v&&v.art).map(v=>String(v.art)));
-  const punterasActuales = getPunteras();
-  const enPunteraSet = articulosAsignadosSet(punterasActuales, null);
-
-  const candidatosPuntera = DATA.filter(function(r){
-    if(enRack.has(String(r.art))) return false;
-    if(enPunteraSet.has(String(r.art))) return false;
-    if(/\d+\.5/.test(r.med||'')) return false;
-    if(EXCLUIR_PROV.indexOf(r.prov)>=0) return false;
-    if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false;
-    if((r.stock||0) <= 0) return false;
-    if((r.stock||0) > 1000) return false; // corte: no sugerir puntera para stocks grandes
-    if((r.pall||0) <= 0) return false;
-    if((r.pall||0) >= 1) return false; // esto es lo nuevo: < 1 pallet, no ≥1
-    if(r.bloque){
-      const bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
-      if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return false;
-    }
-    return true;
-  });
+  const candidatosPuntera = candidatosParaPuntera(); // ya viene ordenado de menor a mayor stock
 
   if(!candidatosPuntera.length){
     const prev = document.getElementById('panel-punteras-candidatos');
     if(prev) prev.remove();
     return;
   }
-
-  // Prioridad: menor stock primero (los más chicos, más urgente sacarlos de la nave)
-  candidatosPuntera.sort(function(a,b){ return (a.stock||0)-(b.stock||0); });
 
   var panelId = 'panel-punteras-candidatos';
   var bodyId  = 'panel-punteras-body';
@@ -4011,13 +4004,49 @@ function procesarPedido(pedido){
   renderPedido(conPuntera, conRack, conBloque, sinUbic, pedido);
 }
 
+function getPrepPedidoState(nro){
+  try { return JSON.parse(localStorage.getItem('wms_ped_prep_'+nro)||'{}'); }
+  catch(e){ return {}; }
+}
+function savePrepPedidoState(nro, state){
+  localStorage.setItem('wms_ped_prep_'+nro, JSON.stringify(state));
+}
+function togglePrepPedidoItem(nro, art, checked){
+  const state = getPrepPedidoState(nro);
+  if(checked) state[art] = true; else delete state[art];
+  savePrepPedidoState(nro, state);
+
+  const row = document.getElementById('ped-row-'+art);
+  if(row){
+    row.style.background = checked ? '#f0fff4' : '';
+    row.style.opacity = checked ? '.55' : '';
+    row.querySelectorAll('.ped-art, .ped-desc').forEach(function(el){
+      el.style.textDecoration = checked ? 'line-through' : '';
+    });
+  }
+  const total = (window._pedidoActual && window._pedidoActual.todos || []).length;
+  const count = Object.values(state).filter(Boolean).length;
+  const sumEl = document.querySelector('#ped-sum-preparados .ped-sum-val');
+  if(sumEl) sumEl.textContent = count+'/'+total;
+}
+function reiniciarPrepPedido(nro){
+  if(!confirm('¿Reiniciar los casilleros de preparado de este pedido?')) return;
+  localStorage.removeItem('wms_ped_prep_'+nro);
+  if(window._pedidoActual) procesarPedido(window._pedidoActual.todos);
+  showToast('↺ Casilleros reiniciados');
+}
+
 function renderPedido(conPuntera, conRack, conBloque, sinUbic, todos){
   const totalArts = todos.length;
   const totalUnid = todos.reduce((s,r)=>s+r.cant,0);
+  const nroPed = (document.getElementById('ped-nropedido')||{}).value || generarNroPedido();
+  const prepState = getPrepPedidoState(nroPed);
+  const preparadosCount = Object.values(prepState).filter(Boolean).length;
 
   function mkRow(item, tipo){
     const esBuscar = item.posRack === 'BUSCAR EN RACK';
     const esBajo = item.cond === 'bajo stock';
+    const yaPrep = !!prepState[item.art];
     const ubic = tipo==='puntera'
       ? `<span class="ped-ubic-puntera" style="font-size:10px;font-weight:600;color:#7a3fb0;background:#f2e6ff;padding:2px 6px;border-radius:4px">🔚 ${item.puntera}</span>`
       : tipo==='rack'
@@ -4027,11 +4056,12 @@ function renderPedido(conPuntera, conRack, conBloque, sinUbic, todos){
       : tipo==='bloque'
       ? `<span class="ped-ubic-bloque">🟡 ${item.bloque}</span>`
       : `<span class="ped-ubic-sin">❓ Sin ubic.</span>`;
-    const rowStyle = esBajo ? 'background:#fff5f5' : '';
-    return `<tr class="${tipo}-row" style="${rowStyle}">
-      <td><div class="ped-art">${item.art}</div></td>
+    const rowStyle = yaPrep ? 'background:#f0fff4;opacity:.55' : (esBajo ? 'background:#fff5f5' : '');
+    return `<tr class="${tipo}-row" id="ped-row-${item.art}" style="${rowStyle}">
+      <td style="text-align:center"><input type="checkbox" ${yaPrep?'checked':''} onchange="togglePrepPedidoItem('${nroPed}','${item.art}',this.checked)" style="width:18px;height:18px;cursor:pointer"></td>
+      <td><div class="ped-art" style="${yaPrep?'text-decoration:line-through':''}">${item.art}</div></td>
       <td>
-        <div class="ped-desc">${item.med} ${item.diseno}</div>
+        <div class="ped-desc" style="${yaPrep?'text-decoration:line-through':''}">${item.med} ${item.diseno}</div>
         <div class="ped-prov">${item.prov}${esBajo?' · <span style="color:#d70015;font-weight:600">⚠️ BAJO STOCK</span>':''}</div>
       </td>
       <td>${ubic}</td>
@@ -4053,13 +4083,17 @@ function renderPedido(conPuntera, conRack, conBloque, sinUbic, todos){
       <div class="ped-sum-card"><div class="ped-sum-val" style="color:#0071e3">${conRack.length}</div><div class="ped-sum-lbl">En rack</div></div>
       <div class="ped-sum-card"><div class="ped-sum-val" style="color:#856404">${conBloque.length}</div><div class="ped-sum-lbl">En bloques</div></div>
       <div class="ped-sum-card"><div class="ped-sum-val">${totalUnid.toLocaleString('es-AR')}</div><div class="ped-sum-lbl">Unidades</div></div>
+      <div class="ped-sum-card" id="ped-sum-preparados"><div class="ped-sum-val" style="color:#34c759">${preparadosCount}/${totalArts}</div><div class="ped-sum-lbl">Preparados</div></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+      <button onclick="reiniciarPrepPedido('${nroPed}')" style="padding:6px 12px;background:#f5f5f7;color:#86868b;border:none;border-radius:8px;font-size:11px;cursor:pointer">↺ Reiniciar casilleros</button>
     </div>
 
     ${conPuntera.length>0?`
     <div class="ped-section-title" style="color:#7a3fb0">🔚 PUNTERA — Preparar primero (${conPuntera.length} arts.)</div>
     <div class="ped-table-wrap">
       <table class="ped-table">
-        <thead><tr><th>ART.</th><th>DESCRIPCIÓN</th><th>PUNTERA</th><th style="text-align:right">CANT.</th><th style="text-align:right">STOCK</th></tr></thead>
+        <thead><tr><th>✓</th><th>ART.</th><th>DESCRIPCIÓN</th><th>PUNTERA</th><th style="text-align:right">CANT.</th><th style="text-align:right">STOCK</th></tr></thead>
         <tbody>${conPuntera.map(r=>mkRow(r,'puntera')).join('')}</tbody>
       </table>
     </div>`:''}
@@ -4068,7 +4102,7 @@ function renderPedido(conPuntera, conRack, conBloque, sinUbic, todos){
     <div class="ped-section-title" style="color:#0071e3">🔵 RACK — Preparar primero (${conRack.length} arts.)</div>
     <div class="ped-table-wrap">
       <table class="ped-table">
-        <thead><tr><th>ART.</th><th>DESCRIPCIÓN</th><th>UBICACIÓN RACK</th><th style="text-align:right">CANT.</th><th style="text-align:right">STOCK</th></tr></thead>
+        <thead><tr><th>✓</th><th>ART.</th><th>DESCRIPCIÓN</th><th>UBICACIÓN RACK</th><th style="text-align:right">CANT.</th><th style="text-align:right">STOCK</th></tr></thead>
         <tbody>${conRack.map(r=>mkRow(r,'rack')).join('')}</tbody>
       </table>
     </div>`:''}
@@ -4077,7 +4111,7 @@ function renderPedido(conPuntera, conRack, conBloque, sinUbic, todos){
     <div class="ped-section-title" style="color:#856404">🟡 BLOQUES — ${_modoPedido==='flete'?'Preparar primero':'Preparar después'} (${conBloque.length} arts.)</div>
     <div class="ped-table-wrap">
       <table class="ped-table">
-        <thead><tr><th>ART.</th><th>DESCRIPCIÓN</th><th>BLOQUE</th><th style="text-align:right">CANT.</th><th style="text-align:right">STOCK</th></tr></thead>
+        <thead><tr><th>✓</th><th>ART.</th><th>DESCRIPCIÓN</th><th>BLOQUE</th><th style="text-align:right">CANT.</th><th style="text-align:right">STOCK</th></tr></thead>
         <tbody>${conBloque.map(r=>mkRow(r,'bloque')).join('')}</tbody>
       </table>
     </div>`:''}
@@ -4086,7 +4120,7 @@ function renderPedido(conPuntera, conRack, conBloque, sinUbic, todos){
     <div class="ped-section-title" style="color:#d70015">❓ SIN UBICACIÓN (${sinUbic.length} arts.)</div>
     <div class="ped-table-wrap">
       <table class="ped-table">
-        <thead><tr><th>ART.</th><th>DESCRIPCIÓN</th><th>UBICACIÓN</th><th style="text-align:right">CANT.</th><th style="text-align:right">STOCK</th></tr></thead>
+        <thead><tr><th>✓</th><th>ART.</th><th>DESCRIPCIÓN</th><th>UBICACIÓN</th><th style="text-align:right">CANT.</th><th style="text-align:right">STOCK</th></tr></thead>
         <tbody>${sinUbic.map(r=>mkRow(r,'sinubic')).join('')}</tbody>
       </table>
     </div>`:''}
@@ -5622,6 +5656,7 @@ function imprimirMapa(){
   const wsStock = [
     ['STOCK TOTAL — WMS Depósito Halpern — '+new Date().toLocaleDateString('es-AR')],
     ['Total artículos: '+DATA.length],
+    [resFull.fecha ? 'Último "Reevaluar"/motor corrido: '+resFull.fecha+' ('+(resFull.fuente||'—')+')' : '⚠️ Todavía no se corrió "Reevaluar" en esta sesión — el motivo puede estar desactualizado'],
     [],
     ['ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','STOCK','PALLETS','ROT/SEM','EN RACK','POSICIÓN','BLOQUE (NAVE)','MOTIVO SI NO ESTÁ EN RACK'],
     ...DATA.map(r=>{
@@ -5639,29 +5674,14 @@ function imprimirMapa(){
   wsS['!cols'] = [{wch:8},{wch:14},{wch:12},{wch:12},{wch:9},{wch:8},{wch:8},{wch:8},{wch:14},{wch:12},{wch:38}];
   XLSX.utils.book_append_sheet(wb, wsS, 'Stock Total');
 
-  // Hoja: candidatos a puntera (stock > 0 pero < 1 pallet)
-  const EXCLUIR_PROV3 = ['SPEEDWAY'];
-  const EXCLUIR_USO3  = ['TT','TL','TLSB','TT ','TL '];
-  const BLOQUES_RACK3 = ['2N/3N','2S/2N','1N','1S'];
-  const candidatosPunteraExp = DATA.filter(r=>{
-    if(enRackFull.has(String(r.art))) return false;
-    if(/\d+\.5/.test(r.med||'')) return false;
-    if(EXCLUIR_PROV3.indexOf(r.prov)>=0) return false;
-    if(EXCLUIR_USO3.indexOf((r.uso||'').trim())>=0) return false;
-    if((r.stock||0)<=0) return false;
-    if((r.pall||0)<=0) return false;
-    if((r.pall||0)>=1) return false;
-    if(r.bloque){
-      const bs=r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
-      if(bs.some(b=>BLOQUES_RACK3.indexOf(b.trim())>=0)) return false;
-    }
-    return true;
-  }).sort((a,b)=>(b.rot_sem||0)-(a.rot_sem||0));
+  // Hoja: candidatos a puntera — mismo criterio que el panel de Mapa Racks
+  // (stock > 0 y ≤ 1000 un., < 1 pallet, no en rack, no ya en puntera, rotación no muy alta)
+  const candidatosPunteraExp = candidatosParaPuntera();
 
   if(candidatosPunteraExp.length){
     const wsPunt = [
-      ['SUGERENCIA PUNTERA — STOCK MAYOR A 0 Y MENOR A 1 PALLET (asignación manual) — '+new Date().toLocaleDateString('es-AR')],
-      ['Total: '+candidatosPunteraExp.length+' artículos · Ordenado por mayor rotación primero'],
+      ['SUGERENCIA PUNTERA — STOCK > 0 Y ≤ 1000 UN., < 1 PALLET (asignación manual) — '+new Date().toLocaleDateString('es-AR')],
+      ['Total: '+candidatosPunteraExp.length+' artículos · Ordenado de menor a mayor stock'],
       [],
       ['ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','ROT/SEM','ROT/MES','STOCK','PALLETS','BLOQUE','CONDICIÓN'],
       ...candidatosPunteraExp.map(r=>[
@@ -8399,21 +8419,24 @@ function imprimirPedido(){
   bloque = [...bloque].sort((a,b)=>getBloqueOrderPrint(a.bloque||'')-getBloqueOrderPrint(b.bloque||''));
 
   const totalCant = [...puntera,...rack,...bloque,...sin].reduce((s,r)=>s+r.cant,0);
+  const prepStatePrint = getPrepPedidoState(nroPedido);
 
   let paso = 1;
   function filas(items, tipoUbic){
-    return items.map(r=>`
-      <tr>
+    return items.map(r=>{
+      const yaPrep = !!prepStatePrint[r.art];
+      return `
+      <tr style="${yaPrep?'background:#eafaef':''}">
         <td style="text-align:center;color:#86868b;font-size:7px">${paso++}</td>
         <td style="font-size:8px">${r.art}</td>
-        <td class="${r.cond==='bajo stock'?'bajo':''}" style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:120px"><strong>${r.med||''}</strong> ${r.diseno||''}</td>
+        <td class="${r.cond==='bajo stock'?'bajo':''}" style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:120px${yaPrep?';text-decoration:line-through':''}"><strong>${r.med||''}</strong> ${r.diseno||''}</td>
         <td style="text-align:center;font-size:7px;font-weight:700;color:#0071e3;white-space:nowrap">${RANGOS&&RANGOS[r.art]?RANGOS[r.art]:''}</td>
         <td>${r.prov||''}</td>
         <td style="text-align:center;font-weight:700;font-size:10px">${r.cant}</td>
         <td style="text-align:center;color:${(r.stock||0)<r.cant?'#d70015':'#1d1d1f'}">${r.stock||0}</td>
         <td style="color:#0071e3;font-weight:600">${tipoUbic==='puntera'?(r.puntera||''):tipoUbic==='rack'?(r.posRack||''):(r.bloque||'')}</td>
         <td style="color:${r.cond==='bajo stock'?'#d70015':'#86868b'}">${r.cond||''}</td>
-        <td style="border-left:1px solid #d2d2d7;min-width:22px;min-height:16px"></td>
+        <td style="border-left:1px solid #d2d2d7;min-width:22px;min-height:16px;text-align:center;font-weight:700;color:#1d7a3c">${yaPrep?'✓':''}</td>
         <td style="border-left:1px solid #d2d2d7;min-width:22px;min-height:16px"></td>
         <td style="border-left:1px solid #d2d2d7;min-width:22px;min-height:16px"></td>
         <td style="border-left:1px solid #d2d2d7;min-width:22px;min-height:16px"></td>
@@ -8424,7 +8447,8 @@ function imprimirPedido(){
         <td style="border-left:1px solid #d2d2d7;min-width:22px;min-height:16px"></td>
         <td style="border-left:1px solid #d2d2d7;min-width:22px;min-height:16px"></td>
         <td style="border-left:1px solid #d2d2d7;min-width:32px;font-weight:700;text-align:center;font-size:9px;background:#f5f5f7"></td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
   }
 
   const printHTML = `<!DOCTYPE html>
@@ -11347,11 +11371,13 @@ function informePunteras(){
   const punteras = getPunteras();
   const ahora = new Date();
   const wb = XLSX.utils.book_new();
+  const resMotor = window._motorResumen || {};
 
   // Hoja 1: DETALLE — un renglón por artículo cargado en cada parrilla
   const wsDetalle = [
     ['INFORME DE PUNTERAS — WMS Depósito Halpern'],
     ['Fecha:', ahora.toLocaleDateString('es-AR'), 'Hora:', ahora.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})],
+    [resMotor.fecha ? 'Último "Reevaluar"/motor corrido: '+resMotor.fecha+' ('+(resMotor.fuente||'—')+')' : '⚠️ Todavía no se corrió "Reevaluar" en esta sesión'],
     [],
     ['PARRILLA','ART.','MEDIDA','DISEÑO','PROVEEDOR','UNIDADES','CAPACIDAD','% OCUPADO'],
   ];
@@ -11409,8 +11435,27 @@ function informePunteras(){
   ws2['!cols'] = [{wch:20},{wch:18},{wch:16},{wch:12},{wch:10}];
   XLSX.utils.book_append_sheet(wb, ws2, 'Resumen');
 
+  // Hoja 3: SUGERENCIA — candidatos a puntera con el criterio actual
+  // (stock > 0 y ≤ 1000 un., < 1 pallet, no en rack, no ya cargados en puntera,
+  // ordenado de menor a mayor stock — mismo criterio que el panel de Mapa Racks)
+  const candidatos = candidatosParaPuntera();
+  const wsSugerencia = [
+    ['SUGERENCIA DE PUNTERA — WMS Depósito Halpern'],
+    ['Fecha:', ahora.toLocaleDateString('es-AR')],
+    ['Criterio: stock > 0 y ≤ 1000 un. · < 1 pallet · no está en rack ni ya cargado en puntera · ordenado de menor a mayor stock'],
+    [],
+    ['ART.','MEDIDA','DISEÑO','PROVEEDOR','STOCK','PALLETS','ROT/SEM','BLOQUE'],
+    ...candidatos.map(function(r){
+      return [r.art, r.med, r.diseno, r.prov, r.stock||0, (r.pall||0).toFixed(2), (r.rot_sem||0).toFixed(2), r.bloque||''];
+    })
+  ];
+  if(!candidatos.length) wsSugerencia.push(['— Sin candidatos nuevos por ahora —']);
+  const ws3 = XLSX.utils.aoa_to_sheet(wsSugerencia);
+  ws3['!cols'] = [{wch:8},{wch:14},{wch:10},{wch:12},{wch:9},{wch:9},{wch:9},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Sugerencia');
+
   XLSX.writeFile(wb, 'informe_punteras_'+ahora.toISOString().split('T')[0]+'.xlsx');
-  showToast('📊 Informe de punteras generado — '+totalArts+' arts · '+totalUn+' un.');
+  showToast('📊 Informe de punteras generado — '+totalArts+' arts cargados · '+candidatos.length+' sugeridos');
 }
 
 function capacidadUsada(items){
@@ -11463,14 +11508,14 @@ function _normalizarParrillaId(raw){
 }
 
 function _buscarArticuloPorFila(row){
-  const codigo = row.ART||row.Art||row.CODIGO||row.Código||row.ARTICULO||row['ARTÍCULO'];
+  const codigo = row.ART;
   if(codigo){
     const art = DATA.find(function(r){ return String(r.art)===String(codigo).trim(); });
     if(art) return art;
   }
-  const marca = String(row.MARCA||row.Marca||row.PROVEEDOR||'').trim().toLowerCase();
-  const diseno = String(row['DISEÑO']||row.DISENO||row.Diseño||'').trim().toLowerCase();
-  const medida = String(row.MEDIDA||row.Medida||'').trim().toLowerCase();
+  const marca = String(row.MARCA||'').trim().toLowerCase();
+  const diseno = String(row.DISENO||'').trim().toLowerCase();
+  const medida = String(row.MEDIDA||'').trim().toLowerCase();
   if(!marca && !diseno && !medida) return null;
   return DATA.find(function(r){
     const okMarca  = !marca  || String(r.prov||'').toLowerCase().includes(marca);
@@ -11487,24 +11532,67 @@ function importarPunterasArchivo(file){
     try {
       const wb = XLSX.read(e.target.result, {type:'array'});
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
-      if(!rows.length){ showToast('❌ El archivo está vacío'); return; }
+      const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      if(!raw.length){ showToast('❌ El archivo está vacío'); return; }
 
+      // Buscar la fila real de encabezados (puede haber títulos/fecha arriba,
+      // como pasa con el propio informe exportado desde acá)
+      const ALIAS = {
+        PARRILLA:['PARRILLA','PUNTERA'],
+        ART:['ART','ART.','ARTICULO','ARTÍCULO','CODIGO','CÓDIGO'],
+        MARCA:['MARCA','PROVEEDOR'],
+        DISENO:['DISEÑO','DISENO'],
+        MEDIDA:['MEDIDA'],
+        UNIDADES:['UNIDADES','CANT','CANTIDAD']
+      };
+      function normCel(c){ return String(c||'').trim().toUpperCase(); }
+
+      let headerRowIdx = -1, colMap = {};
+      for(let i=0; i<Math.min(raw.length,20); i++){
+        const fila = raw[i].map(normCel);
+        if(fila.indexOf('PARRILLA')>=0 || fila.indexOf('PUNTERA')>=0){
+          headerRowIdx = i;
+          Object.keys(ALIAS).forEach(function(key){
+            const idx = fila.findIndex(function(c){ return ALIAS[key].indexOf(c)>=0; });
+            if(idx>=0) colMap[key] = idx;
+          });
+          break;
+        }
+      }
+      if(headerRowIdx===-1){
+        showToast('❌ No encontré la columna "PARRILLA" en el archivo');
+        return;
+      }
+      if(colMap.PARRILLA===undefined || colMap.UNIDADES===undefined){
+        showToast('❌ Faltan columnas obligatorias (PARRILLA y UNIDADES)');
+        return;
+      }
+
+      const dataRows = raw.slice(headerRowIdx+1);
       const nuevasPunteras = {};
       const sumaPorArt = {}; // total importado por artículo (para descontar del rack)
       const sinMatch = [];
       let filasOk = 0;
 
-      rows.forEach(function(row, i){
-        const parrillaId = _normalizarParrillaId(row.PARRILLA||row.Parrilla||row.PUNTERA||row.Puntera);
-        const cant = parseInt(row.UNIDADES||row.Unidades||row.CANT||row.Cantidad||0);
+      dataRows.forEach(function(r, i){
+        const rowNum = headerRowIdx + i + 2; // fila real en el excel (1-indexed + header)
+        const get = function(key){ return colMap[key]!==undefined ? r[colMap[key]] : ''; };
+        const row = {
+          PARRILLA: get('PARRILLA'), ART: get('ART'), MARCA: get('MARCA'),
+          DISENO: get('DISENO'), MEDIDA: get('MEDIDA'), UNIDADES: get('UNIDADES')
+        };
+        // Fila totalmente vacía → se ignora en silencio (no es un error)
+        if(!row.PARRILLA && !row.ART && !row.MARCA && !row.DISENO && !row.MEDIDA && !row.UNIDADES) return;
+
+        const parrillaId = _normalizarParrillaId(row.PARRILLA);
+        const cant = parseInt(row.UNIDADES||0);
         if(!parrillaId || !cant || cant<=0){
-          sinMatch.push('Fila '+(i+2)+': parrilla o cantidad inválida');
+          sinMatch.push('Fila '+rowNum+': parrilla o cantidad inválida');
           return;
         }
         const art = _buscarArticuloPorFila(row);
         if(!art){
-          sinMatch.push('Fila '+(i+2)+': no encontré el artículo ('+(row.ART||((row.MARCA||'')+' '+(row['DISEÑO']||'')+' '+(row.MEDIDA||''))).trim()+')');
+          sinMatch.push('Fila '+rowNum+': no encontré el artículo ('+(row.ART||(row.MARCA+' '+row.DISENO+' '+row.MEDIDA)).trim()+')');
           return;
         }
         if(!nuevasPunteras[parrillaId]) nuevasPunteras[parrillaId] = [];
@@ -11568,21 +11656,27 @@ function candidatosParaPuntera(){
   const EXCLUIR_PROV = ['SPEEDWAY'];
   const EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
   const BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
+  const ROT_MAX_PUNTERA = 5.5; // mismo umbral que usa el motor de rack
   const enRack = new Set(Object.values(ASIGN).filter(v=>v&&v.art).map(v=>String(v.art)));
+  const punterasActuales = getPunteras();
+  const enPunteraSet = articulosAsignadosSet(punterasActuales, null);
   return DATA.filter(function(r){
     if(enRack.has(String(r.art))) return false;
+    if(enPunteraSet.has(String(r.art))) return false;
     if(/\d+\.5/.test(r.med||'')) return false;
     if(EXCLUIR_PROV.indexOf(r.prov)>=0) return false;
     if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false;
     if((r.stock||0) <= 0) return false;
+    if((r.stock||0) > 1000) return false; // corte: no sugerir puntera para stocks grandes
     if((r.pall||0) <= 0) return false;
     if((r.pall||0) >= 1) return false;
+    if((r.rot_sem||0) >= ROT_MAX_PUNTERA) return false; // rota demasiado — necesita reposición rápida, no puntera
     if(r.bloque){
       const bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
       if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return false;
     }
     return true;
-  }).sort(function(a,b){ return (b.rot_sem||0)-(a.rot_sem||0); });
+  }).sort(function(a,b){ return (a.stock||0)-(b.stock||0); }); // menor a mayor stock
 }
 
 function renderPunteras(){
