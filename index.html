@@ -206,6 +206,10 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 .prod-tipo-btn.carga.active{border-color:#34c759;background:#e8f8ee;color:#1c7c2c}
 .prod-tipo-btn.descarga.active{border-color:#ff9500;background:#fff3e0;color:#856404}
 .prod-tipo-btn.chasis.active{border-color:#af52de;background:#f3e8ff;color:#6e36a0}
+.prod-tipo-btn.pedidos.active{border-color:#0071e3;background:#e8f0fe;color:#0071e3}
+.prod-tipo-btn.orden_limpieza.active{border-color:#5ac8fa;background:#e8f9ff;color:#0a7ea4}
+.prod-tipo-btn.conteo.active{border-color:#ffcc00;background:#fff9e0;color:#9a7d00}
+.prod-tipo-btn.almuerzo.active{border-color:#ff3b30;background:#ffece8;color:#c0392b}
 .prod-grupo-row{display:flex;gap:6px;margin-bottom:10px}
 .prod-grupo-btn{flex:1;padding:7px;border-radius:8px;border:2px solid #d2d2d7;background:#fff;color:#86868b;font-size:12px;font-weight:700;cursor:pointer}
 .prod-input-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
@@ -220,6 +224,10 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 .mov-tipo.descarga{background:#fff3e0;color:#856404}
 .mov-tipo.despacho{background:#e8f0fe;color:#0071e3}
 .mov-tipo.chasis{background:#f3e8ff;color:#6e36a0}
+.mov-tipo.pedidos{background:#e8f0fe;color:#0071e3}
+.mov-tipo.orden_limpieza{background:#e8f9ff;color:#0a7ea4}
+.mov-tipo.conteo{background:#fff9e0;color:#9a7d00}
+.mov-tipo.almuerzo{background:#ffece8;color:#c0392b}
 .mov-info{flex:1;min-width:0}
 .mov-title{font-size:13px;font-weight:600}
 .mov-sub{font-size:11px;color:#86868b}
@@ -1133,13 +1141,65 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
       <div style="font-size:11px;font-weight:600;color:#86868b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Movimientos de hoy</div>
       <div id="prod-lista" style="margin-bottom:12px"></div>
 
-      <div id="prod-grupos-btns" style="display:none"></div>
+      <div id="prod-grupos-btns"></div>
       <!-- Selector de fecha para ver histórico -->
       <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
         <span style="font-size:11px;color:#86868b">Ver fecha:</span>
         <input type="date" id="prod-fecha-manual"
           style="padding:4px 8px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;color:#1d1d1f;background:#fff;outline:none"
           onchange="checkFechaManual(this.value)">
+      </div>
+
+      <!-- Formulario de carga de movimiento / tiempo -->
+      <div class="prod-form" style="margin-top:12px">
+        <div class="prod-form-title">➕ Registrar movimiento / tiempo</div>
+        <div class="prod-tipo-row" style="flex-wrap:wrap">
+          <button type="button" class="prod-tipo-btn carga active" onclick="setProdTipo('carga',this)">📥 Carga</button>
+          <button type="button" class="prod-tipo-btn descarga" onclick="setProdTipo('descarga',this)">📤 Descarga</button>
+          <button type="button" class="prod-tipo-btn chasis" onclick="setProdTipo('chasis',this)">🚗 Chasis</button>
+        </div>
+        <div class="prod-tipo-row" style="flex-wrap:wrap">
+          <button type="button" class="prod-tipo-btn pedidos" onclick="setProdTipo('pedidos',this)">📋 Pedidos</button>
+          <button type="button" class="prod-tipo-btn orden_limpieza" onclick="setProdTipo('orden_limpieza',this)">🧹 Orden y limpieza</button>
+          <button type="button" class="prod-tipo-btn conteo" onclick="setProdTipo('conteo',this)">🔢 Conteo</button>
+          <button type="button" class="prod-tipo-btn almuerzo" onclick="setProdTipo('almuerzo',this)">🍽️ Almuerzo</button>
+        </div>
+
+
+        <div class="prod-input-row">
+          <div>
+            <div class="prod-label">Inicio</div>
+            <input type="time" id="prod-inicio" class="prod-input">
+          </div>
+          <div>
+            <div class="prod-label">Fin</div>
+            <input type="time" id="prod-fin" class="prod-input">
+          </div>
+        </div>
+
+        <div id="prod-campos-cant" class="prod-input-row">
+          <div>
+            <div class="prod-label">Unidades</div>
+            <input type="number" id="prod-unidades" class="prod-input" placeholder="0">
+          </div>
+          <div>
+            <div class="prod-label">Semis / Pedidos</div>
+            <input type="number" id="prod-semis" class="prod-input" value="1">
+          </div>
+        </div>
+
+        <div class="prod-input-row">
+          <div>
+            <div class="prod-label">Dársena</div>
+            <input type="text" id="prod-darsena" class="prod-input" placeholder="Dársena...">
+          </div>
+          <div>
+            <div class="prod-label">Destino / Detalle</div>
+            <input type="text" id="prod-destino-mov" class="prod-input" placeholder="Destino o detalle...">
+          </div>
+        </div>
+
+        <button class="prod-save-btn" onclick="guardarMovimiento()">💾 Registrar</button>
       </div>
     </div>
 
@@ -1382,7 +1442,7 @@ function pallEquivalente(art, stock){
 function getSugerenciasUbicacion(){ return JSON.parse(localStorage.getItem('wms_sugerencias_ubicacion')||'[]'); }
 function saveSugerenciasUbicacion(arr){ localStorage.setItem('wms_sugerencias_ubicacion', JSON.stringify(arr.slice(0,200))); }
 
-function chequearCambioUbicacion(art, stockAntes, stockDespues){
+function chequearCambioUbicacion(art, stockAntes, stockDespues, cantIngreso){
   if(stockAntes===stockDespues) return null;
   var pAntes = pallEquivalente(art, stockAntes);
   var pDespues = pallEquivalente(art, stockDespues);
@@ -1392,12 +1452,22 @@ function chequearCambioUbicacion(art, stockAntes, stockDespues){
   if(!tipo) return null;
 
   var sug = getSugerenciasUbicacion();
-  sug.unshift({
+  var entry = {
     art: art.art, med: art.med, diseno: art.diseno, prov: art.prov,
     tipo: tipo, stock: stockDespues,
     fecha: new Date().toLocaleDateString('es-AR'),
     hora: new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})
-  });
+  };
+  // Unificar: si venía de la puntera y entró mercadería, mostrar el desglose
+  // (ej: "sacar 3 + 500") para que se junte todo en el mismo movimiento.
+  if(tipo==='bloque'){
+    var enPuntera = buscarEnPunteras(art.art).total;
+    if(enPuntera>0 && cantIngreso>0){
+      entry.enPuntera = enPuntera;
+      entry.cantIngreso = cantIngreso;
+    }
+  }
+  sug.unshift(entry);
   saveSugerenciasUbicacion(sug);
   return tipo;
 }
@@ -1428,10 +1498,13 @@ function renderSugerenciasUbicacion(){
   html += '</div>';
   sug.forEach(function(s, idx){
     var esPuntera = s.tipo==='puntera';
+    var textoBloque = (s.enPuntera>0 && s.cantIngreso>0)
+      ? '📦 Unificar: sacar '+s.enPuntera+' (puntera) + '+s.cantIngreso+' (ingreso) — llevar junto a bloque'
+      : '📦 Llegaron a '+s.stock+' un. — sacar de puntera y llevar a bloque';
     html += '<div style="display:flex;align-items:center;gap:8px;background:#f5f5f7;border-radius:8px;padding:8px;margin-bottom:6px">';
     html += '<div style="flex:1;min-width:0">';
     html += '<div style="font-size:12px;font-weight:600">'+s.med+' '+s.diseno+' <span style="color:#86868b;font-weight:400">('+s.art+')</span></div>';
-    html += '<div style="font-size:11px;color:'+(esPuntera?'#0071e3':'#856404')+'">'+(esPuntera?'🔚 Quedan '+s.stock+' un. — llevar a puntera':'📦 Llegaron a '+s.stock+' un. — sacar de puntera y llevar a bloque')+'</div>';
+    html += '<div style="font-size:11px;color:'+(esPuntera?'#0071e3':'#856404')+'">'+(esPuntera?'🔚 Quedan '+s.stock+' un. — llevar a puntera':textoBloque)+'</div>';
     html += '</div>';
     html += '<button onclick="descartarSugerenciaUbicacion('+idx+')" style="border:none;background:#e5e5ea;color:#1d1d1f;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer">✓ Listo</button>';
     html += '</div>';
@@ -3615,6 +3688,7 @@ function renderCandidatosPunteras(){
     if(EXCLUIR_PROV.indexOf(r.prov)>=0) return false;
     if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false;
     if((r.stock||0) <= 0) return false;
+    if((r.stock||0) > 1000) return false; // corte: no sugerir puntera para stocks grandes
     if((r.pall||0) <= 0) return false;
     if((r.pall||0) >= 1) return false; // esto es lo nuevo: < 1 pallet, no ≥1
     if(r.bloque){
@@ -3630,8 +3704,8 @@ function renderCandidatosPunteras(){
     return;
   }
 
-  // Prioridad: mayor rotación primero (son los que más urge sacar de la nave)
-  candidatosPuntera.sort(function(a,b){ return (b.rot_sem||0)-(a.rot_sem||0); });
+  // Prioridad: menor stock primero (los más chicos, más urgente sacarlos de la nave)
+  candidatosPuntera.sort(function(a,b){ return (a.stock||0)-(b.stock||0); });
 
   var panelId = 'panel-punteras-candidatos';
   var bodyId  = 'panel-punteras-body';
@@ -3660,7 +3734,7 @@ function renderCandidatosPunteras(){
     html += '</tr>';
   });
   html += '</table></div>';
-  html += '<div style="font-size:10px;color:#86868b;margin-top:4px;border-top:1px solid #f0f0f0;padding-top:5px">Criterio: stock &gt; 0 y &lt; 1 pallet · excluye .5, Speedway, agrícola, bloques 1-2 · ordenado por mayor rotación primero</div>';
+  html += '<div style="font-size:10px;color:#86868b;margin-top:4px;border-top:1px solid #f0f0f0;padding-top:5px">Criterio: stock &gt; 0, hasta 1000 un. y &lt; 1 pallet · excluye .5, Speedway, agrícola, bloques 1-2 · ordenado de menor a mayor stock</div>';
   html += '</div></div>';
 
   const prev = document.getElementById(panelId);
@@ -3785,9 +3859,12 @@ function buscarEnPunteras(art){
 
 // Descuenta de las punteras cuando se prepara/despacha un pedido.
 // Reparte entre las parrillas donde esté el artículo hasta cubrir "cant".
+// Devuelve {descontado, detalle:[{id,unidades}]} para poder revertirlo
+// si el pedido se cancela después de enviarlo a tránsito.
 function descontarPunteraPorPedido(art, cant){
   var punteras = getPunteras();
   var descontado = 0;
+  var detalle = [];
   Object.keys(punteras).forEach(function(id){
     if(descontado>=cant) return;
     var items = punteras[id]||[];
@@ -3798,11 +3875,31 @@ function descontarPunteraPorPedido(art, cant){
     it.unidades -= desc;
     if(it.deRack) it.deRack = Math.max(0, Math.min(it.deRack, it.unidades));
     descontado += desc;
+    if(desc>0) detalle.push({id:id, unidades:desc});
     if(it.unidades<=0) items.splice(idx,1);
     punteras[id] = items;
   });
   if(descontado>0) savePunteras(punteras);
-  return descontado;
+  return {descontado:descontado, detalle:detalle};
+}
+
+// Inversa de descontarPunteraPorPedido — repone unidades en las mismas
+// parrillas de donde se sacaron (usa el detalle guardado en el tránsito).
+function reponerPunteraPorDetalle(art, detalle){
+  if(!detalle || !detalle.length) return 0;
+  var punteras = getPunteras();
+  var repuesto = 0;
+  detalle.forEach(function(d){
+    if(!d || !d.unidades) return;
+    var items = punteras[d.id]||[];
+    var it = items.find(function(x){ return String(x.art)===String(art); });
+    if(it){ it.unidades = (it.unidades||0) + d.unidades; }
+    else { items.push({art:art, unidades:d.unidades}); }
+    punteras[d.id] = items;
+    repuesto += d.unidades;
+  });
+  if(repuesto>0) savePunteras(punteras);
+  return repuesto;
 }
 
 function procesarPedido(pedido){
@@ -4255,9 +4352,12 @@ function pedidoEnviarTransito(){
 
   // Descontar stock real (puntera + rack + DATA) al momento de enviar a tránsito
   todos.forEach(function(item){
-    var deP = descontarPunteraPorPedido(item.art, item.cant);
+    var resP = descontarPunteraPorPedido(item.art, item.cant);
+    var deP = resP.descontado;
     var restante = item.cant - deP;
     if(restante>0) descontarRackPorPedido(item.art, restante);
+    item._punteraDetalle = resP.detalle;
+    item._rackRestante = restante;
 
     var dataArt = DATA.find(function(r){ return r.art===item.art; });
     if(dataArt){
@@ -4318,7 +4418,9 @@ function pedidoEnviarTransito(){
         posRack: r.posRack||'',
         bloque:  r.bloque||'',
         tipo: r.puntera ? 'puntera' : (r.posRack ? 'rack' : 'bloque'),
-        rangos: r.rangos||[]
+        rangos: r.rangos||[],
+        punteraDetalle: r._punteraDetalle||[],
+        rackRestante: r._rackRestante||0
       };
     })
   };
@@ -4872,7 +4974,7 @@ function confirmarDespacho(){
 
   _confirmItems.forEach(item=>{
     // Descontar primero de la puntera (si tenía stock ahí), el resto del rack_stock
-    const deP = descontarPunteraPorPedido(item.art, item.cantReal);
+    const deP = descontarPunteraPorPedido(item.art, item.cantReal).descontado;
     const restanteRack = item.cantReal - deP;
     if(restanteRack>0) descontarRackPorPedido(item.art, restanteRack);
 
@@ -7299,6 +7401,11 @@ function setProdTipo(tipo, btn){
     b.classList.remove('active');
   });
   btn.classList.add('active');
+  var camposCant = document.getElementById('prod-campos-cant');
+  if(camposCant){
+    var esActividadSinCant = ['orden_limpieza','conteo','almuerzo'].indexOf(tipo)>=0;
+    camposCant.style.display = esActividadSinCant ? 'none' : 'grid';
+  }
 }
 
 function setProdGrupo(g, btn){
@@ -7314,7 +7421,9 @@ function guardarMovimiento(){
   const darsena = document.getElementById('prod-darsena').value||'';
   const destino = document.getElementById('prod-destino-mov').value||'';
 
-  if(!unidades){ showToast('❌ Ingresá las unidades'); return; }
+  const esActividadSinCant = ['orden_limpieza','conteo','almuerzo'].indexOf(_prodTipo)>=0;
+  if(!unidades && !esActividadSinCant){ showToast('❌ Ingresá las unidades'); return; }
+  if(!inicio && esActividadSinCant){ showToast('❌ Ingresá el horario de inicio'); return; }
   if(!_prodGrupo){ showToast('❌ Seleccioná un grupo'); return; }
 
   // Calcular duración
@@ -7332,8 +7441,8 @@ function guardarMovimiento(){
     grupo: _prodGrupo,
     darsena,
     destino,
-    unidades,
-    semis,
+    unidades: unidades||0,
+    semis: esActividadSinCant ? 0 : semis,
     inicio,
     fin,
     durMin,
@@ -7377,7 +7486,11 @@ function renderProdLista(){
   if(!el) return;
   if(!movs.length){ el.innerHTML='<div class="empty">Sin movimientos hoy</div>'; return; }
   el.innerHTML = movs.map((m,i)=>{
-    var tipoLabel = m.tipo==='carga'?'📥 CARGA':m.tipo==='descarga'?'📤 DESCARGA':m.tipo==='despacho'?'📋 DESPACHO':'🚗 CHASIS';
+    var tipoLabels = {
+      carga:'📥 CARGA', descarga:'📤 DESCARGA', despacho:'📋 DESPACHO', chasis:'🚗 CHASIS',
+      pedidos:'📋 PEDIDOS', orden_limpieza:'🧹 ORDEN Y LIMPIEZA', conteo:'🔢 CONTEO', almuerzo:'🍽️ ALMUERZO'
+    };
+    var tipoLabel = tipoLabels[m.tipo] || m.tipo.toUpperCase();
     var autoTag = m.auto?' <span style="font-size:8px;opacity:.6">auto</span>':'';
     var subInfo = [];
     subInfo.push((GRUPOS_NOMBRES[m.grupo]||m.grupo||'—'));
@@ -7395,7 +7508,7 @@ function renderProdLista(){
         ${obsStr}
       </div>
       <div class="mov-stats">
-        <div class="mov-unid">${m.unidades.toLocaleString('es-AR')}</div>
+        <div class="mov-unid">${m.unidades>0?m.unidades.toLocaleString('es-AR'):''}</div>
         <div class="mov-time">${durStr}</div>
       </div>
       <button onclick="eliminarMov(${movs.length-1-i})" style="background:none;border:none;color:#d2d2d7;font-size:16px;cursor:pointer;flex-shrink:0">✕</button>
@@ -8530,7 +8643,7 @@ function confirmarColaPedido(idx){
         const cantReal = Math.round(item.cant * escala);
         art.stock = Math.max(0, (art.stock||0) - cantReal);
         // Descontar primero de la puntera (si tenía stock ahí), el resto del rack
-        const deP = descontarPunteraPorPedido(item.art, cantReal);
+        const deP = descontarPunteraPorPedido(item.art, cantReal).descontado;
         const restante = cantReal - deP;
         if(restante>0){
           if(item.posRack && ASIGN[item.posRack] && ASIGN[item.posRack].art==item.art){
@@ -9462,6 +9575,7 @@ if('serviceWorker' in navigator){
     <div style="font-size:12px;color:#86868b;margin-bottom:10px">5 punteras (pasillos 4, 5, 6, 7 y 8) · 7 parrillas c/u · 35 parrillas en total · cada parrilla admite varios artículos mezclados, hasta <span id="punt-cap-label">35</span> unidades · asignación 100% manual, vos elegís la posición de cada artículo</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button onclick="limpiarPunteras()" style="padding:10px 16px;background:#ffd6d9;color:#d70015;border:none;border-radius:10px;font-size:14px;cursor:pointer">🗑️ Vaciar todo</button>
+      <button onclick="informePunteras()" style="padding:10px 16px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer">📊 Generar informe</button>
     </div>
   </div>
   <div id="punteras-grid"></div>
@@ -9855,7 +9969,30 @@ function cydConfirmarDesdeTransito(id){
 }
 
 function cydEliminarTransito(id){
-  if(!confirm('¿Eliminar este tránsito? No se puede deshacer.')) return;
+  var lista0 = transitoGetAll();
+  var tr0 = lista0.find(function(t){return t.id===id;});
+  var esCancelacionSalidaPendiente = tr0 && tr0.flujo==='salida' && tr0.estado==='transito' && tr0.descontado;
+
+  var msgConfirm = esCancelacionSalidaPendiente
+    ? '¿Cancelar este pedido en tránsito? Se devuelve el stock descontado (puntera/rack).'
+    : '¿Eliminar este tránsito? No se puede deshacer.';
+  if(!confirm(msgConfirm)) return;
+
+  if(esCancelacionSalidaPendiente){
+    tr0.items.forEach(function(item){
+      var dataArt = DATA.find(function(r){ return r.art===item.art; });
+      if(dataArt){
+        dataArt.stock = (dataArt.stock||0) + item.cant;
+        dataArt.pall = Math.floor(dataArt.stock / (dataArt.max_pos||32));
+        recalcularCond(dataArt);
+      }
+      reponerPunteraPorDetalle(item.art, item.punteraDetalle);
+      if(item.rackRestante>0) reponerRackPorAjuste(item.art, item.rackRestante, item.posRack);
+    });
+    saveDataStock();
+    showToast('↩️ Pedido cancelado — stock devuelto a puntera/rack');
+  }
+
   var lista = transitoGetAll().filter(function(t){return t.id!==id;});
   transitoSave(lista);
   transitoBadge();
@@ -10475,7 +10612,7 @@ function cydConfirmar(tipo){
         da.stock = (da.stock||0) + r.cant;
         da.pall  = Math.floor(da.stock / (da.max_pos||32));
         recalcularCond(da);
-        if(chequearCambioUbicacion(da, stockAntesCarga, da.stock)) sugUbicCarga++;
+        if(chequearCambioUbicacion(da, stockAntesCarga, da.stock, r.cant)) sugUbicCarga++;
       }
     });
     saveDataStock();
@@ -10506,7 +10643,7 @@ function cydConfirmar(tipo){
         da.stock = (da.stock||0) + r.cant;
         da.pall  = Math.floor(da.stock / (da.max_pos||32));
         recalcularCond(da);
-        if(chequearCambioUbicacion(da, stockAntesDesc, da.stock)) sugUbicDesc++;
+        if(chequearCambioUbicacion(da, stockAntesDesc, da.stock, r.cant)) sugUbicDesc++;
       }
     });
     saveDataStock();
@@ -11082,6 +11219,76 @@ function getParrillaIds(){
 
 function getPunteras(){ return JSON.parse(localStorage.getItem('wms_punteras')||'{}'); }
 function savePunteras(obj){ localStorage.setItem('wms_punteras', JSON.stringify(obj)); }
+
+function informePunteras(){
+  const punteras = getPunteras();
+  const ahora = new Date();
+  const wb = XLSX.utils.book_new();
+
+  // Hoja 1: DETALLE — un renglón por artículo cargado en cada parrilla
+  const wsDetalle = [
+    ['INFORME DE PUNTERAS — WMS Depósito Halpern'],
+    ['Fecha:', ahora.toLocaleDateString('es-AR'), 'Hora:', ahora.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})],
+    [],
+    ['PARRILLA','ART.','MEDIDA','DISEÑO','PROVEEDOR','UNIDADES','CAPACIDAD','% OCUPADO'],
+  ];
+
+  let totalArts = 0, totalUn = 0, parrillasConStock = 0;
+  const resumenZona = {};
+  PUNTERA_ZONAS.forEach(function(zona){ resumenZona[zona] = {arts:0, un:0, parrillas:0}; });
+
+  PUNTERA_ZONAS.forEach(function(zona){
+    for(let i=1; i<=PARRILLAS_X_ZONA; i++){
+      const id = 'P'+zona+'-'+i;
+      const items = punteras[id] || [];
+      if(!items.length) continue;
+      parrillasConStock++;
+      const usado = capacidadUsada(items);
+      resumenZona[zona].parrillas++;
+      items.forEach(function(it){
+        const dataArt = DATA.find(function(r){ return String(r.art)===String(it.art); });
+        wsDetalle.push([
+          id, it.art,
+          dataArt?dataArt.med:'', dataArt?dataArt.diseno:'', dataArt?dataArt.prov:'',
+          it.unidades||0,
+          CAP_PARRILLA_UNIDADES||'',
+          CAP_PARRILLA_UNIDADES ? Math.round((usado/CAP_PARRILLA_UNIDADES)*100)+'%' : ''
+        ]);
+        totalArts++;
+        totalUn += (it.unidades||0);
+        resumenZona[zona].arts++;
+        resumenZona[zona].un += (it.unidades||0);
+      });
+    }
+  });
+
+  if(totalArts===0) wsDetalle.push(['— Sin artículos cargados en punteras —']);
+
+  const ws1 = XLSX.utils.aoa_to_sheet(wsDetalle);
+  ws1['!cols'] = [{wch:10},{wch:8},{wch:14},{wch:10},{wch:12},{wch:10},{wch:10},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Detalle');
+
+  // Hoja 2: RESUMEN — totales por puntera (pasillo) y total general
+  const wsResumen = [
+    ['RESUMEN POR PUNTERA — WMS Depósito Halpern'],
+    ['Fecha:', ahora.toLocaleDateString('es-AR')],
+    [],
+    ['PUNTERA (PASILLO)','PARRILLAS OCUPADAS','PARRILLAS TOTALES','ARTÍCULOS','UNIDADES'],
+  ];
+  PUNTERA_ZONAS.forEach(function(zona){
+    const r = resumenZona[zona];
+    wsResumen.push(['Puntera pasillo '+zona, r.parrillas, PARRILLAS_X_ZONA, r.arts, r.un]);
+  });
+  wsResumen.push([]);
+  wsResumen.push(['TOTAL', parrillasConStock, PUNTERA_ZONAS.length*PARRILLAS_X_ZONA, totalArts, totalUn]);
+
+  const ws2 = XLSX.utils.aoa_to_sheet(wsResumen);
+  ws2['!cols'] = [{wch:20},{wch:18},{wch:16},{wch:12},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Resumen');
+
+  XLSX.writeFile(wb, 'informe_punteras_'+ahora.toISOString().split('T')[0]+'.xlsx');
+  showToast('📊 Informe de punteras generado — '+totalArts+' arts · '+totalUn+' un.');
+}
 
 function capacidadUsada(items){
   return (items||[]).reduce(function(s,it){return s+(it.unidades||0);},0);
