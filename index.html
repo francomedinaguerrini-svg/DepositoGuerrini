@@ -2615,8 +2615,30 @@ function seleccionarArt(artId){
   ASIGN[currentPosId]={art:artId,unidades:currentUnidades};
   registrarMovimiento(currentPosId, artId, 'asignar', currentUnidades);
   saveAsign();
+  const sacadoDePuntera = vaciarArticuloDePunteras(artId);
+  if(sacadoDePuntera>0) showToast('📦 '+sacadoDePuntera+' un. sacadas de puntera — ahora está en '+currentPosId);
   // mostrar control de unidades
   showModalOcupada(currentPosId,art);
+}
+
+// Saca por completo un artículo de todas las punteras donde esté cargado
+// (se usa cuando ese artículo pasa a ocupar una posición de rack, manual
+// o por el motor, para que no quede contado en los dos lugares a la vez).
+// Devuelve el total de unidades que tenía en puntera.
+function vaciarArticuloDePunteras(artId){
+  const punteras = getPunteras();
+  let total = 0;
+  Object.keys(punteras).forEach(function(id){
+    const items = punteras[id]||[];
+    const idx = items.findIndex(function(it){ return String(it.art)===String(artId); });
+    if(idx>=0){
+      total += items[idx].unidades||0;
+      items.splice(idx,1);
+      punteras[id] = items;
+    }
+  });
+  if(total>0) savePunteras(punteras);
+  return total;
 }
 
 function closeModal(e){if(e.target===document.getElementById('modal-bg'))closeModalDirect();}
@@ -2674,11 +2696,20 @@ function barridoCandidatosRack(){
   // Diseños excluidos siempre (alta rotación aunque estén en bloque 3)
   var EXCLUIR_DISENO = ['AT51','AT52','MT51'];
 
+  // Artículos que ya tienen unidades cargadas en alguna puntera —
+  // no deben volver a asignarse al rack (quedarían contados dos veces).
+  var enPuntera = new Set();
+  var _punterasActuales = getPunteras();
+  Object.values(_punterasActuales).forEach(function(items){
+    (items||[]).forEach(function(it){ if((it.unidades||0)>0) enPuntera.add(String(it.art)); });
+  });
+
   function pasaFiltroBase(r){
     if(/\d+\.5/.test(r.med||''))                    return false; // camión
     if(EXCLUIR_PROV.indexOf(r.prov)>=0)             return false; // Speedway
     if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0)  return false; // agrícola
     if(EXCLUIR_DISENO.indexOf((r.diseno||'').trim())>=0) return false; // AT51/AT52/MT51
+    if(enPuntera.has(String(r.art)))                return false; // ya está en puntera
     if((r.stock||0) <= 0)                           return false; // sin stock
     if((r.pall||0) > PALL_MAX)                      return false; // > 5 pallets → bloque
     if((r.pall||0) < 1)                             return false; // menos de 1 pallet
