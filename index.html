@@ -1091,6 +1091,33 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
   </div>
 </div>
 
+<!-- TIEMPO DE RECEPCIÓN / DESCARGA (modal) -->
+<div id="cyd-tiempo-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;max-width:420px;width:92%;padding:18px;box-sizing:border-box">
+    <div style="font-size:15px;font-weight:700;margin-bottom:2px">✅ Confirmar recepción</div>
+    <div style="font-size:12px;color:#86868b;margin-bottom:14px" id="cyd-tiempo-sub"></div>
+
+    <div style="font-size:11px;color:#86868b;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.3px">Equipo que descargó</div>
+    <div id="cyd-tiempo-grupos" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px">
+      <div>
+        <div style="font-size:11px;color:#86868b;margin-bottom:3px">Inicio descarga</div>
+        <input type="time" id="cyd-tiempo-inicio" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:11px;color:#86868b;margin-bottom:3px">Fin descarga</div>
+        <input type="time" id="cyd-tiempo-fin" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('cyd-tiempo-modal').style.display='none'" style="flex:1;padding:11px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:14px;cursor:pointer">Cancelar</button>
+      <button onclick="confirmarRecepcionConTiempo()" style="flex:1;padding:11px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">✅ Confirmar recepción</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- GRUPOS -->
 <div class="view" id="view-grupos">
@@ -7225,17 +7252,20 @@ let _prodTipo = 'carga';
 let _prodGrupo = 'G1';
 
 // ── Registrar movimiento automático en productividad ──────────
-function registrarMovProd(tipo, unidades, detalle){
+function registrarMovProd(tipo, unidades, detalle, grupoReal, inicioReal, finReal, durMinReal){
   try {
     var fecha = new Date().toLocaleDateString('es-AR');
     var hora  = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-    // Obtener grupo activo del día (primer grupo con presentes)
-    var personal = getGruposHoy();
-    var gruposPresentes = [];
-    personal.filter(function(p){return p.presente;}).forEach(function(p){
-      if(gruposPresentes.indexOf(p.grupoHoy)<0) gruposPresentes.push(p.grupoHoy);
-    });
-    var grupo = gruposPresentes[0] || _prodGrupo || 'G1';
+    var grupo = grupoReal;
+    if(!grupo){
+      // Sin grupo real informado: usar el primer grupo presente hoy como antes
+      var personal = getGruposHoy();
+      var gruposPresentes = [];
+      personal.filter(function(p){return p.presente;}).forEach(function(p){
+        if(gruposPresentes.indexOf(p.grupoHoy)<0) gruposPresentes.push(p.grupoHoy);
+      });
+      grupo = gruposPresentes[0] || _prodGrupo || 'G1';
+    }
 
     var mov = {
       fecha: fecha, hora: hora,
@@ -7244,8 +7274,9 @@ function registrarMovProd(tipo, unidades, detalle){
       unidades: unidades,
       semis: 1,
       destino: detalle||'',
-      darsena: '', inicio: '', fin: '', durMin: 0,
-      auto: true            // marca que fue generado automáticamente
+      darsena: '',
+      inicio: inicioReal||'', fin: finReal||'', durMin: durMinReal||0,
+      auto: !grupoReal       // true solo si nadie informó el equipo/tiempo real
     };
 
     var dayKey = getProdKey();
@@ -9607,7 +9638,11 @@ if('serviceWorker' in navigator){
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button onclick="limpiarPunteras()" style="padding:10px 16px;background:#ffd6d9;color:#d70015;border:none;border-radius:10px;font-size:14px;cursor:pointer">🗑️ Vaciar todo</button>
       <button onclick="informePunteras()" style="padding:10px 16px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer">📊 Generar informe</button>
+      <button onclick="descargarPlantillaPunteras()" style="padding:10px 16px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:14px;cursor:pointer">📄 Plantilla</button>
+      <button onclick="document.getElementById('punteras-import-input').click()" style="padding:10px 16px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer">📤 Importar archivo</button>
+      <input type="file" id="punteras-import-input" accept=".xlsx,.xls" style="display:none" onchange="importarPunterasArchivo(this.files[0])">
     </div>
+    <div id="punt-import-resultado"></div>
   </div>
   <div id="punteras-grid"></div>
 </div>
@@ -9931,11 +9966,68 @@ function cydConfirmarTransito(){
   cydTab('transito');
 }
 
-function cydConfirmarDesdeTransito(id){
+var _cydTransitoIdPendiente = null;
+var _cydTiempoGrupo = null;
+
+function abrirModalTiempoRecepcion(id){
+  var lista = transitoGetAll();
+  var tr = lista.find(function(t){return t.id===id;});
+  if(!tr){ showToast('❌ Tránsito no encontrado'); return; }
+
+  _cydTransitoIdPendiente = id;
+  _cydTiempoGrupo = null;
+
+  var totalUn = tr.items.reduce(function(s,r){return s+(r.cant||0);},0);
+  document.getElementById('cyd-tiempo-sub').textContent =
+    tr.tipoIcon+' '+tr.tipoLabel+' — '+tr.items.length+' arts · '+totalUn+' un.';
+
+  var personal = getGruposHoy();
+  var gruposHoy = [...new Set(personal.filter(function(p){return p.presente;}).map(function(p){return p.grupoHoy;}))];
+  var gruposBox = document.getElementById('cyd-tiempo-grupos');
+  gruposBox.innerHTML = gruposHoy.map(function(g){
+    return '<button class="prod-grupo-btn" data-grupo="'+g+'" onclick="setCydTiempoGrupo(\''+g+'\',this)" '+
+      'style="border-color:#d2d2d7;background:#fff;color:#86868b">'+g+'</button>';
+  }).join('') || '<div style="font-size:12px;color:#86868b">No hay grupos presentes hoy — cargalos en Grupos</div>';
+  if(gruposHoy.length===1) setCydTiempoGrupo(gruposHoy[0], gruposBox.querySelector('button'));
+
+  var now = new Date();
+  document.getElementById('cyd-tiempo-inicio').value = '';
+  document.getElementById('cyd-tiempo-fin').value = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+
+  document.getElementById('cyd-tiempo-modal').style.display = 'flex';
+}
+
+function setCydTiempoGrupo(g, btn){
+  _cydTiempoGrupo = g;
+  document.querySelectorAll('#cyd-tiempo-grupos .prod-grupo-btn').forEach(function(b){
+    var activo = b===btn;
+    var color = activo ? (GRUPOS_COLORES[g]||'#0071e3') : '#d2d2d7';
+    b.style.borderColor = color;
+    b.style.background = activo ? color+'20' : '#fff';
+    b.style.color = activo ? color : '#86868b';
+  });
+}
+
+function confirmarRecepcionConTiempo(){
+  if(!_cydTiempoGrupo){ showToast('❌ Elegí qué equipo/grupo hizo la descarga'); return; }
+  var inicio = document.getElementById('cyd-tiempo-inicio').value||'';
+  var fin = document.getElementById('cyd-tiempo-fin').value||'';
+  if(!inicio || !fin){ showToast('❌ Ingresá inicio y fin de la descarga'); return; }
+
+  var durMin = 0;
+  var [ih,im] = inicio.split(':').map(Number);
+  var [fh,fm] = fin.split(':').map(Number);
+  durMin = (fh*60+fm) - (ih*60+im);
+
+  document.getElementById('cyd-tiempo-modal').style.display = 'none';
+  cydConfirmarDesdeTransito(_cydTransitoIdPendiente, _cydTiempoGrupo, inicio, fin, durMin);
+  _cydTransitoIdPendiente = null;
+}
+
+function cydConfirmarDesdeTransito(id, grupo, inicio, fin, durMin){
   var lista = transitoGetAll();
   var tr = lista.find(function(t){return t.id===id;});
   if(!tr){showToast('❌ Tránsito no encontrado'); return;}
-  if(!confirm('¿Confirmar recepción de '+tr.tipoIcon+' '+tr.tipoLabel+' — '+tr.items.length+' arts? Esto suma el stock real.')) return;
 
   var fecha = new Date().toLocaleDateString('es-AR');
   var fechaISO = new Date().toISOString().split('T')[0];
@@ -9995,7 +10087,7 @@ function cydConfirmarDesdeTransito(id){
   transitoBadge();
   cydRenderTransito();
   var totalUn = tr.items.reduce(function(s,r){return s+r.cant;},0);
-  registrarMovProd('carga', totalUn, tr.tipoLabel+(tr.nroContenedor?' '+tr.nroContenedor:''));
+  registrarMovProd('carga', totalUn, tr.tipoLabel+(tr.nroContenedor?' '+tr.nroContenedor:''), grupo, inicio, fin, durMin);
   showToast('✅ Recepción confirmada — '+totalUn+' un. sumadas al stock · rack actualizado');
 }
 
@@ -10227,7 +10319,7 @@ function cydRenderTransito(){
     } else {
       html += '<button onclick="cydExportarPlanilla(&quot;'+tr.id+'&quot;)" style="padding:6px 10px;background:#1d1d1f;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">🖨️ Guardado</button>';
       if(esPend){
-        html += '<button onclick="cydConfirmarDesdeTransito(&quot;'+tr.id+'&quot;)" style="padding:6px 10px;background:#34c759;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">✅ Recibir</button>';
+        html += '<button onclick="abrirModalTiempoRecepcion(&quot;'+tr.id+'&quot;)" style="padding:6px 10px;background:#34c759;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">✅ Recibir</button>';
       }
     }
     html += '<button onclick="cydEliminarTransito(&quot;'+tr.id+'&quot;)" style="padding:6px 10px;background:#ffd6d9;color:#d70015;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">🗑️</button>';
@@ -11237,7 +11329,7 @@ function renderPensamiento(){
 // ═══════════════════════════════════════════════════════════
 var PUNTERA_ZONAS = ['4','5','6','7','8'];
 var PARRILLAS_X_ZONA = 7;
-var CAP_PARRILLA_UNIDADES = 35; // tope real: 5 zonas x 7 parrillas x 35 un. = 1225
+var CAP_PARRILLA_UNIDADES = 0; // 0 = sin límite (antes 35 por parrilla)
 var _punteraActiva = null;
 
 function getParrillaIds(){
@@ -11323,6 +11415,144 @@ function informePunteras(){
 
 function capacidadUsada(items){
   return (items||[]).reduce(function(s,it){return s+(it.unidades||0);},0);
+}
+
+// ============================================================
+// IMPORTAR PUNTERAS DESDE ARCHIVO
+// ============================================================
+
+function descargarPlantillaPunteras(){
+  const wb = XLSX.utils.book_new();
+  const rows = [
+    ['PARRILLA','ART','MARCA','DISEÑO','MEDIDA','UNIDADES'],
+    ['P4-1', 62020, 'DOUBLESTAR', 'DSS02', '215 60 17', 3],
+    ['P4-1', '', 'KUMHO', 'HP71', '235 50 19', 5],
+    ['P5-3', 32058, '', '', '', 10],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:10},{wch:10},{wch:14},{wch:12},{wch:14},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Punteras');
+
+  const wsAyuda = XLSX.utils.aoa_to_sheet([
+    ['CÓMO COMPLETAR ESTA PLANTILLA'],
+    [''],
+    ['PARRILLA','Código de la parrilla. Ej: P4-1 (pasillo 4, parrilla 1). Zonas válidas: 4,5,6,7,8 · parrillas 1 a 7'],
+    ['ART','Código de artículo, si lo tenés (recomendado — es lo más exacto)'],
+    ['MARCA / DISEÑO / MEDIDA','Si no tenés el código, completá estos 3 para que el sistema busque el artículo (ej: KUMHO / HP71 / 235 50 19)'],
+    ['UNIDADES','Cantidad de unidades en esa parrilla'],
+    [''],
+    ['Al importar, esta información REEMPLAZA todo lo que hay cargado actualmente en punteras.'],
+    ['Si un artículo importado ya tenía unidades en el rack, se descuentan automáticamente de ahí (para que no quede contado dos veces).']
+  ]);
+  wsAyuda['!cols'] = [{wch:22},{wch:90}];
+  XLSX.utils.book_append_sheet(wb, wsAyuda, 'Ayuda');
+
+  XLSX.writeFile(wb, 'plantilla_punteras.xlsx');
+}
+
+function _normalizarParrillaId(raw){
+  if(!raw) return null;
+  const s = String(raw).toUpperCase().replace(/\s+/g,'');
+  const m = s.match(/(\d)[^\d]*[-_]?(\d)/); // ej: P4-1, 4-1, PUNTERA4/1
+  if(!m) return null;
+  const zona = m[1], parrilla = m[2];
+  if(PUNTERA_ZONAS.indexOf(zona)<0) return null;
+  const n = parseInt(parrilla);
+  if(n<1 || n>PARRILLAS_X_ZONA) return null;
+  return 'P'+zona+'-'+n;
+}
+
+function _buscarArticuloPorFila(row){
+  const codigo = row.ART||row.Art||row.CODIGO||row.Código||row.ARTICULO||row['ARTÍCULO'];
+  if(codigo){
+    const art = DATA.find(function(r){ return String(r.art)===String(codigo).trim(); });
+    if(art) return art;
+  }
+  const marca = String(row.MARCA||row.Marca||row.PROVEEDOR||'').trim().toLowerCase();
+  const diseno = String(row['DISEÑO']||row.DISENO||row.Diseño||'').trim().toLowerCase();
+  const medida = String(row.MEDIDA||row.Medida||'').trim().toLowerCase();
+  if(!marca && !diseno && !medida) return null;
+  return DATA.find(function(r){
+    const okMarca  = !marca  || String(r.prov||'').toLowerCase().includes(marca);
+    const okDiseno = !diseno || String(r.diseno||'').toLowerCase().includes(diseno);
+    const okMedida = !medida || String(r.med||'').toLowerCase().replace(/\s+/g,'').includes(medida.replace(/\s+/g,''));
+    return okMarca && okDiseno && okMedida;
+  }) || null;
+}
+
+function importarPunterasArchivo(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      if(!rows.length){ showToast('❌ El archivo está vacío'); return; }
+
+      const nuevasPunteras = {};
+      const sumaPorArt = {}; // total importado por artículo (para descontar del rack)
+      const sinMatch = [];
+      let filasOk = 0;
+
+      rows.forEach(function(row, i){
+        const parrillaId = _normalizarParrillaId(row.PARRILLA||row.Parrilla||row.PUNTERA||row.Puntera);
+        const cant = parseInt(row.UNIDADES||row.Unidades||row.CANT||row.Cantidad||0);
+        if(!parrillaId || !cant || cant<=0){
+          sinMatch.push('Fila '+(i+2)+': parrilla o cantidad inválida');
+          return;
+        }
+        const art = _buscarArticuloPorFila(row);
+        if(!art){
+          sinMatch.push('Fila '+(i+2)+': no encontré el artículo ('+(row.ART||((row.MARCA||'')+' '+(row['DISEÑO']||'')+' '+(row.MEDIDA||''))).trim()+')');
+          return;
+        }
+        if(!nuevasPunteras[parrillaId]) nuevasPunteras[parrillaId] = [];
+        const existente = nuevasPunteras[parrillaId].find(function(it){ return String(it.art)===String(art.art); });
+        if(existente) existente.unidades += cant;
+        else nuevasPunteras[parrillaId].push({art:art.art, unidades:cant});
+        sumaPorArt[art.art] = (sumaPorArt[art.art]||0) + cant;
+        filasOk++;
+      });
+
+      if(!filasOk){
+        document.getElementById('punt-import-resultado').innerHTML =
+          '<div style="background:#fff3cd;color:#856404;border-radius:8px;padding:10px;margin-top:10px;font-size:12px">❌ Ninguna fila se pudo importar.<br>'+sinMatch.slice(0,15).join('<br>')+'</div>';
+        return;
+      }
+
+      const totalArts = Object.keys(sumaPorArt).length;
+      const totalUn = Object.values(sumaPorArt).reduce(function(a,b){return a+b;},0);
+      if(!confirm('Se va a REEMPLAZAR toda la carga actual de punteras por '+totalArts+' artículos ('+totalUn+' un.) del archivo. ¿Continuar?')) return;
+
+      // Descontar del rack lo que corresponda, para no contar dos veces
+      let totalDescontadoRack = 0;
+      Object.keys(sumaPorArt).forEach(function(art){
+        const d = descontarRackPorPedido(art, sumaPorArt[art]);
+        totalDescontadoRack += d;
+      });
+
+      savePunteras(nuevasPunteras);
+      renderPunteras();
+      renderMapa();
+      renderReposicion();
+      document.getElementById('punteras-import-input').value = '';
+
+      let resHtml = '<div style="background:#e8f9ec;color:#1d7a3c;border-radius:8px;padding:10px;margin-top:10px;font-size:12px">'
+        +'✅ Importado: '+filasOk+' filas · '+totalArts+' artículos · '+totalUn+' un. en total'
+        +(totalDescontadoRack>0?'<br>🗄️ '+totalDescontadoRack+' un. se descontaron automáticamente del rack (estaban duplicadas)':'')
+        +'</div>';
+      if(sinMatch.length){
+        resHtml += '<div style="background:#fff3cd;color:#856404;border-radius:8px;padding:10px;margin-top:6px;font-size:12px">⚠️ '+sinMatch.length+' fila(s) sin poder importar:<br>'+sinMatch.slice(0,15).join('<br>')+(sinMatch.length>15?'<br>… y '+(sinMatch.length-15)+' más':'')+'</div>';
+      }
+      document.getElementById('punt-import-resultado').innerHTML = resHtml;
+      showToast('✅ Punteras actualizadas desde archivo');
+    } catch(err){
+      showToast('❌ Error al leer el archivo');
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 function articulosAsignadosSet(punteras, excluirParrilla){
@@ -11436,14 +11666,48 @@ function renderDetalleParrilla(id, punteras){
     });
   }
 
-  html += '<div class="punt-add-form">';
-  html += '<input type="text" id="punt-add-art-'+id+'" placeholder="Código de artículo...">';
+  html += '<div class="punt-add-form" style="flex-direction:column;align-items:stretch">';
+  html += '<input type="text" id="punt-add-search-'+id+'" placeholder="🔍 Buscar por marca, diseño, medida o código..." oninput="buscarArtParaParrilla(this.value,\''+id+'\')" autocomplete="off" style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px">';
+  html += '<div id="punt-add-results-'+id+'" style="margin-bottom:4px"></div>';
+  html += '<div id="punt-add-selected-'+id+'" style="font-size:12px;color:#0071e3;font-weight:600;margin-bottom:6px"></div>';
+  html += '<input type="hidden" id="punt-add-art-'+id+'">';
+  html += '<div style="display:flex;gap:6px">';
   html += '<input type="number" id="punt-add-cant-'+id+'" placeholder="Cant." min="1"'+(isFinite(libre)?' max="'+libre+'"':'')+' value="1">';
   html += '<button class="btn-primary" style="flex:none;padding:8px 14px" onclick="agregarAParrilla(\''+id+'\')">+ Agregar</button>';
+  html += '</div>';
   html += '</div>';
   html += '<div style="font-size:10px;color:#86868b;margin-top:8px">Tip: los candidatos con más rotación están en el panel de Mapa Racks → 🔚 candidatos a puntera</div>';
   html += '</div>';
   return html;
+}
+
+function buscarArtParaParrilla(q, id){
+  const box = document.getElementById('punt-add-results-'+id);
+  if(!box) return;
+  if(!q || q.trim().length<2){ box.innerHTML=''; return; }
+  const ql = q.toLowerCase();
+  const found = DATA.filter(function(r){
+    return (r.art+' '+(r.diseno||'')+' '+(r.med||'')+' '+(r.prov||'')).toLowerCase().includes(ql);
+  }).slice(0,8);
+  if(!found.length){ box.innerHTML = '<div style="font-size:12px;color:#86868b;padding:4px 2px">Sin resultados</div>'; return; }
+  box.innerHTML = found.map(function(r){
+    return '<div onclick="elegirArtParaParrilla('+r.art+',&quot;'+id+'&quot;)" style="padding:7px 8px;background:#f5f5f7;border-radius:8px;margin-bottom:4px;cursor:pointer">'
+      +'<div style="font-size:12px;font-weight:600">'+(r.prov||'')+' '+(r.diseno||'')+' <span style="color:#86868b;font-weight:400">('+(r.med||'')+')</span></div>'
+      +'<div style="font-size:10px;color:#86868b">Art '+r.art+' · stock '+(r.stock||0).toLocaleString('es-AR')+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function elegirArtParaParrilla(artId, id){
+  const art = DATA.find(function(r){ return String(r.art)===String(artId); });
+  const artInput = document.getElementById('punt-add-art-'+id);
+  if(artInput) artInput.value = artId;
+  const sel = document.getElementById('punt-add-selected-'+id);
+  if(sel) sel.textContent = art ? '✓ '+(art.prov||'')+' '+(art.diseno||'')+' ('+(art.med||'')+') — Art '+art.art : '';
+  const box = document.getElementById('punt-add-results-'+id);
+  if(box) box.innerHTML = '';
+  const search = document.getElementById('punt-add-search-'+id);
+  if(search) search.value = art ? (art.prov||'')+' '+(art.diseno||'') : '';
 }
 
 function agregarAParrilla(id){
@@ -11451,7 +11715,7 @@ function agregarAParrilla(id){
   const cantInput = document.getElementById('punt-add-cant-'+id);
   const artCode = (artInput.value||'').trim();
   const cant = parseInt(cantInput.value)||0;
-  if(!artCode){ showToast('Ingresá un código de artículo'); return; }
+  if(!artCode){ showToast('🔍 Buscá el artículo y elegilo de la lista'); return; }
   if(cant<=0){ showToast('Ingresá una cantidad válida'); return; }
 
   const art = DATA.find(r=>String(r.art)===artCode);
