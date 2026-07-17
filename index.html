@@ -1186,6 +1186,28 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
   </div>
 </div>
 
+<!-- AJUSTE MANUAL DE GRUPO (Resumen mensual) -->
+<div id="ajuste-grupo-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;max-width:380px;width:92%;padding:18px;box-sizing:border-box">
+    <div style="font-size:15px;font-weight:700;margin-bottom:2px">✎ Ajustar grupo <span id="ajuste-grupo-nombre"></span></div>
+    <div style="font-size:12px;color:#86868b;margin-bottom:14px">Este mes — el ajuste queda registrado y se refleja igual en el informe Excel</div>
+
+    <div style="font-size:11px;color:#86868b;margin-bottom:3px">Unidades totales (correcto)</div>
+    <input type="number" id="ajuste-unidades" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:10px">
+
+    <div style="font-size:11px;color:#86868b;margin-bottom:3px">Horas totales (correcto)</div>
+    <input type="number" id="ajuste-horas" step="0.5" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:16px">
+
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button onclick="document.getElementById('ajuste-unidades').value=0;document.getElementById('ajuste-horas').value=0" style="flex:1;padding:9px;background:#ffe8e8;color:#d70015;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">🗑️ Poner en 0</button>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('ajuste-grupo-modal').style.display='none'" style="flex:1;padding:11px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:14px;cursor:pointer">Cancelar</button>
+      <button onclick="guardarAjusteGrupo()" style="flex:1;padding:11px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- GRUPOS -->
 <div class="view" id="view-grupos">
@@ -1223,7 +1245,6 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     <!-- Tabs internos -->
     <div style="display:flex;gap:6px;margin-bottom:10px">
       <button class="sort-btn active" id="ptab-movs" onclick="setProdTab('movs',this)">📦 Movimientos</button>
-      <button class="sort-btn" id="ptab-cola" onclick="setProdTab('cola',this)">🟡 Cola pedidos</button>
       <button class="sort-btn" id="ptab-resumen" onclick="setProdTab('resumen',this)">📊 Resumen</button>
     </div>
 
@@ -1295,18 +1316,6 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
         </div>
 
         <button class="prod-save-btn" onclick="guardarMovimiento()">💾 Registrar</button>
-      </div>
-    </div>
-
-    <!-- TAB: COLA DE PEDIDOS -->
-    <div id="prod-tab-cola" style="display:none">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <span style="font-size:12px;color:#86868b">Pedidos del día en standby</span>
-        <button onclick="limpiarColaPedidos()" style="padding:5px 10px;background:#ffd6d9;color:#d70015;border:none;border-radius:8px;font-size:11px;cursor:pointer">🗑️ Limpiar</button>
-      </div>
-      <div id="prod-cola-lista"></div>
-      <div style="font-size:11px;color:#86868b;margin-top:8px;padding:8px;background:#f5f5f7;border-radius:8px">
-        💡 Los pedidos se agregan acá desde el módulo de Pedidos al procesar
       </div>
     </div>
 
@@ -2364,7 +2373,7 @@ function init(){
   // Set today as default date in forms
   const hoyISO = new Date().toISOString().split('T')[0];
   const pfm = document.getElementById('prod-fecha-manual');
-  if(pfm) pfm.value = hoyISO;
+  if(pfm){ pfm.value = hoyISO; if(typeof checkFechaManual==='function') checkFechaManual(hoyISO); }
   const gfs = document.getElementById('grupos-fecha-sel');
   if(gfs) gfs.value = hoyISO;
   // Set initial badge
@@ -4749,7 +4758,7 @@ function cydEjecutarDespacho(id){
 
   document.getElementById('cyd-modal-despacho-op').remove();
 
-  var fecha = new Date().toLocaleDateString('es-AR');
+  var fecha = fechaHoyZP();
   var hora  = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
   var repoSugerido = [];
   var diferencias  = [];
@@ -4871,7 +4880,7 @@ function cydEjecutarDespacho(id){
     var movsDia = JSON.parse(localStorage.getItem(dayKey)||'[]');
     movsDia.push(mov);
     localStorage.setItem(dayKey, JSON.stringify(movsDia));
-    var mes = new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+    var mes = mesKeyHoyZP();
     var histKey = 'prod_hist_'+mes;
     var hist = JSON.parse(localStorage.getItem(histKey)||'[]');
     hist.push(mov);
@@ -6860,7 +6869,7 @@ function renderGruposKPI(){
   var unidPorCabezaDia = totalPres > 0 ? Math.round(totalUnidDia/totalPres) : 0;
 
   // --- Datos históricos del mes ---
-  var mesKey = new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+  var mesKey = mesKeyHoyZP();
   var histProd   = JSON.parse(localStorage.getItem('prod_hist_'+mesKey)||'[]');
   var histGrupos = JSON.parse(localStorage.getItem('grupos_hist')||'[]');
 
@@ -7381,7 +7390,7 @@ let _prodGrupo = 'G1';
 // ── Registrar movimiento automático en productividad ──────────
 function registrarMovProd(tipo, unidades, detalle, grupoReal, inicioReal, finReal, durMinReal, fechaReal){
   try {
-    var fecha = fechaReal || new Date().toLocaleDateString('es-AR');
+    var fecha = fechaReal || fechaHoyZP();
     var hora  = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
     var grupo = grupoReal;
     if(!grupo){
@@ -7417,7 +7426,7 @@ function registrarMovProd(tipo, unidades, detalle, grupoReal, inicioReal, finRea
 
     var mes = partsFecha.length===3
       ? (partsFecha[1]+'_'+partsFecha[2])
-      : new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+      : mesKeyHoyZP();
     var histKey = 'prod_hist_'+mes;
     var hist = JSON.parse(localStorage.getItem(histKey)||'[]');
     hist.push(mov);
@@ -7426,11 +7435,27 @@ function registrarMovProd(tipo, unidades, detalle, grupoReal, inicioReal, finRea
 }
 
 function getProdKey(){
-  return 'prod_'+new Date().toLocaleDateString('es-AR').replace(/\//g,'-');
+  var p = fechaHoyZP().split('/'); // dd/mm/yyyy
+  return 'prod_'+p[0]+'-'+p[1]+'-'+p[2];
 }
 
 function genMovId(){
   return Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+}
+
+// IMPORTANTE: toLocaleDateString('es-AR', {month:'2-digit',...}) NO rellena
+// con cero el mes/día pese al nombre de la opción (da "7/2026" en vez de
+// "07/2026"). Estos helpers garantizan el cero a la izquierda siempre, para
+// que las claves de storage (día y mes) sean siempre consistentes entre sí.
+function fechaHoyZP(){
+  var d = new Date();
+  var dd = String(d.getDate()).padStart(2,'0');
+  var mm = String(d.getMonth()+1).padStart(2,'0');
+  return dd+'/'+mm+'/'+d.getFullYear();
+}
+function mesKeyHoyZP(){
+  var d = new Date();
+  return String(d.getMonth()+1).padStart(2,'0')+'_'+d.getFullYear();
 }
 
 function getMovimientos(){
@@ -7450,7 +7475,7 @@ function saveMovimiento(mov){
   // Historial mensual — también según la fecha del movimiento
   const mes = partsFecha.length===3
     ? (partsFecha[1]+'_'+partsFecha[2])
-    : new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+    : mesKeyHoyZP();
   const histKey = 'prod_hist_'+mes;
   const hist = JSON.parse(localStorage.getItem(histKey)||'[]');
   hist.push(mov);
@@ -7515,7 +7540,7 @@ function guardarMovimientoFecha(){
     fechaMov = parts[2]+'/'+parts[1]+'/'+parts[0];
     horaMov = inicio||'--:--';
   } else {
-    fechaMov = new Date().toLocaleDateString('es-AR');
+    fechaMov = fechaHoyZP();
     horaMov = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
   }
 
@@ -7536,7 +7561,7 @@ function guardarMovimientoFecha(){
   // Save to monthly history
   const mes = _prodFechaManual 
     ? _prodFechaManual.substring(0,7).replace('-','_').replace('-','_')
-    : new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+    : mesKeyHoyZP();
   const histKey = 'prod_hist_'+mes;
   const hist = JSON.parse(localStorage.getItem(histKey)||'[]');
   hist.push(mov);
@@ -7641,11 +7666,12 @@ function guardarMovimiento(){
     durMin = (fh*60+fm) - (ih*60+im);
   }
 
-  // Fecha del movimiento: si hay una fecha elegida en "Ver fecha" (carga
-  // retroactiva), se usa esa. Si no, la de hoy.
-  const fechaMov = _prodFechaManual
-    ? (function(){ const p=_prodFechaManual.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; })() // YYYY-MM-DD → DD/MM/YYYY
-    : new Date().toLocaleDateString('es-AR');
+  // Fecha del movimiento: se lee siempre del campo "Ver fecha" en el momento
+  // de guardar (no de una variable aparte que se podía desincronizar).
+  const fechaInputVal = (document.getElementById('prod-fecha-manual')||{}).value||'';
+  const fechaMov = fechaInputVal
+    ? (function(){ const p=fechaInputVal.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; })() // YYYY-MM-DD → DD/MM/YYYY
+    : fechaHoyZP();
 
   const mov = {
     id: genMovId(),
@@ -7898,7 +7924,7 @@ function guardarEdicionMov(){
 
 function exportarProductividad(){
   const mes = new Date().toLocaleDateString('es-AR',{month:'long',year:'numeric'});
-  const mesKey = new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+  const mesKey = mesKeyHoyZP();
   const hist = JSON.parse(localStorage.getItem('prod_hist_'+mesKey)||'[]');
   if(!hist.length){ showToast('Sin movimientos para exportar'); return; }
 
@@ -8854,9 +8880,7 @@ function setProdTab(tab, btn){
   document.querySelectorAll('[id^="ptab-"]').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('prod-tab-movs').style.display = tab==='movs'?'block':'none';
-  document.getElementById('prod-tab-cola').style.display = tab==='cola'?'block':'none';
   document.getElementById('prod-tab-resumen').style.display = tab==='resumen'?'block':'none';
-  if(tab==='cola') renderColaPedidos();
   if(tab==='resumen') renderResumenProd();
 }
 
@@ -9059,10 +9083,71 @@ function limpiarColaPedidos(){
 }
 
 // Resumen mensual
+function abrirAjusteGrupo(g){
+  const mes = mesKeyHoyZP();
+  const hist = JSON.parse(localStorage.getItem('prod_hist_'+mes)||'[]');
+  const totalUnid = hist.filter(m=>m.grupo===g).reduce((s,m)=>s+(m.unidades||0),0);
+  const totalMin = hist.filter(m=>m.grupo===g).reduce((s,m)=>s+(m.durMin||0),0);
+
+  window._ajusteGrupoActual = g;
+  document.getElementById('ajuste-grupo-nombre').textContent = g;
+  document.getElementById('ajuste-grupo-nombre').style.color = GRUPOS_COLORES[g]||'#1d1d1f';
+  document.getElementById('ajuste-unidades').value = totalUnid;
+  document.getElementById('ajuste-horas').value = Math.round((totalMin/60)*10)/10;
+  document.getElementById('ajuste-grupo-modal').style.display = 'flex';
+}
+
+function guardarAjusteGrupo(){
+  const g = window._ajusteGrupoActual;
+  if(!g) return;
+  const mes = mesKeyHoyZP();
+  const histKey = 'prod_hist_'+mes;
+  const hist = JSON.parse(localStorage.getItem(histKey)||'[]');
+
+  const totalUnidActual = hist.filter(m=>m.grupo===g).reduce((s,m)=>s+(m.unidades||0),0);
+  const totalMinActual = hist.filter(m=>m.grupo===g).reduce((s,m)=>s+(m.durMin||0),0);
+
+  const unidObjetivo = parseInt(document.getElementById('ajuste-unidades').value)||0;
+  const horasObjetivo = parseFloat(document.getElementById('ajuste-horas').value)||0;
+  const minObjetivo = Math.round(horasObjetivo*60);
+
+  const deltaUnid = unidObjetivo - totalUnidActual;
+  const deltaMin = minObjetivo - totalMinActual;
+
+  if(deltaUnid===0 && deltaMin===0){
+    document.getElementById('ajuste-grupo-modal').style.display = 'none';
+    showToast('Sin cambios');
+    return;
+  }
+
+  // El ajuste queda como un movimiento más (tipo "ajuste"), por eso se ve
+  // igual en el Resumen y en el informe Excel — mismos datos, un solo lugar.
+  const ajuste = {
+    id: genMovId(),
+    fecha: fechaHoyZP(),
+    hora: new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),
+    tipo: 'ajuste',
+    grupo: g,
+    darsena: '',
+    destino: 'Ajuste manual de resumen',
+    unidades: deltaUnid,
+    semis: 0,
+    inicio: '', fin: '',
+    durMin: deltaMin,
+    auto: false
+  };
+  hist.push(ajuste);
+  localStorage.setItem(histKey, JSON.stringify(hist));
+
+  document.getElementById('ajuste-grupo-modal').style.display = 'none';
+  renderResumenProd();
+  showToast('✅ '+g+' ajustado a '+unidObjetivo.toLocaleString('es-AR')+' un. · '+horasObjetivo+'h');
+}
+
 function renderResumenProd(){
   const el = document.getElementById('prod-resumen-content');
   if(!el) return;
-  const mes = new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+  const mes = mesKeyHoyZP();
   const hist = JSON.parse(localStorage.getItem('prod_hist_'+mes)||'[]');
 
   if(!hist.length){ el.innerHTML='<div class="empty">Sin movimientos este mes</div>'; return; }
@@ -9101,19 +9186,20 @@ function renderResumenProd(){
         <div style="font-size:13px;font-weight:700;color:${GRUPOS_COLORES[g]||'#86868b'};width:30px">${g}</div>
         <div style="flex:1">
           <div style="height:6px;background:#f0f0f0;border-radius:3px;overflow:hidden">
-            <div style="width:${Math.round(porGrupo[g].unid/totalUnid*100)}%;height:100%;background:${GRUPOS_COLORES[g]||'#86868b'};border-radius:3px"></div>
+            <div style="width:${totalUnid>0?Math.round(porGrupo[g].unid/totalUnid*100):0}%;height:100%;background:${GRUPOS_COLORES[g]||'#86868b'};border-radius:3px"></div>
           </div>
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-size:14px;font-weight:700">${porGrupo[g].unid.toLocaleString('es-AR')} un.</div>
           <div style="font-size:10px;color:#86868b">${porGrupo[g].movs} movs · ${porGrupo[g].tiempo>0?Math.round(porGrupo[g].tiempo/60)+'h':'—'}</div>
         </div>
+        <button onclick="abrirAjusteGrupo('${g}')" style="background:none;border:none;color:#86868b;font-size:15px;cursor:pointer;flex-shrink:0" title="Ajustar">✎</button>
       </div>`).join('')}
 
     <div style="font-size:11px;font-weight:600;color:#86868b;margin:10px 0 6px;text-transform:uppercase">Por tipo</div>
     ${Object.entries(porTipo).sort((a,b)=>b[1]-a[1]).map(([tipo,unid])=>`
       <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #e5e5ea;margin-bottom:4px">
-        <span style="font-size:12px;font-weight:500">${tipo==='carga'?'📥 Carga':tipo==='descarga'?'📤 Descarga':tipo==='despacho'?'📋 Despacho':'🚗 Chasis'}</span>
+        <span style="font-size:12px;font-weight:500">${({carga:'📥 Carga',descarga:'📤 Descarga',despacho:'📋 Despacho',chasis:'🚗 Chasis',pedidos:'📋 Pedidos',orden_limpieza:'🧹 Orden y limpieza',conteo:'🔢 Conteo',almuerzo:'🍽️ Almuerzo',ajuste:'⚙️ Ajuste manual'})[tipo] || tipo.toUpperCase()}</span>
         <span style="font-size:13px;font-weight:700">${unid.toLocaleString('es-AR')} un.</span>
       </div>`).join('')}
   `;
@@ -10373,7 +10459,7 @@ function confirmarRecepcionConTiempo(){
   var fechaInput = document.getElementById('cyd-tiempo-fecha').value; // YYYY-MM-DD
   var fechaReal = fechaInput
     ? (function(){ var p=fechaInput.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; })() // → DD/MM/YYYY
-    : new Date().toLocaleDateString('es-AR');
+    : fechaHoyZP();
 
   var durMin = 0;
   var [ih,im] = inicio.split(':').map(Number);
