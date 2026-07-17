@@ -5010,10 +5010,14 @@ function cydPlanillaPicking(id){
   var fecha = new Date().toLocaleDateString('es-AR');
   var hora  = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
 
-  // Separar rack (N1 primero) y bloque
-  var enRack   = tr.items.filter(function(r){return r.posRack;});
-  var enBloque = tr.items.filter(function(r){return !r.posRack && r.bloque;});
-  var sinUbic  = tr.items.filter(function(r){return !r.posRack && !r.bloque;});
+  // Separar por ubicación real usada (tipo ya viene calculado desde el
+  // pedido: puntera > rack > bloque > sin ubicación). Antes esta función
+  // no revisaba puntera para nada, así que esos artículos caían mezclados
+  // en "bloque" y la planilla no mostraba dónde buscarlos realmente.
+  var enPuntera = tr.items.filter(function(r){return r.tipo==='puntera';});
+  var enRack    = tr.items.filter(function(r){return r.tipo==='rack';});
+  var enBloque  = tr.items.filter(function(r){return r.tipo==='bloque';});
+  var sinUbic   = tr.items.filter(function(r){return r.tipo!=='puntera' && r.tipo!=='rack' && r.tipo!=='bloque';});
 
   // Ordenar rack por nivel (N1→N4) y posición
   enRack.sort(function(a,b){
@@ -5027,7 +5031,9 @@ function cydPlanillaPicking(id){
     var cantReal = r.cantReal||r.cant;
     var diff = cantReal - r.cant;
     var alerta = r.stock < r.cant ? 'background:#fff3cd' : '';
-    var ubic = seccion==='rack'
+    var ubic = seccion==='puntera'
+      ? '<b style="color:#7a3fb0">🔚 '+((r.punteraDetalle&&r.punteraDetalle.length)?r.punteraDetalle.map(function(d){return d.id+' ('+d.unidades+')';}).join(' + '):'PUNTERA')+'</b>'
+      : seccion==='rack'
       ? '<b style="color:#0071e3">'+r.posRack+'</b>'
       : seccion==='bloque'
       ? '<b style="color:#ff9500">'+r.bloque+'</b>'
@@ -5048,6 +5054,7 @@ function cydPlanillaPicking(id){
   }
 
   var totalCant = tr.items.reduce(function(s,r){return s+(r.cantReal||r.cant);},0);
+  var rowsPuntera = enPuntera.map(function(r){return mkRow(r,'puntera');}).join('');
   var rowsRack   = enRack.map(function(r){return mkRow(r,'rack');}).join('');
   var rowsBloque = enBloque.map(function(r){return mkRow(r,'bloque');}).join('');
   var rowsSin    = sinUbic.map(function(r){return mkRow(r,'sin');}).join('');
@@ -5062,6 +5069,7 @@ function cydPlanillaPicking(id){
     '.meta b{color:#1d1d1f}'+
     '.sec{font-size:11px;font-weight:700;margin:8px 0 4px;padding:3px 8px;border-radius:4px}'+
     '.sec-rack{background:#e8f0fe;color:#0071e3}'+
+    '.sec-puntera{background:#f2e6ff;color:#7a3fb0}'+
     '.sec-bloque{background:#fff3cd;color:#856404}'+
     '.sec-sin{background:#ffd6d9;color:#d70015}'+
     'table{width:100%;border-collapse:collapse;font-size:9.5px;margin-bottom:6px}'+
@@ -5080,6 +5088,10 @@ function cydPlanillaPicking(id){
       '<span>Unidades: <b>'+totalCant+'</b></span>'+
       '<span style="margin-left:auto;color:#bbb">ID: '+tr.id+'</span>'+
     '</div>'+
+    (enPuntera.length?
+      '<div class="sec sec-puntera">🔚 PUNTERA — preparar primero ('+enPuntera.length+' arts)</div>'+
+      '<table><thead><tr><th>Art</th><th>Medida</th><th>Diseño</th><th>Prov</th><th>Puntera</th><th style="text-align:center">Rango</th><th style="text-align:right">Cant</th><th style="text-align:right">Stock</th><th style="text-align:right">Dif</th><th style="min-width:80px">Visto ✍</th></tr></thead>'+
+      '<tbody>'+rowsPuntera+'</tbody></table>':'')+
     (enRack.length?
       '<div class="sec sec-rack">RACK — preparar primero ('+enRack.length+' arts · N1 antes que N4)</div>'+
       '<table><thead><tr><th>Art</th><th>Medida</th><th>Diseño</th><th>Prov</th><th>Posición rack</th><th style="text-align:center">Rango</th><th style="text-align:right">Cant</th><th style="text-align:right">Stock</th><th style="text-align:right">Dif</th><th style="min-width:80px">Visto ✍</th></tr></thead>'+
@@ -5092,7 +5104,7 @@ function cydPlanillaPicking(id){
       '<div class="sec sec-sin">SIN UBICACIÓN ('+sinUbic.length+' arts)</div>'+
       '<table><thead><tr><th>Art</th><th>Medida</th><th>Diseño</th><th>Prov</th><th>Ubicación</th><th style="text-align:center">Rango</th><th style="text-align:right">Cant</th><th style="text-align:right">Stock</th><th style="text-align:right">Dif</th><th style="min-width:80px">Visto ✍</th></tr></thead>'+
       '<tbody>'+rowsSin+'</tbody></table>':'')+
-    '<div class="pie">Amarillo = stock insuficiente · Azul = rack · Naranja = bloque · '+
+    '<div class="pie">Amarillo = stock insuficiente · Violeta = puntera · Azul = rack · Naranja = bloque · '+
     'Generado '+new Date().toLocaleString('es-AR')+' — WMS Halpern Depósito</div>'+
     '<script>window.onload=function(){window.print();}<\/script>'+
     '</body></html>'
