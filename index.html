@@ -5010,14 +5010,17 @@ function cydPlanillaPicking(id){
   var fecha = new Date().toLocaleDateString('es-AR');
   var hora  = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
 
-  // Separar por ubicación real usada (tipo ya viene calculado desde el
-  // pedido: puntera > rack > bloque > sin ubicación). Antes esta función
-  // no revisaba puntera para nada, así que esos artículos caían mezclados
-  // en "bloque" y la planilla no mostraba dónde buscarlos realmente.
-  var enPuntera = tr.items.filter(function(r){return r.tipo==='puntera';});
-  var enRack    = tr.items.filter(function(r){return r.tipo==='rack';});
-  var enBloque  = tr.items.filter(function(r){return r.tipo==='bloque';});
-  var sinUbic   = tr.items.filter(function(r){return r.tipo!=='puntera' && r.tipo!=='rack' && r.tipo!=='bloque';});
+  // Separar por ubicación real usada. Se usan DOS señales para detectar
+  // puntera: el campo "tipo" (calculado al enviar a tránsito) Y también
+  // "punteraDetalle" (que se completa siempre que se descontó de una
+  // puntera, incluso en tránsitos generados antes de este arreglo).
+  function esDePuntera(r){
+    return (r.punteraDetalle && r.punteraDetalle.length>0) || r.tipo==='puntera';
+  }
+  var enPuntera = tr.items.filter(esDePuntera);
+  var enRack    = tr.items.filter(function(r){return !esDePuntera(r) && r.tipo==='rack';});
+  var enBloque  = tr.items.filter(function(r){return !esDePuntera(r) && r.tipo==='bloque';});
+  var sinUbic   = tr.items.filter(function(r){return !esDePuntera(r) && r.tipo!=='rack' && r.tipo!=='bloque';});
 
   // Ordenar rack por nivel (N1→N4) y posición
   enRack.sort(function(a,b){
