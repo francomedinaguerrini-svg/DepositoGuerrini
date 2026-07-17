@@ -1118,6 +1118,66 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
   </div>
 </div>
 
+<!-- EDITAR MOVIMIENTO DE PRODUCTIVIDAD (modal) -->
+<div id="mov-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;max-width:420px;width:92%;padding:18px;box-sizing:border-box;max-height:90vh;overflow-y:auto">
+    <div style="font-size:15px;font-weight:700;margin-bottom:14px">✎ Editar movimiento</div>
+
+    <div style="font-size:11px;color:#86868b;margin-bottom:3px">Tipo</div>
+    <select id="movedit-tipo" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:10px">
+      <option value="carga">📥 Carga</option>
+      <option value="descarga">📤 Descarga</option>
+      <option value="despacho">📋 Despacho</option>
+      <option value="chasis">🚗 Chasis</option>
+      <option value="pedidos">📋 Pedidos</option>
+      <option value="orden_limpieza">🧹 Orden y limpieza</option>
+      <option value="conteo">🔢 Conteo</option>
+      <option value="almuerzo">🍽️ Almuerzo</option>
+    </select>
+
+    <div style="font-size:11px;color:#86868b;margin-bottom:6px">Equipo / grupo</div>
+    <div id="movedit-grupos" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div>
+        <div style="font-size:11px;color:#86868b;margin-bottom:3px">Unidades</div>
+        <input type="number" id="movedit-unidades" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:11px;color:#86868b;margin-bottom:3px">Semis / Pedidos</div>
+        <input type="number" id="movedit-semis" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div>
+        <div style="font-size:11px;color:#86868b;margin-bottom:3px">Inicio</div>
+        <input type="time" id="movedit-inicio" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:11px;color:#86868b;margin-bottom:3px">Fin</div>
+        <input type="time" id="movedit-fin" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+      <div>
+        <div style="font-size:11px;color:#86868b;margin-bottom:3px">Dársena</div>
+        <input type="text" id="movedit-darsena" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:11px;color:#86868b;margin-bottom:3px">Destino / Detalle</div>
+        <input type="text" id="movedit-destino" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('mov-edit-modal').style.display='none'" style="flex:1;padding:11px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:14px;cursor:pointer">Cancelar</button>
+      <button onclick="guardarEdicionMov()" style="flex:1;padding:11px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">💾 Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- GRUPOS -->
 <div class="view" id="view-grupos">
@@ -4782,6 +4842,7 @@ function cydEjecutarDespacho(id){
   // Registrar en productividad con datos operativos completos
   try {
     var mov = {
+      id: genMovId(),
       fecha: fecha, hora: hora,
       tipo: 'despacho',
       grupo: grupoSel,
@@ -7326,6 +7387,7 @@ function registrarMovProd(tipo, unidades, detalle, grupoReal, inicioReal, finRea
     }
 
     var mov = {
+      id: genMovId(),
       fecha: fecha, hora: hora,
       tipo: tipo,           // 'carga' | 'descarga' | 'despacho'
       grupo: grupo,
@@ -7352,6 +7414,10 @@ function registrarMovProd(tipo, unidades, detalle, grupoReal, inicioReal, finRea
 
 function getProdKey(){
   return 'prod_'+new Date().toLocaleDateString('es-AR').replace(/\//g,'-');
+}
+
+function genMovId(){
+  return Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 }
 
 function getMovimientos(){
@@ -7555,6 +7621,7 @@ function guardarMovimiento(){
   }
 
   const mov = {
+    id: genMovId(),
     fecha: new Date().toLocaleDateString('es-AR'),
     hora: new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),
     tipo: _prodTipo,
@@ -7605,6 +7672,16 @@ function renderProdLista(){
   const el = document.getElementById('prod-lista');
   if(!el) return;
   if(!movs.length){ el.innerHTML='<div class="empty">Sin movimientos hoy</div>'; return; }
+
+  // Autocorrección: movimientos viejos (de antes de este cambio) no tienen
+  // id — se lo asignamos ahora y lo guardamos, así también se pueden editar/borrar.
+  let necesitaGuardar = false;
+  movs.forEach(function(m){ if(!m.id){ m.id = genMovId(); necesitaGuardar = true; } });
+  if(necesitaGuardar){
+    const key = _prodFechaManual ? getProdKeyFecha(_prodFechaManual) : getProdKey();
+    localStorage.setItem(key, JSON.stringify(movs.slice().reverse()));
+  }
+
   el.innerHTML = movs.map((m,i)=>{
     var tipoLabels = {
       carga:'📥 CARGA', descarga:'📤 DESCARGA', despacho:'📋 DESPACHO', chasis:'🚗 CHASIS',
@@ -7631,17 +7708,126 @@ function renderProdLista(){
         <div class="mov-unid">${m.unidades>0?m.unidades.toLocaleString('es-AR'):''}</div>
         <div class="mov-time">${durStr}</div>
       </div>
-      <button onclick="eliminarMov(${movs.length-1-i})" style="background:none;border:none;color:#d2d2d7;font-size:16px;cursor:pointer;flex-shrink:0">✕</button>
+      <button onclick="editarMov('${m.id||''}')" style="background:none;border:none;color:#0071e3;font-size:15px;cursor:pointer;flex-shrink:0" title="Editar">✎</button>
+      <button onclick="eliminarMov('${m.id||''}')" style="background:none;border:none;color:#d2d2d7;font-size:16px;cursor:pointer;flex-shrink:0" title="Eliminar">✕</button>
     </div>`;
   }).join('');
 }
 
-function eliminarMov(idx){
-  const movs = getMovimientos();
+function eliminarMov(id){
+  if(!confirm('¿Eliminar este movimiento?')) return;
+  const key = _prodFechaManual ? getProdKeyFecha(_prodFechaManual) : getProdKey();
+  const movs = JSON.parse(localStorage.getItem(key)||'[]');
+  const idx = movs.findIndex(function(m){ return m.id===id; });
+  if(idx<0){ showToast('❌ No se encontró el movimiento'); return; }
+  const eliminado = movs[idx];
   movs.splice(idx,1);
-  localStorage.setItem(getProdKey(), JSON.stringify(movs));
+  localStorage.setItem(key, JSON.stringify(movs));
+
+  // También sacarlo del historial mensual (de ahí sale el resumen del mes)
+  const partsFecha = (eliminado.fecha||'').split('/'); // dd/mm/yyyy
+  if(partsFecha.length===3){
+    const mesKey = 'prod_hist_'+partsFecha[1]+'_'+partsFecha[2];
+    const hist = JSON.parse(localStorage.getItem(mesKey)||'[]');
+    const hIdx = hist.findIndex(function(m){ return m.id===id; });
+    if(hIdx>=0){
+      hist.splice(hIdx,1);
+      localStorage.setItem(mesKey, JSON.stringify(hist));
+    }
+  }
+
   renderProdResumen();
   renderProdLista();
+  if(typeof renderResumenProd==='function') renderResumenProd();
+  showToast('🗑️ Movimiento eliminado');
+}
+
+let _movEditandoId = null;
+
+function editarMov(id){
+  const key = _prodFechaManual ? getProdKeyFecha(_prodFechaManual) : getProdKey();
+  const movs = JSON.parse(localStorage.getItem(key)||'[]');
+  const mov = movs.find(function(m){ return m.id===id; });
+  if(!mov){ showToast('❌ No se encontró el movimiento'); return; }
+  _movEditandoId = id;
+
+  document.getElementById('movedit-tipo').value = mov.tipo||'carga';
+  document.getElementById('movedit-destino').value = mov.destino||'';
+  document.getElementById('movedit-darsena').value = mov.darsena||'';
+  document.getElementById('movedit-unidades').value = mov.unidades||0;
+  document.getElementById('movedit-semis').value = mov.semis||1;
+  document.getElementById('movedit-inicio').value = mov.inicio||'';
+  document.getElementById('movedit-fin').value = mov.fin||'';
+
+  const gruposBox = document.getElementById('movedit-grupos');
+  const gruposDisponibles = ['G1','G2','G3','R','C'];
+  gruposBox.innerHTML = gruposDisponibles.map(function(g){
+    const activo = g===mov.grupo;
+    const color = GRUPOS_COLORES[g]||'#0071e3';
+    return '<button type="button" onclick="setMoveditGrupo(\''+g+'\',this)" data-grupo="'+g+'" '+
+      'style="border:1.5px solid '+(activo?color:'#d2d2d7')+';background:'+(activo?color+'20':'#fff')+';color:'+(activo?color:'#86868b')+';padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">'+g+'</button>';
+  }).join('');
+  document.getElementById('movedit-grupos').dataset.grupoActual = mov.grupo||'';
+
+  document.getElementById('mov-edit-modal').style.display = 'flex';
+}
+
+function setMoveditGrupo(g, btn){
+  document.getElementById('movedit-grupos').dataset.grupoActual = g;
+  document.querySelectorAll('#movedit-grupos button').forEach(function(b){
+    const activo = b===btn;
+    const color = GRUPOS_COLORES[b.dataset.grupo]||'#0071e3';
+    b.style.borderColor = activo ? color : '#d2d2d7';
+    b.style.background = activo ? color+'20' : '#fff';
+    b.style.color = activo ? color : '#86868b';
+  });
+}
+
+function guardarEdicionMov(){
+  const id = _movEditandoId;
+  if(!id) return;
+  const key = _prodFechaManual ? getProdKeyFecha(_prodFechaManual) : getProdKey();
+  const movs = JSON.parse(localStorage.getItem(key)||'[]');
+  const mov = movs.find(function(m){ return m.id===id; });
+  if(!mov){ showToast('❌ No se encontró el movimiento'); return; }
+
+  const inicio = document.getElementById('movedit-inicio').value||'';
+  const fin = document.getElementById('movedit-fin').value||'';
+  let durMin = 0;
+  if(inicio && fin){
+    const [ih,im] = inicio.split(':').map(Number);
+    const [fh,fm] = fin.split(':').map(Number);
+    durMin = (fh*60+fm) - (ih*60+im);
+  }
+
+  mov.tipo = document.getElementById('movedit-tipo').value;
+  mov.grupo = document.getElementById('movedit-grupos').dataset.grupoActual || mov.grupo;
+  mov.destino = document.getElementById('movedit-destino').value||'';
+  mov.darsena = document.getElementById('movedit-darsena').value||'';
+  mov.unidades = parseInt(document.getElementById('movedit-unidades').value)||0;
+  mov.semis = parseInt(document.getElementById('movedit-semis').value)||0;
+  mov.inicio = inicio;
+  mov.fin = fin;
+  mov.durMin = durMin;
+  mov.auto = false; // ya fue corregido a mano
+
+  localStorage.setItem(key, JSON.stringify(movs));
+
+  // Reflejar el mismo cambio en el historial mensual (mismo id)
+  const partsFecha = (mov.fecha||'').split('/');
+  if(partsFecha.length===3){
+    const mesKey = 'prod_hist_'+partsFecha[1]+'_'+partsFecha[2];
+    const hist = JSON.parse(localStorage.getItem(mesKey)||'[]');
+    const hIdx = hist.findIndex(function(m){ return m.id===id; });
+    if(hIdx>=0){ hist[hIdx] = mov; localStorage.setItem(mesKey, JSON.stringify(hist)); }
+  }
+
+  document.getElementById('mov-edit-modal').style.display = 'none';
+  _movEditandoId = null;
+  renderProdResumen();
+  renderProdLista();
+  if(typeof renderResumenProd==='function') renderResumenProd();
+  showToast('✅ Movimiento actualizado');
 }
 
 function exportarProductividad(){
