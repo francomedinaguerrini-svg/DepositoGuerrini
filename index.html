@@ -1100,6 +1100,11 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     <div style="font-size:11px;color:#86868b;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.3px">Equipo que descargó</div>
     <div id="cyd-tiempo-grupos" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px"></div>
 
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;color:#86868b;margin-bottom:3px">Fecha real de la descarga</div>
+      <input type="date" id="cyd-tiempo-fecha" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+    </div>
+
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px">
       <div>
         <div style="font-size:11px;color:#86868b;margin-bottom:3px">Inicio descarga</div>
@@ -1122,6 +1127,9 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 <div id="mov-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:14px;max-width:420px;width:92%;padding:18px;box-sizing:border-box;max-height:90vh;overflow-y:auto">
     <div style="font-size:15px;font-weight:700;margin-bottom:14px">✎ Editar movimiento</div>
+
+    <div style="font-size:11px;color:#86868b;margin-bottom:3px">Fecha</div>
+    <input type="date" id="movedit-fecha" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:10px">
 
     <div style="font-size:11px;color:#86868b;margin-bottom:3px">Tipo</div>
     <select id="movedit-tipo" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:10px">
@@ -7371,9 +7379,9 @@ let _prodTipo = 'carga';
 let _prodGrupo = 'G1';
 
 // ── Registrar movimiento automático en productividad ──────────
-function registrarMovProd(tipo, unidades, detalle, grupoReal, inicioReal, finReal, durMinReal){
+function registrarMovProd(tipo, unidades, detalle, grupoReal, inicioReal, finReal, durMinReal, fechaReal){
   try {
-    var fecha = new Date().toLocaleDateString('es-AR');
+    var fecha = fechaReal || new Date().toLocaleDateString('es-AR');
     var hora  = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
     var grupo = grupoReal;
     if(!grupo){
@@ -7399,12 +7407,17 @@ function registrarMovProd(tipo, unidades, detalle, grupoReal, inicioReal, finRea
       auto: !grupoReal       // true solo si nadie informó el equipo/tiempo real
     };
 
-    var dayKey = getProdKey();
+    // Guardar en el día y el mes que corresponden a la fecha real del
+    // movimiento (puede ser retroactiva), no siempre en el día de hoy.
+    var partsFecha = fecha.split('/'); // dd/mm/yyyy
+    var dayKey = partsFecha.length===3 ? ('prod_'+partsFecha[0]+'-'+partsFecha[1]+'-'+partsFecha[2]) : getProdKey();
     var movsDia = JSON.parse(localStorage.getItem(dayKey)||'[]');
     movsDia.push(mov);
     localStorage.setItem(dayKey, JSON.stringify(movsDia));
 
-    var mes = new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+    var mes = partsFecha.length===3
+      ? (partsFecha[1]+'_'+partsFecha[2])
+      : new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
     var histKey = 'prod_hist_'+mes;
     var hist = JSON.parse(localStorage.getItem(histKey)||'[]');
     hist.push(mov);
@@ -7425,11 +7438,19 @@ function getMovimientos(){
 }
 
 function saveMovimiento(mov){
-  const movs = getMovimientos();
+  // La fecha del movimiento manda (puede ser retroactiva, elegida con el
+  // selector "Ver fecha") — se guarda en el día y el mes que corresponden
+  // a esa fecha, no en el día de hoy.
+  const partsFecha = (mov.fecha||'').split('/'); // dd/mm/yyyy
+  const dayKey = partsFecha.length===3 ? ('prod_'+partsFecha[0]+'-'+partsFecha[1]+'-'+partsFecha[2]) : getProdKey();
+  const movs = JSON.parse(localStorage.getItem(dayKey)||'[]');
   movs.push(mov);
-  localStorage.setItem(getProdKey(), JSON.stringify(movs));
-  // Save to monthly history
-  const mes = new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
+  localStorage.setItem(dayKey, JSON.stringify(movs));
+
+  // Historial mensual — también según la fecha del movimiento
+  const mes = partsFecha.length===3
+    ? (partsFecha[1]+'_'+partsFecha[2])
+    : new Date().toLocaleDateString('es-AR',{month:'2-digit',year:'numeric'}).replace('/','_');
   const histKey = 'prod_hist_'+mes;
   const hist = JSON.parse(localStorage.getItem(histKey)||'[]');
   hist.push(mov);
@@ -7620,9 +7641,15 @@ function guardarMovimiento(){
     durMin = (fh*60+fm) - (ih*60+im);
   }
 
+  // Fecha del movimiento: si hay una fecha elegida en "Ver fecha" (carga
+  // retroactiva), se usa esa. Si no, la de hoy.
+  const fechaMov = _prodFechaManual
+    ? (function(){ const p=_prodFechaManual.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; })() // YYYY-MM-DD → DD/MM/YYYY
+    : new Date().toLocaleDateString('es-AR');
+
   const mov = {
     id: genMovId(),
-    fecha: new Date().toLocaleDateString('es-AR'),
+    fecha: fechaMov,
     hora: new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),
     tipo: _prodTipo,
     grupo: _prodGrupo,
@@ -7650,7 +7677,8 @@ function guardarMovimiento(){
 
   renderProdResumen();
   renderProdLista();
-  showToast('✅ Movimiento registrado');
+  if(typeof renderResumenProd==='function') renderResumenProd();
+  showToast('✅ Movimiento registrado — '+fechaMov);
 }
 
 function renderProdResumen(){
@@ -7752,6 +7780,9 @@ function editarMov(id){
   _movEditandoId = id;
 
   document.getElementById('movedit-tipo').value = mov.tipo||'carga';
+  const partsFechaEdit = (mov.fecha||'').split('/'); // dd/mm/yyyy
+  document.getElementById('movedit-fecha').value = partsFechaEdit.length===3
+    ? (partsFechaEdit[2]+'-'+partsFechaEdit[1]+'-'+partsFechaEdit[0]) : '';
   document.getElementById('movedit-destino').value = mov.destino||'';
   document.getElementById('movedit-darsena').value = mov.darsena||'';
   document.getElementById('movedit-unidades').value = mov.unidades||0;
@@ -7786,10 +7817,12 @@ function setMoveditGrupo(g, btn){
 function guardarEdicionMov(){
   const id = _movEditandoId;
   if(!id) return;
-  const key = _prodFechaManual ? getProdKeyFecha(_prodFechaManual) : getProdKey();
-  const movs = JSON.parse(localStorage.getItem(key)||'[]');
-  const mov = movs.find(function(m){ return m.id===id; });
-  if(!mov){ showToast('❌ No se encontró el movimiento'); return; }
+  const keyVieja = _prodFechaManual ? getProdKeyFecha(_prodFechaManual) : getProdKey();
+  const movsViejo = JSON.parse(localStorage.getItem(keyVieja)||'[]');
+  const idxViejo = movsViejo.findIndex(function(m){ return m.id===id; });
+  if(idxViejo<0){ showToast('❌ No se encontró el movimiento'); return; }
+  const mov = movsViejo[idxViejo];
+  const fechaVieja = mov.fecha||'';
 
   const inicio = document.getElementById('movedit-inicio').value||'';
   const fin = document.getElementById('movedit-fin').value||'';
@@ -7800,6 +7833,12 @@ function guardarEdicionMov(){
     durMin = (fh*60+fm) - (ih*60+im);
   }
 
+  const fechaInput = document.getElementById('movedit-fecha').value; // YYYY-MM-DD
+  const fechaNueva = fechaInput
+    ? (function(){ const p=fechaInput.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; })()
+    : fechaVieja;
+
+  mov.fecha = fechaNueva;
   mov.tipo = document.getElementById('movedit-tipo').value;
   mov.grupo = document.getElementById('movedit-grupos').dataset.grupoActual || mov.grupo;
   mov.destino = document.getElementById('movedit-destino').value||'';
@@ -7811,15 +7850,42 @@ function guardarEdicionMov(){
   mov.durMin = durMin;
   mov.auto = false; // ya fue corregido a mano
 
-  localStorage.setItem(key, JSON.stringify(movs));
+  const cambioFecha = fechaNueva !== fechaVieja;
 
-  // Reflejar el mismo cambio en el historial mensual (mismo id)
-  const partsFecha = (mov.fecha||'').split('/');
-  if(partsFecha.length===3){
-    const mesKey = 'prod_hist_'+partsFecha[1]+'_'+partsFecha[2];
-    const hist = JSON.parse(localStorage.getItem(mesKey)||'[]');
-    const hIdx = hist.findIndex(function(m){ return m.id===id; });
-    if(hIdx>=0){ hist[hIdx] = mov; localStorage.setItem(mesKey, JSON.stringify(hist)); }
+  if(!cambioFecha){
+    // Mismo día: se actualiza en el mismo bucket
+    localStorage.setItem(keyVieja, JSON.stringify(movsViejo));
+  } else {
+    // Cambió la fecha: sacarlo del bucket viejo y ponerlo en el nuevo
+    movsViejo.splice(idxViejo,1);
+    localStorage.setItem(keyVieja, JSON.stringify(movsViejo));
+
+    const partsNueva = fechaNueva.split('/'); // dd/mm/yyyy
+    const dayKeyNueva = 'prod_'+partsNueva[0]+'-'+partsNueva[1]+'-'+partsNueva[2];
+    const movsNuevo = JSON.parse(localStorage.getItem(dayKeyNueva)||'[]');
+    movsNuevo.push(mov);
+    localStorage.setItem(dayKeyNueva, JSON.stringify(movsNuevo));
+  }
+
+  // Historial mensual: sacar del mes viejo (si corresponde) y reflejar en el mes nuevo
+  const partsVieja = fechaVieja.split('/');
+  if(partsVieja.length===3){
+    const mesKeyVieja = 'prod_hist_'+partsVieja[1]+'_'+partsVieja[2];
+    const histVieja = JSON.parse(localStorage.getItem(mesKeyVieja)||'[]');
+    const hIdxVieja = histVieja.findIndex(function(m){ return m.id===id; });
+    const mesCambio = cambioFecha && (partsVieja[1]+'_'+partsVieja[2]) !== (fechaNueva.split('/')[1]+'_'+fechaNueva.split('/')[2]);
+    if(hIdxVieja>=0){
+      if(mesCambio){ histVieja.splice(hIdxVieja,1); }
+      else { histVieja[hIdxVieja] = mov; }
+      localStorage.setItem(mesKeyVieja, JSON.stringify(histVieja));
+    }
+    if(mesCambio){
+      const partsNueva2 = fechaNueva.split('/');
+      const mesKeyNueva = 'prod_hist_'+partsNueva2[1]+'_'+partsNueva2[2];
+      const histNueva = JSON.parse(localStorage.getItem(mesKeyNueva)||'[]');
+      histNueva.push(mov);
+      localStorage.setItem(mesKeyNueva, JSON.stringify(histNueva));
+    }
   }
 
   document.getElementById('mov-edit-modal').style.display = 'none';
@@ -7827,7 +7893,7 @@ function guardarEdicionMov(){
   renderProdResumen();
   renderProdLista();
   if(typeof renderResumenProd==='function') renderResumenProd();
-  showToast('✅ Movimiento actualizado');
+  showToast('✅ Movimiento actualizado'+(cambioFecha?' — movido a '+fechaNueva:''));
 }
 
 function exportarProductividad(){
@@ -10282,6 +10348,7 @@ function abrirModalTiempoRecepcion(id){
   var now = new Date();
   document.getElementById('cyd-tiempo-inicio').value = '';
   document.getElementById('cyd-tiempo-fin').value = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+  document.getElementById('cyd-tiempo-fecha').value = now.toISOString().split('T')[0];
 
   document.getElementById('cyd-tiempo-modal').style.display = 'flex';
 }
@@ -10303,17 +10370,22 @@ function confirmarRecepcionConTiempo(){
   var fin = document.getElementById('cyd-tiempo-fin').value||'';
   if(!inicio || !fin){ showToast('❌ Ingresá inicio y fin de la descarga'); return; }
 
+  var fechaInput = document.getElementById('cyd-tiempo-fecha').value; // YYYY-MM-DD
+  var fechaReal = fechaInput
+    ? (function(){ var p=fechaInput.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; })() // → DD/MM/YYYY
+    : new Date().toLocaleDateString('es-AR');
+
   var durMin = 0;
   var [ih,im] = inicio.split(':').map(Number);
   var [fh,fm] = fin.split(':').map(Number);
   durMin = (fh*60+fm) - (ih*60+im);
 
   document.getElementById('cyd-tiempo-modal').style.display = 'none';
-  cydConfirmarDesdeTransito(_cydTransitoIdPendiente, _cydTiempoGrupo, inicio, fin, durMin);
+  cydConfirmarDesdeTransito(_cydTransitoIdPendiente, _cydTiempoGrupo, inicio, fin, durMin, fechaReal);
   _cydTransitoIdPendiente = null;
 }
 
-function cydConfirmarDesdeTransito(id, grupo, inicio, fin, durMin){
+function cydConfirmarDesdeTransito(id, grupo, inicio, fin, durMin, fechaReal){
   var lista = transitoGetAll();
   var tr = lista.find(function(t){return t.id===id;});
   if(!tr){showToast('❌ Tránsito no encontrado'); return;}
@@ -10376,7 +10448,10 @@ function cydConfirmarDesdeTransito(id, grupo, inicio, fin, durMin){
   transitoBadge();
   cydRenderTransito();
   var totalUn = tr.items.reduce(function(s,r){return s+r.cant;},0);
-  registrarMovProd('carga', totalUn, tr.tipoLabel+(tr.nroContenedor?' '+tr.nroContenedor:''), grupo, inicio, fin, durMin);
+  registrarMovProd('carga', totalUn, tr.tipoLabel+(tr.nroContenedor?' '+tr.nroContenedor:''), grupo, inicio, fin, durMin, fechaReal);
+  if(typeof renderProdResumen==='function') renderProdResumen();
+  if(typeof renderProdLista==='function') renderProdLista();
+  if(typeof renderResumenProd==='function') renderResumenProd();
   showToast('✅ Recepción confirmada — '+totalUn+' un. sumadas al stock · rack actualizado');
 }
 
