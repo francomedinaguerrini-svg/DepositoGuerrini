@@ -234,7 +234,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
 .mov-stats{text-align:right;flex-shrink:0}
 .mov-unid{font-size:16px;font-weight:700;color:#0071e3}
 .mov-time{font-size:10px;color:#86868b}
-.prod-resumen{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+.prod-resumen{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
 .prod-res-card{background:#fff;border-radius:10px;border:1px solid #e5e5ea;padding:10px;text-align:center}
 .prod-res-val{font-size:20px;font-weight:700}
 .prod-res-lbl{font-size:10px;color:#86868b;margin-top:2px}
@@ -1152,8 +1152,8 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
         <input type="number" id="movedit-unidades" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
       </div>
       <div>
-        <div style="font-size:11px;color:#86868b;margin-bottom:3px">Semis / Pedidos</div>
-        <input type="number" id="movedit-semis" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+        <div style="font-size:11px;color:#86868b;margin-bottom:3px">Nº Viaje / Nº Pedido</div>
+        <input type="text" id="movedit-semis" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
       </div>
     </div>
 
@@ -1299,8 +1299,8 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
             <input type="number" id="prod-unidades" class="prod-input" placeholder="0">
           </div>
           <div>
-            <div class="prod-label">Semis / Pedidos</div>
-            <input type="number" id="prod-semis" class="prod-input" value="1">
+            <div class="prod-label">Nº Viaje / Nº Pedido</div>
+            <input type="text" id="prod-semis" class="prod-input" placeholder="Ej: 4, 7...">
           </div>
         </div>
 
@@ -4866,7 +4866,7 @@ function cydEjecutarDespacho(id){
       controlador: controlador,
       patente: patente,
       unidades: totalUnD,
-      semis: 1,
+      semis: '',
       destino: tr.destino||tr.tipoLabel||'',
       darsena: darsena,
       inicio: inicio,
@@ -7409,7 +7409,7 @@ function registrarMovProd(tipo, unidades, detalle, grupoReal, inicioReal, finRea
       tipo: tipo,           // 'carga' | 'descarga' | 'despacho'
       grupo: grupo,
       unidades: unidades,
-      semis: 1,
+      semis: '',
       destino: detalle||'',
       darsena: '',
       inicio: inicioReal||'', fin: finReal||'', durMin: durMinReal||0,
@@ -7647,7 +7647,7 @@ function setProdGrupo(g, btn){
 
 function guardarMovimiento(){
   const unidades = parseInt(document.getElementById('prod-unidades').value||0);
-  const semis = parseInt(document.getElementById('prod-semis').value||1);
+  const nroViajePedido = (document.getElementById('prod-semis').value||'').trim();
   const inicio = document.getElementById('prod-inicio').value||'';
   const fin = document.getElementById('prod-fin').value||'';
   const darsena = document.getElementById('prod-darsena').value||'';
@@ -7682,7 +7682,7 @@ function guardarMovimiento(){
     darsena,
     destino,
     unidades: unidades||0,
-    semis: esActividadSinCant ? 0 : semis,
+    semis: esActividadSinCant ? '' : nroViajePedido,
     inicio,
     fin,
     durMin,
@@ -7692,7 +7692,7 @@ function guardarMovimiento(){
 
   // Reset form
   document.getElementById('prod-unidades').value='';
-  document.getElementById('prod-semis').value='1';
+  document.getElementById('prod-semis').value='';
   document.getElementById('prod-destino-mov').value='';
   document.getElementById('prod-darsena').value='';
   const finEl = document.getElementById('prod-fin');
@@ -7710,13 +7710,16 @@ function guardarMovimiento(){
 function renderProdResumen(){
   const movs = getMovimientosFecha();
   const totalUnid = movs.reduce((s,m)=>s+m.unidades,0);
-  const totalSemis = movs.reduce((s,m)=>s+m.semis,0);
+  const TIPOS_VIAJE = ['carga','descarga','despacho','chasis'];
+  const totalViajes = movs.filter(m=>TIPOS_VIAJE.indexOf(m.tipo)>=0).length;
+  const totalPedidos = movs.filter(m=>m.tipo==='pedidos').length;
   const totalDurMin = movs.filter(m=>m.durMin>0).reduce((s,m)=>s+m.durMin,0);
   const el = document.getElementById('prod-resumen');
   if(!el) return;
   el.innerHTML = `
     <div class="prod-res-card"><div class="prod-res-val" style="color:#0071e3">${totalUnid.toLocaleString('es-AR')}</div><div class="prod-res-lbl">Unidades hoy</div></div>
-    <div class="prod-res-card"><div class="prod-res-val">${totalSemis}</div><div class="prod-res-lbl">Semis / Pedidos</div></div>
+    <div class="prod-res-card"><div class="prod-res-val">${totalViajes}</div><div class="prod-res-lbl">Viajes</div></div>
+    <div class="prod-res-card"><div class="prod-res-val">${totalPedidos}</div><div class="prod-res-lbl">Pedidos</div></div>
     <div class="prod-res-card"><div class="prod-res-val">${totalDurMin>0?Math.round(totalDurMin/60)+'h '+totalDurMin%60+'m':'—'}</div><div class="prod-res-lbl">Tiempo total</div></div>
   `;
 }
@@ -7745,6 +7748,7 @@ function renderProdLista(){
     var autoTag = m.auto?' <span style="font-size:8px;opacity:.6">auto</span>':'';
     var subInfo = [];
     subInfo.push((GRUPOS_NOMBRES[m.grupo]||m.grupo||'—'));
+    if(m.semis) subInfo.push((m.tipo==='pedidos'?'Pedido #':'Viaje #')+m.semis);
     if(m.controlador) subInfo.push('Ctrl: '+m.controlador);
     if(m.patente) subInfo.push('🚛 '+m.patente);
     if(m.inicio) subInfo.push(m.inicio+(m.fin?' → '+m.fin:''));
@@ -7812,7 +7816,7 @@ function editarMov(id){
   document.getElementById('movedit-destino').value = mov.destino||'';
   document.getElementById('movedit-darsena').value = mov.darsena||'';
   document.getElementById('movedit-unidades').value = mov.unidades||0;
-  document.getElementById('movedit-semis').value = mov.semis||1;
+  document.getElementById('movedit-semis').value = mov.semis||'';
   document.getElementById('movedit-inicio').value = mov.inicio||'';
   document.getElementById('movedit-fin').value = mov.fin||'';
 
@@ -7870,7 +7874,7 @@ function guardarEdicionMov(){
   mov.destino = document.getElementById('movedit-destino').value||'';
   mov.darsena = document.getElementById('movedit-darsena').value||'';
   mov.unidades = parseInt(document.getElementById('movedit-unidades').value)||0;
-  mov.semis = parseInt(document.getElementById('movedit-semis').value)||0;
+  mov.semis = (document.getElementById('movedit-semis').value||'').trim();
   mov.inicio = inicio;
   mov.fin = fin;
   mov.durMin = durMin;
@@ -7935,32 +7939,34 @@ function exportarProductividad(){
   const wsDet = [
     [`INFORME DE PRODUCTIVIDAD — ${mes.toUpperCase()}`],
     [],
-    ['FECHA','HORA','TIPO','GRUPO','DÁRSENA','DESTINO/ORIGEN','UNIDADES','SEMIS','INICIO','FIN','DURACIÓN (min)'],
-    ...hist.map(m=>[m.fecha,m.hora,m.tipo.toUpperCase(),m.grupo,m.darsena||'',m.destino||'',m.unidades,m.semis,m.inicio||'',m.fin||'',m.durMin||0])
+    ['FECHA','HORA','TIPO','GRUPO','DÁRSENA','DESTINO/ORIGEN','UNIDADES','Nº VIAJE/PEDIDO','INICIO','FIN','DURACIÓN (min)'],
+    ...hist.map(m=>[m.fecha,m.hora,m.tipo.toUpperCase(),m.grupo,m.darsena||'',m.destino||'',m.unidades,m.semis||'',m.inicio||'',m.fin||'',m.durMin||0])
   ];
   const wsD = XLSX.utils.aoa_to_sheet(wsDet);
-  wsD['!cols'] = [{wch:10},{wch:6},{wch:10},{wch:6},{wch:8},{wch:20},{wch:10},{wch:6},{wch:8},{wch:8},{wch:12}];
+  wsD['!cols'] = [{wch:10},{wch:6},{wch:10},{wch:6},{wch:8},{wch:20},{wch:10},{wch:14},{wch:8},{wch:8},{wch:12}];
   XLSX.utils.book_append_sheet(wb, wsD, 'Detalle');
 
   // === HOJA 2: RESUMEN POR GRUPO ===
+  const TIPOS_VIAJE_XLS = ['carga','descarga','despacho','chasis'];
   const wsRes = [
     ['RESUMEN POR GRUPO'],
     [],
-    ['GRUPO','TOTAL UNIDADES','TOTAL SEMIS','CARGAS','DESCARGAS','CHASIS','TIEMPO TOTAL (min)','PROM. MIN/SEMI'],
+    ['GRUPO','TOTAL UNIDADES','VIAJES','PEDIDOS','CARGAS','DESCARGAS','CHASIS','TIEMPO TOTAL (min)'],
   ];
   grupos.forEach(g=>{
     const movG = hist.filter(m=>m.grupo===g);
     if(!movG.length) return;
     const totalU = movG.reduce((s,m)=>s+m.unidades,0);
-    const totalS = movG.reduce((s,m)=>s+m.semis,0);
     const totalT = movG.reduce((s,m)=>s+(m.durMin||0),0);
+    const viajes = movG.filter(m=>TIPOS_VIAJE_XLS.indexOf(m.tipo)>=0).length;
+    const pedidos = movG.filter(m=>m.tipo==='pedidos').length;
     const cargas = movG.filter(m=>m.tipo==='carga').length;
     const descargas = movG.filter(m=>m.tipo==='descarga').length;
     const chasis = movG.filter(m=>m.tipo==='chasis').length;
-    wsRes.push([g, totalU, totalS, cargas, descargas, chasis, totalT, totalS>0?Math.round(totalT/totalS):0]);
+    wsRes.push([g, totalU, viajes, pedidos, cargas, descargas, chasis, totalT]);
   });
   const wsR = XLSX.utils.aoa_to_sheet(wsRes);
-  wsR['!cols'] = [{wch:8},{wch:16},{wch:13},{wch:8},{wch:10},{wch:8},{wch:18},{wch:16}];
+  wsR['!cols'] = [{wch:8},{wch:16},{wch:9},{wch:9},{wch:8},{wch:10},{wch:8},{wch:18}];
   XLSX.utils.book_append_sheet(wb, wsR, 'Resumen Grupos');
 
   // === HOJA 3: RANKING DIARIO ===
