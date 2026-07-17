@@ -11823,13 +11823,17 @@ function informePunteras(){
   const wb = XLSX.utils.book_new();
   const resMotor = window._motorResumen || {};
 
+  // Chequeo de medio pallet (mismo criterio que el panel) para marcar en el informe
+  const violacionesInforme = chequearLimitePunteras();
+  const artsConViolacion = new Set(violacionesInforme.map(function(v){return String(v.art);}));
+
   // Hoja 1: DETALLE — un renglón por artículo cargado en cada parrilla
   const wsDetalle = [
     ['INFORME DE PUNTERAS — WMS Depósito Halpern'],
     ['Fecha:', ahora.toLocaleDateString('es-AR'), 'Hora:', ahora.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})],
     [resMotor.fecha ? 'Último "Reevaluar"/motor corrido: '+resMotor.fecha+' ('+(resMotor.fuente||'—')+')' : '⚠️ Todavía no se corrió "Reevaluar" en esta sesión'],
     [],
-    ['PARRILLA','ART.','MEDIDA','DISEÑO','PROVEEDOR','UNIDADES','CAPACIDAD','% OCUPADO'],
+    ['PARRILLA','ART.','MEDIDA','DISEÑO','PROVEEDOR','UNIDADES','CAPACIDAD','% OCUPADO','AVISO'],
   ];
 
   let totalArts = 0, totalUn = 0, parrillasConStock = 0;
@@ -11851,7 +11855,8 @@ function informePunteras(){
           dataArt?dataArt.med:'', dataArt?dataArt.diseno:'', dataArt?dataArt.prov:'',
           it.unidades||0,
           CAP_PARRILLA_UNIDADES||'',
-          CAP_PARRILLA_UNIDADES ? Math.round((usado/CAP_PARRILLA_UNIDADES)*100)+'%' : ''
+          CAP_PARRILLA_UNIDADES ? Math.round((usado/CAP_PARRILLA_UNIDADES)*100)+'%' : '',
+          artsConViolacion.has(String(it.art)) ? '⚠️ Supera medio pallet — mover a Mapa Racks' : ''
         ]);
         totalArts++;
         totalUn += (it.unidades||0);
@@ -11864,7 +11869,7 @@ function informePunteras(){
   if(totalArts===0) wsDetalle.push(['— Sin artículos cargados en punteras —']);
 
   const ws1 = XLSX.utils.aoa_to_sheet(wsDetalle);
-  ws1['!cols'] = [{wch:10},{wch:8},{wch:14},{wch:10},{wch:12},{wch:10},{wch:10},{wch:10}];
+  ws1['!cols'] = [{wch:10},{wch:8},{wch:14},{wch:10},{wch:12},{wch:10},{wch:10},{wch:10},{wch:32}];
   XLSX.utils.book_append_sheet(wb, ws1, 'Detalle');
 
   // Hoja 2: RESUMEN — totales por puntera (pasillo) y total general
@@ -12113,28 +12118,20 @@ function importarPunterasArchivo(file){
         return;
       }
 
-      // Tope de medio pallet por artículo — lo que lo supere no se importa
-      // a la puntera; se genera una tarea obligatoria para llevarlo a rack.
+      // Tope de medio pallet por artículo — se importa igual (puede ser lo
+      // que hay físicamente), pero se avisa y se crea la tarea obligatoria
+      // para llevarlo a Mapa Racks.
       const superanLimite = [];
       Object.keys(sumaPorArt).forEach(function(art){
         const limite = capacidadMediaPuntera(art);
         if(sumaPorArt[art] > limite){
           superanLimite.push({art:art, total:sumaPorArt[art], limite:limite});
-          Object.keys(nuevasPunteras).forEach(function(pid){
-            nuevasPunteras[pid] = nuevasPunteras[pid].filter(function(it){ return String(it.art)!==String(art); });
-          });
-          delete sumaPorArt[art];
-          crearTareaObligatoriaPuntera(art, superanLimite[superanLimite.length-1].total, limite);
+          crearTareaObligatoriaPuntera(art, sumaPorArt[art], limite);
         }
       });
 
       const totalArts = Object.keys(sumaPorArt).length;
       const totalUn = Object.values(sumaPorArt).reduce(function(a,b){return a+b;},0);
-      if(!totalArts){
-        document.getElementById('punt-import-resultado').innerHTML =
-          '<div style="background:#ffe8e8;color:#d70015;border-radius:8px;padding:10px;margin-top:10px;font-size:12px">🚫 Todas las filas superaban medio pallet — se crearon tareas obligatorias en Pendientes en vez de importarlas.</div>';
-        return;
-      }
       if(!confirm('Se va a REEMPLAZAR toda la carga actual de punteras por '+totalArts+' artículos ('+totalUn+' un.) del archivo. ¿Continuar?')) return;
 
       // Descontar del rack lo que corresponda, para no contar dos veces
@@ -12158,7 +12155,7 @@ function importarPunterasArchivo(file){
         resHtml += '<div style="background:#fff3cd;color:#856404;border-radius:8px;padding:10px;margin-top:6px;font-size:12px">⚠️ '+sinMatch.length+' fila(s) sin poder importar:<br>'+sinMatch.slice(0,15).join('<br>')+(sinMatch.length>15?'<br>… y '+(sinMatch.length-15)+' más':'')+'</div>';
       }
       if(superanLimite.length){
-        resHtml += '<div style="background:#ffe8e8;color:#d70015;border-radius:8px;padding:10px;margin-top:6px;font-size:12px">🚨 '+superanLimite.length+' artículo(s) superaban medio pallet — no se importaron y se creó tarea obligatoria en Pendientes:<br>'+superanLimite.map(function(v){return 'Art '+v.art+' — '+v.total+' un. (máx. '+v.limite.toFixed(1)+')';}).join('<br>')+'</div>';
+        resHtml += '<div style="background:#ffe8e8;color:#d70015;border-radius:8px;padding:10px;margin-top:6px;font-size:12px">🚨 '+superanLimite.length+' artículo(s) superan medio pallet — se importaron igual y se creó tarea obligatoria en Pendientes para llevarlos a Mapa Racks:<br>'+superanLimite.map(function(v){return 'Art '+v.art+' — '+v.total+' un. (máx. '+v.limite.toFixed(1)+')';}).join('<br>')+'</div>';
       }
       document.getElementById('punt-import-resultado').innerHTML = resHtml;
       showToast('✅ Punteras actualizadas desde archivo');
@@ -12366,17 +12363,18 @@ function agregarAParrilla(id){
   }
 
   // Tope: medio pallet por artículo (según su max_pos), sumando TODAS las
-  // punteras donde ya esté cargado. Si se pasa, no se agrega — tiene que ir
-  // al rack en Mapa Racks en vez de acumularse acá.
+  // punteras donde ya esté cargado. Si se pasa, SE PERMITE cargarlo igual
+  // (puede ser lo que hay físicamente ahí) pero se avisa y se crea la tarea
+  // obligatoria para moverlo a Mapa Racks.
   const limitePuntera = capacidadMediaPuntera(art.art);
   const totalEnPunteras = Object.values(punteras).reduce(function(s, arr2){
     const it = (arr2||[]).find(function(x){ return String(x.art)===artCode; });
     return s + (it ? (it.unidades||0) : 0);
   }, 0);
+  let superoLimitePuntera = false;
   if(totalEnPunteras + cant > limitePuntera){
-    showToast('🚫 Supera medio pallet de este artículo ('+limitePuntera.toFixed(1)+' un. máx. en puntera) — el resto va a Mapa Racks');
+    superoLimitePuntera = true;
     crearTareaObligatoriaPuntera(art.art, totalEnPunteras + cant, limitePuntera);
-    return;
   }
 
   // Si el artículo tiene unidades en el rack, se descuentan de ahí (se está
@@ -12402,6 +12400,7 @@ function agregarAParrilla(id){
   if(deRack>0 && deBloque>0) msg += deRack+' un. del rack + '+deBloque+' un. del bloque';
   else if(deRack>0) msg += deRack+' un. descontadas del rack';
   else msg += cant+' un. del bloque (no estaba en rack)';
+  if(superoLimitePuntera) msg += ' · ⚠️ supera medio pallet — tarea creada para moverlo a Mapa Racks';
   showToast(msg);
 }
 
