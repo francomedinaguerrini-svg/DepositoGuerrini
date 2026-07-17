@@ -1474,8 +1474,19 @@ function chequearCambioUbicacion(art, stockAntes, stockDespues, cantIngreso){
   var pAntes = pallEquivalente(art, stockAntes);
   var pDespues = pallEquivalente(art, stockDespues);
   var tipo = null;
-  if(pAntes>=1 && pDespues<1 && stockDespues>0) tipo = 'puntera';
-  else if(pAntes<1 && pDespues>=1) tipo = 'bloque';
+
+  if(pAntes>=1 && pDespues<1 && stockDespues>0){
+    tipo = 'puntera';
+  } else if(pAntes<1 && pDespues>=1){
+    // Cruzó el umbral de 1 pallet — ¿le corresponde rack o bloque?
+    // Rack: 1 a 6 pallets, no excluido (camión/Speedway/agrícola/AT51-AT52-MT51), rotación < 5.5/sem.
+    // Si no entra en ese rango, recién ahí es bloque.
+    var excluido = /\d+\.5/.test(art.med||'') || (art.prov==='SPEEDWAY') ||
+                   ['TT','TL','TLSB'].indexOf((art.uso||'').trim())>=0 ||
+                   ['AT51','AT52','MT51'].indexOf((art.diseno||'').trim())>=0;
+    var rotAlta = (art.rot_sem||0) >= 5.5;
+    tipo = (!excluido && !rotAlta && pDespues<=6) ? 'rack' : 'bloque';
+  }
   if(!tipo) return null;
 
   var sug = getSugerenciasUbicacion();
@@ -1487,7 +1498,7 @@ function chequearCambioUbicacion(art, stockAntes, stockDespues, cantIngreso){
   };
   // Unificar: si venía de la puntera y entró mercadería, mostrar el desglose
   // (ej: "sacar 3 + 500") para que se junte todo en el mismo movimiento.
-  if(tipo==='bloque'){
+  if(tipo==='bloque' || tipo==='rack'){
     var enPuntera = buscarEnPunteras(art.art).total;
     if(enPuntera>0 && cantIngreso>0){
       entry.enPuntera = enPuntera;
@@ -1525,13 +1536,15 @@ function renderSugerenciasUbicacion(){
   html += '</div>';
   sug.forEach(function(s, idx){
     var esPuntera = s.tipo==='puntera';
-    var textoBloque = (s.enPuntera>0 && s.cantIngreso>0)
-      ? '📦 Unificar: sacar '+s.enPuntera+' (puntera) + '+s.cantIngreso+' (ingreso) — llevar junto a bloque'
-      : '📦 Llegaron a '+s.stock+' un. — sacar de puntera y llevar a bloque';
+    var esRack = s.tipo==='rack';
+    var destinoLbl = esRack ? 'rack' : 'bloque';
+    var textoDestino = (s.enPuntera>0 && s.cantIngreso>0)
+      ? '📦 Unificar: sacar '+s.enPuntera+' (puntera) + '+s.cantIngreso+' (ingreso) — llevar junto a '+destinoLbl
+      : (esRack ? '📦 Llegaron a '+s.stock+' un. — mover a rack (queda en el rango 1-6 pallets)' : '📦 Llegaron a '+s.stock+' un. — sacar de puntera y llevar a bloque');
     html += '<div style="display:flex;align-items:center;gap:8px;background:#f5f5f7;border-radius:8px;padding:8px;margin-bottom:6px">';
     html += '<div style="flex:1;min-width:0">';
     html += '<div style="font-size:12px;font-weight:600">'+s.med+' '+s.diseno+' <span style="color:#86868b;font-weight:400">('+s.art+')</span></div>';
-    html += '<div style="font-size:11px;color:'+(esPuntera?'#0071e3':'#856404')+'">'+(esPuntera?'🔚 Quedan '+s.stock+' un. — llevar a puntera':textoBloque)+'</div>';
+    html += '<div style="font-size:11px;color:'+(esPuntera?'#0071e3':(esRack?'#0071e3':'#856404'))+'">'+(esPuntera?'🔚 Quedan '+s.stock+' un. — llevar a puntera':textoDestino)+'</div>';
     html += '</div>';
     html += '<button onclick="descartarSugerenciaUbicacion('+idx+')" style="border:none;background:#e5e5ea;color:#1d1d1f;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer">✓ Listo</button>';
     html += '</div>';
@@ -3983,10 +3996,22 @@ function procesarPedido(pedido){
 
     // ¿Está en alguna puntera? Si tiene stock ahí, es lo más rápido de agarrar
     // (ya está en la punta del pasillo), así que va primero en prioridad.
+    // OJO: la puntera puede no alcanzar para cubrir todo el pedido — en ese
+    // caso hay que avisar que el resto sale de rack/bloque, no ocultarlo.
     const enPuntera = buscarEnPunteras(item.art);
-    item.puntera = enPuntera.total>0 ? enPuntera.ubicaciones.join(' + ') : '';
+    const dePuntera = Math.min(enPuntera.total, item.cant);
+    const restante = item.cant - dePuntera;
+    item.puntera = dePuntera>0 ? enPuntera.ubicaciones.join(' + ') : '';
 
-    // Prioridad: puntera > rack > bloque > sin ubicación
+    item.fuentes = [];
+    if(dePuntera>0) item.fuentes.push({tipo:'puntera', ubic: enPuntera.ubicaciones.join(' + '), cant: dePuntera});
+    if(restante>0){
+      if(item.posRack) item.fuentes.push({tipo:'rack', ubic:item.posRack, cant:restante});
+      else if(item.bloque) item.fuentes.push({tipo:'bloque', ubic:item.bloque, cant:restante});
+      else item.fuentes.push({tipo:'sinubic', ubic:'', cant:restante});
+    }
+
+    // Prioridad de sección: puntera > rack > bloque > sin ubicación
     if(item.puntera){
       conPuntera.push(item);
     } else if(item.posRack){
@@ -4047,7 +4072,13 @@ function renderPedido(conPuntera, conRack, conBloque, sinUbic, todos){
     const esBuscar = item.posRack === 'BUSCAR EN RACK';
     const esBajo = item.cond === 'bajo stock';
     const yaPrep = !!prepState[item.art];
-    const ubic = tipo==='puntera'
+    const dividido = item.fuentes && item.fuentes.length>1;
+    const ICONOS = {puntera:'🔚', rack:'🔵', bloque:'🟡', sinubic:'❓'};
+    const ubic = dividido
+      ? `<div style="display:flex;flex-direction:column;gap:2px">` + item.fuentes.map(f=>
+          `<span style="font-size:9px;font-weight:600;color:#d70015;background:#ffe8e8;padding:2px 5px;border-radius:4px;white-space:nowrap">${ICONOS[f.tipo]||'❓'} ${f.ubic||'sin ubic.'} — ${f.cant}</span>`
+        ).join('') + `</div>`
+      : tipo==='puntera'
       ? `<span class="ped-ubic-puntera" style="font-size:10px;font-weight:600;color:#7a3fb0;background:#f2e6ff;padding:2px 6px;border-radius:4px">🔚 ${item.puntera}</span>`
       : tipo==='rack'
       ? esBuscar
@@ -4056,13 +4087,13 @@ function renderPedido(conPuntera, conRack, conBloque, sinUbic, todos){
       : tipo==='bloque'
       ? `<span class="ped-ubic-bloque">🟡 ${item.bloque}</span>`
       : `<span class="ped-ubic-sin">❓ Sin ubic.</span>`;
-    const rowStyle = yaPrep ? 'background:#f0fff4;opacity:.55' : (esBajo ? 'background:#fff5f5' : '');
+    const rowStyle = yaPrep ? 'background:#f0fff4;opacity:.55' : (dividido ? 'background:#fff5f5' : (esBajo ? 'background:#fff5f5' : ''));
     return `<tr class="${tipo}-row" id="ped-row-${item.art}" style="${rowStyle}">
       <td style="text-align:center"><input type="checkbox" ${yaPrep?'checked':''} onchange="togglePrepPedidoItem('${nroPed}','${item.art}',this.checked)" style="width:18px;height:18px;cursor:pointer"></td>
       <td><div class="ped-art" style="${yaPrep?'text-decoration:line-through':''}">${item.art}</div></td>
       <td>
         <div class="ped-desc" style="${yaPrep?'text-decoration:line-through':''}">${item.med} ${item.diseno}</div>
-        <div class="ped-prov">${item.prov}${esBajo?' · <span style="color:#d70015;font-weight:600">⚠️ BAJO STOCK</span>':''}</div>
+        <div class="ped-prov">${item.prov}${esBajo?' · <span style="color:#d70015;font-weight:600">⚠️ BAJO STOCK</span>':''}${dividido?' · <span style="color:#d70015;font-weight:600">⚠️ SACAR DE 2 LUGARES</span>':''}</div>
       </td>
       <td>${ubic}</td>
       <td class="ped-cant">${item.cant}</td>
@@ -4212,24 +4243,31 @@ function exportarPedido(){
   ];
 
   let paso = 1;
+  function detalleFuentes(r){
+    if(!r.fuentes || r.fuentes.length<2) return '';
+    var ICONOS_XLS = {puntera:'PUNTERA', rack:'RACK', bloque:'BLOQUE', sinubic:'S/UBIC'};
+    return '⚠️ DIVIDIDO: ' + r.fuentes.map(function(f){
+      return ICONOS_XLS[f.tipo]+' '+(f.ubic||'')+' ('+f.cant+')';
+    }).join(' + ');
+  }
   // Separador puntera (reusa la columna "UBIC. RACK" para mostrar la parrilla)
   if(puntera.length>0){
     wsData.push(['--- PUNTERA ---','','','','','','','','','']);
-    puntera.forEach(r=>wsData.push([paso++, r.art, r.med+' '+r.diseno, r.prov, r.cant, r.stock||0, '🔚 '+(r.puntera||''), '', r.cond||'', '']));
+    puntera.forEach(r=>wsData.push([paso++, r.art, r.med+' '+r.diseno, r.prov, r.cant, r.stock||0, '🔚 '+(r.puntera||''), '', r.cond||'', detalleFuentes(r)]));
   }
   // Separador rack
   if(rack.length>0){
     wsData.push(['--- RACK ---','','','','','','','','','']);
-    rack.forEach(r=>wsData.push([paso++, r.art, r.med+' '+r.diseno, r.prov, r.cant, r.stock||0, r.posRack||'', '', r.cond||'', '']));
+    rack.forEach(r=>wsData.push([paso++, r.art, r.med+' '+r.diseno, r.prov, r.cant, r.stock||0, r.posRack||'', '', r.cond||'', detalleFuentes(r)]));
   }
   // Separador bloques
   if(bloque.length>0){
     wsData.push(['--- BLOQUES ---','','','','','','','','','']);
-    bloque.forEach(r=>wsData.push([paso++, r.art, r.med+' '+r.diseno, r.prov, r.cant, r.stock||0, '', r.bloque||'', r.cond||'', '']));
+    bloque.forEach(r=>wsData.push([paso++, r.art, r.med+' '+r.diseno, r.prov, r.cant, r.stock||0, '', r.bloque||'', r.cond||'', detalleFuentes(r)]));
   }
   if(sin.length>0){
     wsData.push(['--- SIN UBICACIÓN ---','','','','','','','','','']);
-    sin.forEach(r=>wsData.push([paso++, r.art, r.med+' '+r.diseno, r.prov, r.cant, r.stock||0, '', '', r.cond||'', '']));
+    sin.forEach(r=>wsData.push([paso++, r.art, r.med+' '+r.diseno, r.prov, r.cant, r.stock||0, '', '', r.cond||'', detalleFuentes(r)]));
   }
 
   // Total
@@ -8425,16 +8463,21 @@ function imprimirPedido(){
   function filas(items, tipoUbic){
     return items.map(r=>{
       const yaPrep = !!prepStatePrint[r.art];
+      const dividido = r.fuentes && r.fuentes.length>1;
+      const ICONOS_PRINT = {puntera:'🔚', rack:'🔵', bloque:'🟡', sinubic:'❓'};
+      const ubicStr = dividido
+        ? r.fuentes.map(f=>(ICONOS_PRINT[f.tipo]||'')+' '+(f.ubic||'s/ubic')+' ('+f.cant+')').join(' + ')
+        : (tipoUbic==='puntera'?(r.puntera||''):tipoUbic==='rack'?(r.posRack||''):(r.bloque||''));
       return `
-      <tr style="${yaPrep?'background:#eafaef':''}">
+      <tr style="${yaPrep?'background:#eafaef':(dividido?'background:#fff0f0':'')}">
         <td style="text-align:center;color:#86868b;font-size:7px">${paso++}</td>
         <td style="font-size:8px">${r.art}</td>
-        <td class="${r.cond==='bajo stock'?'bajo':''}" style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:120px${yaPrep?';text-decoration:line-through':''}"><strong>${r.med||''}</strong> ${r.diseno||''}</td>
+        <td class="${r.cond==='bajo stock'?'bajo':''}" style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:120px${yaPrep?';text-decoration:line-through':''}"><strong>${r.med||''}</strong> ${r.diseno||''}${dividido?' <span style="color:#d70015;font-weight:700">⚠️2 UBIC.</span>':''}</td>
         <td style="text-align:center;font-size:7px;font-weight:700;color:#0071e3;white-space:nowrap">${RANGOS&&RANGOS[r.art]?RANGOS[r.art]:''}</td>
         <td>${r.prov||''}</td>
         <td style="text-align:center;font-weight:700;font-size:10px">${r.cant}</td>
         <td style="text-align:center;color:${(r.stock||0)<r.cant?'#d70015':'#1d1d1f'}">${r.stock||0}</td>
-        <td style="color:#0071e3;font-weight:600">${tipoUbic==='puntera'?(r.puntera||''):tipoUbic==='rack'?(r.posRack||''):(r.bloque||'')}</td>
+        <td style="color:${dividido?'#d70015':'#0071e3'};font-weight:600;font-size:${dividido?'7px':'inherit'}">${ubicStr}</td>
         <td style="color:${r.cond==='bajo stock'?'#d70015':'#86868b'}">${r.cond||''}</td>
         <td style="border-left:1px solid #d2d2d7;min-width:22px;min-height:16px;text-align:center;font-weight:700;color:#1d7a3c">${yaPrep?'✓':''}</td>
         <td style="border-left:1px solid #d2d2d7;min-width:22px;min-height:16px"></td>
@@ -9786,7 +9829,7 @@ function transitoBadge(){
 }
 
 // Calcula posición sugerida para un artículo dado el stock ACTUAL (sin sumar el ingreso)
-function transitoPosicionSugerida(artId, cantEntrada){
+function _transitoPosicionSugeridaBase(artId, cantEntrada){
   var da = DATA.find(function(r){return r.art===artId;});
   if(!da) return {tipo:'desconocido', pos:'—', detalle:'Art no en DATA'};
 
@@ -9909,6 +9952,42 @@ function transitoPosicionSugerida(artId, cantEntrada){
   // ── Bloque directo ──
   return {tipo:'bloque', pos: da.bloque||'—',
           detalle:'Bloque '+(da.bloque||'—'), pallets: pallFuturo.toFixed(1)};
+}
+
+// Envuelve la función base cruzando con lo que ya está en punteras Y en rack.
+// Premisa: un artículo no puede tener stock físico en dos lugares a la vez —
+// si ya está en una puntera o en el rack, y el destino sugerido termina siendo
+// otro lugar, hay que avisar para unificar en vez de dejarlo repartido.
+function transitoPosicionSugerida(artId, cantEntrada){
+  var res = _transitoPosicionSugeridaBase(artId, cantEntrada);
+
+  var enPuntera = buscarEnPunteras(artId);
+  if(enPuntera && enPuntera.total>0){
+    res.enPuntera = enPuntera.total;
+    res.punteraUbic = enPuntera.ubicaciones.join(', ');
+  }
+
+  // Si el destino sugerido NO es rack pero el artículo ya tiene unidades
+  // asignadas ahí, también hay que unificar (sacarlo del rack primero)
+  if(res.tipo !== 'rack'){
+    var posEnRack = [];
+    Object.entries(ASIGN).forEach(function(e){
+      var posId=e[0], v=e[1];
+      if(v && v.art===artId && (v.unidades||0)>0) posEnRack.push(posId+' ('+v.unidades+')');
+    });
+    if(posEnRack.length){
+      res.enRack = posEnRack.length;
+      res.rackUbic = posEnRack.join(', ');
+    }
+  }
+
+  var avisos = [];
+  if(res.enPuntera) avisos.push('sacar '+res.enPuntera+' un. de '+res.punteraUbic);
+  if(res.rackUbic)  avisos.push('sacar del rack '+res.rackUbic);
+  if(avisos.length){
+    res.detalle = '⚠️ UNIFICAR: '+avisos.join(' + ')+' → '+res.detalle;
+  }
+  return res;
 }
 
 function cydEnviarTransito(){
@@ -10146,6 +10225,21 @@ function cydEliminarTransito(id){
   cydRenderTransito();
 }
 
+// Desglosa una cantidad en pallets físicos reales: pallets completos (a
+// capacidad max_pos) + el resto suelto. Ej: 506 un. con max_pos=40 →
+// "12×40 + 1×26" en vez de un decimal genérico como "12.65".
+function formatPalletizado(total, maxPos){
+  total = total||0;
+  if(!maxPos || maxPos<=0) return total+' un.';
+  var completos = Math.floor(total / maxPos);
+  var resto = total % maxPos;
+  var partes = [];
+  if(completos>0) partes.push(completos+'×'+maxPos);
+  if(resto>0) partes.push('1×'+resto);
+  if(!partes.length) return '0';
+  return partes.join(' + ');
+}
+
 function cydExportarPlanilla(id){
   var lista = transitoGetAll();
   var tr = lista.find(function(t){return t.id===id;});
@@ -10173,8 +10267,11 @@ function cydExportarPlanilla(id){
     var stockNuevo = (r.stockActual||0) + r.cant;
     var cantStr = '+'+r.cant;
     var cantColor = '#34c759';
-    var destColor = sug.tipo==='rack' ? '#0071e3' : '#ff9500';
+    var destColor = (sug.enPuntera || sug.rackUbic) ? '#d70015' : (sug.tipo==='rack' ? '#0071e3' : '#ff9500');
     var rango = (typeof RANGOS !== 'undefined' && RANGOS[String(r.art)]) ? RANGOS[String(r.art)] : '—';
+    var dataArtRow = DATA.find(function(x){ return x.art===r.art; });
+    var maxPosRow = dataArtRow ? (dataArtRow.max_pos||32) : 32;
+    var paletizadoStr = formatPalletizado(stockNuevo, maxPosRow);
     var dot = (function(){
       try{
         var dots = JSON.parse(localStorage.getItem('wms_dots')||'{}');
@@ -10194,7 +10291,7 @@ function cydExportarPlanilla(id){
       '<td style="text-align:right">'+(r.stockActual||0)+'</td>'+
       '<td style="text-align:right;font-weight:700;color:'+cantColor+'">'+cantStr+'</td>'+
       '<td style="text-align:right;font-weight:700">'+stockNuevo+'</td>'+
-      '<td style="text-align:right">'+(sug.pallets||'—')+'</td>'+
+      '<td style="text-align:right">'+paletizadoStr+'</td>'+
       '<td style="font-weight:700;color:'+destColor+'">'+(sug.detalle||'—')+'</td>'+
       '<td style="border:2px solid #bbb;min-width:80px">&nbsp;</td>'+
       '</tr>';
@@ -10258,7 +10355,7 @@ function cydExportarPlanilla(id){
       '<th style="text-align:right">Stock act.</th>'+
       '<th style="text-align:right">Entra</th>'+
       '<th style="text-align:right">Stock nuevo</th>'+
-      '<th style="text-align:right">Pallets</th>'+
+      '<th style="text-align:right">Paletizado</th>'+
       '<th>Destino sugerido</th>'+
       '<th style="min-width:80px">Posición física ✍</th>'+
     '</tr></thead><tbody>'+rows+'</tbody>'+
@@ -11462,6 +11559,60 @@ function capacidadUsada(items){
   return (items||[]).reduce(function(s,it){return s+(it.unidades||0);},0);
 }
 
+// Tope de puntera por artículo: medio pallet, según la capacidad real del
+// artículo (max_pos) cargada en el módulo de paletizado.
+function capacidadMediaPuntera(artId){
+  var da = DATA.find(function(r){ return String(r.art)===String(artId); });
+  var maxPos = da ? (da.max_pos||32) : 32;
+  return maxPos / 2;
+}
+
+// Crea una tarea obligatoria en Pendientes para sacar un artículo de puntera
+// y llevarlo a Mapa Racks. No duplica si ya hay una pendiente para ese art.
+function crearTareaObligatoriaPuntera(artId, totalActual, limite){
+  var arr = getPensamientos();
+  var yaExiste = arr.some(function(t){ return t.estado==='pendiente' && t._punteraArt===String(artId); });
+  if(yaExiste) return false;
+  var da = DATA.find(function(r){ return String(r.art)===String(artId); });
+  var desc = da ? (da.med+' '+da.diseno+' ('+da.prov+')') : '';
+  arr.unshift({
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    titulo: '🚨 OBLIGATORIO: sacar art. '+artId+(desc?' — '+desc:'')+' de puntera y llevarlo a Mapa Racks — tiene '+totalActual+' un. (máx. permitido: '+limite.toFixed(1)+', medio pallet)',
+    categoria: 'WMS',
+    prioridad: 'Alta',
+    estado: 'pendiente',
+    desarrollo: '',
+    fecha: new Date().toLocaleDateString('es-AR'),
+    fechaHecho: null,
+    _punteraArt: String(artId)
+  });
+  savePensamientos(arr);
+  return true;
+}
+
+// Recorre todas las punteras, suma el total por artículo (puede estar
+// repartido en varias parrillas) y detecta los que superan medio pallet.
+// Por cada violación nueva, crea la tarea obligatoria correspondiente.
+function chequearLimitePunteras(){
+  var punteras = getPunteras();
+  var totalesPorArt = {};
+  Object.values(punteras).forEach(function(items){
+    (items||[]).forEach(function(it){
+      totalesPorArt[it.art] = (totalesPorArt[it.art]||0) + (it.unidades||0);
+    });
+  });
+  var violaciones = [];
+  Object.keys(totalesPorArt).forEach(function(art){
+    var limite = capacidadMediaPuntera(art);
+    var total = totalesPorArt[art];
+    if(total > limite){
+      violaciones.push({art:art, total:total, limite:limite});
+      crearTareaObligatoriaPuntera(art, total, limite);
+    }
+  });
+  return violaciones;
+}
+
 // ============================================================
 // IMPORTAR PUNTERAS DESDE ARCHIVO
 // ============================================================
@@ -11609,8 +11760,28 @@ function importarPunterasArchivo(file){
         return;
       }
 
+      // Tope de medio pallet por artículo — lo que lo supere no se importa
+      // a la puntera; se genera una tarea obligatoria para llevarlo a rack.
+      const superanLimite = [];
+      Object.keys(sumaPorArt).forEach(function(art){
+        const limite = capacidadMediaPuntera(art);
+        if(sumaPorArt[art] > limite){
+          superanLimite.push({art:art, total:sumaPorArt[art], limite:limite});
+          Object.keys(nuevasPunteras).forEach(function(pid){
+            nuevasPunteras[pid] = nuevasPunteras[pid].filter(function(it){ return String(it.art)!==String(art); });
+          });
+          delete sumaPorArt[art];
+          crearTareaObligatoriaPuntera(art, superanLimite[superanLimite.length-1].total, limite);
+        }
+      });
+
       const totalArts = Object.keys(sumaPorArt).length;
       const totalUn = Object.values(sumaPorArt).reduce(function(a,b){return a+b;},0);
+      if(!totalArts){
+        document.getElementById('punt-import-resultado').innerHTML =
+          '<div style="background:#ffe8e8;color:#d70015;border-radius:8px;padding:10px;margin-top:10px;font-size:12px">🚫 Todas las filas superaban medio pallet — se crearon tareas obligatorias en Pendientes en vez de importarlas.</div>';
+        return;
+      }
       if(!confirm('Se va a REEMPLAZAR toda la carga actual de punteras por '+totalArts+' artículos ('+totalUn+' un.) del archivo. ¿Continuar?')) return;
 
       // Descontar del rack lo que corresponda, para no contar dos veces
@@ -11632,6 +11803,9 @@ function importarPunterasArchivo(file){
         +'</div>';
       if(sinMatch.length){
         resHtml += '<div style="background:#fff3cd;color:#856404;border-radius:8px;padding:10px;margin-top:6px;font-size:12px">⚠️ '+sinMatch.length+' fila(s) sin poder importar:<br>'+sinMatch.slice(0,15).join('<br>')+(sinMatch.length>15?'<br>… y '+(sinMatch.length-15)+' más':'')+'</div>';
+      }
+      if(superanLimite.length){
+        resHtml += '<div style="background:#ffe8e8;color:#d70015;border-radius:8px;padding:10px;margin-top:6px;font-size:12px">🚨 '+superanLimite.length+' artículo(s) superaban medio pallet — no se importaron y se creó tarea obligatoria en Pendientes:<br>'+superanLimite.map(function(v){return 'Art '+v.art+' — '+v.total+' un. (máx. '+v.limite.toFixed(1)+')';}).join('<br>')+'</div>';
       }
       document.getElementById('punt-import-resultado').innerHTML = resHtml;
       showToast('✅ Punteras actualizadas desde archivo');
@@ -11697,6 +11871,21 @@ function renderPunteras(){
       ⚠️ La Puntera 9 se sacó del módulo pero todavía tiene ${totalArts} artículo(s) cargados (${totalUn} un.) en ${huerfanas.length} parrilla(s) — no se borraron, solo dejaron de mostrarse. Movelos a otra puntera o
       <button onclick="if(confirm('¿Vaciar definitivamente los datos de la ex-Puntera 9?')){ var p=getPunteras(); ${keysJs}.forEach(function(k){delete p[k];}); savePunteras(p); renderPunteras(); showToast('🗑️ Ex-Puntera 9 vaciada'); }" style="background:none;border:none;color:#856404;text-decoration:underline;font-weight:700;cursor:pointer;padding:0;font-size:12px">borralos</button>.
     </div>`;
+  }
+
+  // Tope de medio pallet por artículo — si algo lo supera, no alcanza con
+  // un aviso: se genera una tarea obligatoria en Pendientes para sacarlo
+  // de la puntera y llevarlo a Mapa Racks.
+  const violacionesLimite = chequearLimitePunteras();
+  if(violacionesLimite.length){
+    html += '<div style="background:#ffe8e8;border:1px solid #ffb3b3;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#d70015">';
+    html += '🚨 <b>'+violacionesLimite.length+' artículo(s) superan medio pallet en puntera</b> — se creó una tarea obligatoria en Pendientes para moverlos a Mapa Racks:<br>';
+    html += violacionesLimite.map(function(v){
+      var da = DATA.find(function(r){return String(r.art)===String(v.art);});
+      var desc = da ? (da.med+' '+da.diseno) : '';
+      return '• Art '+v.art+' '+desc+' — '+v.total+' un. (máx. '+v.limite.toFixed(1)+')';
+    }).join('<br>');
+    html += '</div>';
   }
 
   PUNTERA_ZONAS.forEach(function(zona){
@@ -11820,6 +12009,20 @@ function agregarAParrilla(id){
   const usado = capacidadUsada(items);
   if(CAP_PARRILLA_UNIDADES && usado + cant > CAP_PARRILLA_UNIDADES){
     showToast('⚠️ Supera la capacidad de la parrilla ('+(CAP_PARRILLA_UNIDADES-usado)+' disponibles)');
+    return;
+  }
+
+  // Tope: medio pallet por artículo (según su max_pos), sumando TODAS las
+  // punteras donde ya esté cargado. Si se pasa, no se agrega — tiene que ir
+  // al rack en Mapa Racks en vez de acumularse acá.
+  const limitePuntera = capacidadMediaPuntera(art.art);
+  const totalEnPunteras = Object.values(punteras).reduce(function(s, arr2){
+    const it = (arr2||[]).find(function(x){ return String(x.art)===artCode; });
+    return s + (it ? (it.unidades||0) : 0);
+  }, 0);
+  if(totalEnPunteras + cant > limitePuntera){
+    showToast('🚫 Supera medio pallet de este artículo ('+limitePuntera.toFixed(1)+' un. máx. en puntera) — el resto va a Mapa Racks');
+    crearTareaObligatoriaPuntera(art.art, totalEnPunteras + cant, limitePuntera);
     return;
   }
 
