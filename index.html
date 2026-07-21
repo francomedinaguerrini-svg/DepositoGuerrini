@@ -629,6 +629,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
     <div class="tab-row2-item" id="row2tab-grupos" onclick="switchTab('grupos',this)">👥 Grupos</div>
     <div class="tab-row2-item" id="row2tab-dot" onclick="switchTab('dot',this)">📅 DOTs</div>
     <div class="tab-row2-item" id="row2tab-viaticos" onclick="switchTab('viaticos',this)">🧾 Viáticos</div>
+    <div class="tab-row2-item" id="row2tab-chasis" onclick="switchTab('chasis',this)">🚛 Chasis</div>
 
     <div class="tab-row2-group">📊 Gestión</div>
     <div class="tab-row2-item" id="row2tab-dash" onclick="switchTab('dash',this)">📊 Dashboard</div>
@@ -1957,6 +1958,7 @@ function switchTab(name,btn){
   if(name==='checklist') renderChecklist();
   if(name==='hys') renderHys();
   if(name==='viaticos') renderViaticos();
+  if(name==='chasis') renderChasis();
 }
 
 // --- UPDATE ---
@@ -10143,6 +10145,28 @@ if('serviceWorker' in navigator){
   <div id="viaticos-lista"></div>
 </div>
 
+<!-- CHASIS: viajes, rendición, consumo y checklist de camiones -->
+<div class="view" id="view-chasis">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+    <span style="font-size:13px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px">🚛 Chasis — Viajes y Rendición</span>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button onclick="switchTab('checklist', document.getElementById('row2tab-checklist'))" style="padding:6px 12px;background:#f5f5f7;color:#1d1d1f;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">🚚 Checklist de camiones</button>
+      <button onclick="exportarViajesChasis()" style="padding:6px 12px;background:#1d1d1f;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">📊 Informe</button>
+      <button onclick="abrirNuevoViajeChasis()" style="padding:6px 12px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">+ Nuevo viaje</button>
+    </div>
+  </div>
+
+  <div id="chasis-kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px"></div>
+
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px">
+    <span style="font-size:11px;color:#86868b">Mes:</span>
+    <input type="month" id="chasis-mes-sel" onchange="renderChasis()" style="padding:4px 8px;border:1px solid #d2d2d7;border-radius:8px;font-size:12px;color:#1d1d1f;background:#fff">
+  </div>
+
+  <div id="chasis-form-box"></div>
+  <div id="chasis-lista"></div>
+</div>
+
 <script>
 
 
@@ -14262,6 +14286,243 @@ function exportarRendicionViatico(id){
   XLSX.utils.book_append_sheet(wb, ws, 'Rendición');
   XLSX.writeFile(wb, 'Rendicion_Viaticos_'+(r.nombre||'sinnombre').replace(/\s+/g,'_')+'_'+r.fecha.replace(/\//g,'-')+'.xlsx');
   showToast('✅ Rendición exportada');
+}
+
+// ═══════════════════════════════════════════════════════════
+// MÓDULO CHASIS — viajes, rendición, consumo
+// (el checklist de camiones vive en el módulo Checklist,
+// se accede desde acá con el botón "Checklist de camiones")
+// ═══════════════════════════════════════════════════════════
+
+const CHOFERES_CHASIS = ['Nicastro Fabricio Exequiel','Miranda Kevin','Funes P'];
+
+// Semilla con el historial que ya estaba cargado (del Excel VIAJES_CHASIS.xlsx),
+// para no perderlo. Solo se aplica una vez, si nunca se inicializó el storage.
+const CHASIS_SEED_VIAJES = [
+  {fecha:'05/06/2026', chofer:'Nicastro Fabricio Exequiel', destino:'SAN JUAN', kms:394, gastoCombustible:0, gastoFondoFijo:50000, observaciones:'OK RENDIDO'},
+  {fecha:'08/06/2026', chofer:'Miranda Kevin', destino:'villa mercedes', kms:725, gastoCombustible:0, gastoFondoFijo:58000, observaciones:'OK RENDIDO'},
+  {fecha:'12/06/2026', chofer:'Nicastro Fabricio Exequiel', destino:'SAN JUAN', kms:366, gastoCombustible:0, gastoFondoFijo:52000, observaciones:'OK RENDIDO'},
+  {fecha:'19/06/2026', chofer:'Miranda Kevin', destino:'SAN JUAN', kms:388, gastoCombustible:0, gastoFondoFijo:52000, observaciones:'OK RENDIDO'},
+  {fecha:'24/06/2026', chofer:'Nicastro Fabricio Exequiel', destino:'SAN RAFAEL', kms:494, gastoCombustible:0, gastoFondoFijo:25000, observaciones:'OK RENDIDO'},
+  {fecha:'01/07/2026', chofer:'Miranda Kevin', destino:'RIO IV', kms:1489, gastoCombustible:0, gastoFondoFijo:157300, observaciones:''},
+  {fecha:'08/07/2026', chofer:'Nicastro Fabricio Exequiel', destino:'SAN JUAN', kms:370, gastoCombustible:0, gastoFondoFijo:51000, observaciones:''},
+  {fecha:'13/07/2026', chofer:'Funes P', destino:'SURI', kms:0, gastoCombustible:0, gastoFondoFijo:0, observaciones:'cintas hys'},
+  {fecha:'15/07/2026', chofer:'Nicastro Fabricio Exequiel', destino:'CBA SL', kms:1569, gastoCombustible:0, gastoFondoFijo:220000, observaciones:'120 CAJA CHICA-10 HS EXTRAS- A REINTEGRAR 100'},
+  {fecha:'20/07/2026', chofer:'Nicastro Fabricio Exequiel', destino:'SAN JUAN', kms:0, gastoCombustible:0, gastoFondoFijo:0, observaciones:'SIN SALDO CAJA CHICA-A REINTEGRAR'},
+];
+
+function getViajesChasis(){
+  if(localStorage.getItem('wms_viajes_chasis_seeded')!=='1'){
+    localStorage.setItem('wms_viajes_chasis_seeded','1');
+    if(!localStorage.getItem('wms_viajes_chasis')){
+      var seed = CHASIS_SEED_VIAJES.map(function(v){ return Object.assign({id:genMovId()}, v); });
+      localStorage.setItem('wms_viajes_chasis', JSON.stringify(seed));
+    }
+  }
+  try{ return JSON.parse(localStorage.getItem('wms_viajes_chasis')||'[]'); }catch(e){ return []; }
+}
+function saveViajesChasis(arr){
+  localStorage.setItem('wms_viajes_chasis', JSON.stringify(arr));
+}
+function _fechaDMYtoISO(dmy){
+  var p = (dmy||'').split('/');
+  return p.length===3 ? p[2]+'-'+p[1]+'-'+p[0] : '';
+}
+function _fechaISOtoDMY(iso){
+  var p = (iso||'').split('-');
+  return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : '';
+}
+
+function abrirNuevoViajeChasis(editId){
+  var v = editId ? getViajesChasis().find(function(x){return x.id===editId;}) : null;
+  var box = document.getElementById('chasis-form-box');
+  var hoyISO = new Date().toISOString().split('T')[0];
+  box.innerHTML = `
+    <div style="background:#fff;border:1px solid #e5e5ea;border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px">${v?'✎ Editar viaje':'➕ Nuevo viaje'}</div>
+      <input type="hidden" id="cv-id" value="${v?v.id:''}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <div style="font-size:11px;color:#86868b;margin-bottom:3px">Fecha</div>
+          <input type="date" id="cv-fecha" value="${v?_fechaDMYtoISO(v.fecha):hoyISO}" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+        </div>
+        <div>
+          <div style="font-size:11px;color:#86868b;margin-bottom:3px">Chofer</div>
+          <input list="cv-choferes-list" id="cv-chofer" value="${v?v.chofer:''}" placeholder="Nombre del chofer" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+          <datalist id="cv-choferes-list">${CHOFERES_CHASIS.map(function(c){return '<option value="'+c+'">';}).join('')}</datalist>
+        </div>
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="font-size:11px;color:#86868b;margin-bottom:3px">Destino / Motivo</div>
+        <input type="text" id="cv-destino" value="${v?(v.destino||''):''}" placeholder="Ej: SAN JUAN" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <div style="font-size:11px;color:#86868b;margin-bottom:3px">KMs</div>
+          <input type="number" id="cv-kms" value="${v?v.kms:''}" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+        </div>
+        <div>
+          <div style="font-size:11px;color:#86868b;margin-bottom:3px">Gasto combustible</div>
+          <input type="number" id="cv-comb" value="${v?v.gastoCombustible:''}" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+        </div>
+        <div>
+          <div style="font-size:11px;color:#86868b;margin-bottom:3px">Gasto fondo fijo</div>
+          <input type="number" id="cv-fondo" value="${v?v.gastoFondoFijo:''}" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:#86868b;margin-bottom:3px">Observaciones</div>
+        <input type="text" id="cv-obs" value="${v?(v.observaciones||''):''}" placeholder="Ej: OK RENDIDO" style="width:100%;padding:8px;border:1px solid #d2d2d7;border-radius:8px;font-size:13px;box-sizing:border-box">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="document.getElementById('chasis-form-box').innerHTML=''" style="flex:1;padding:10px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:13px;cursor:pointer">Cancelar</button>
+        <button onclick="guardarViajeChasis()" style="flex:1;padding:10px;background:#0071e3;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">💾 Guardar</button>
+      </div>
+    </div>
+  `;
+}
+
+function guardarViajeChasis(){
+  var id = document.getElementById('cv-id').value;
+  var fechaISO = document.getElementById('cv-fecha').value;
+  var chofer = document.getElementById('cv-chofer').value.trim();
+  var destino = document.getElementById('cv-destino').value.trim();
+  var kms = parseFloat(document.getElementById('cv-kms').value)||0;
+  var comb = parseFloat(document.getElementById('cv-comb').value)||0;
+  var fondo = parseFloat(document.getElementById('cv-fondo').value)||0;
+  var obs = document.getElementById('cv-obs').value.trim();
+
+  if(!fechaISO || !chofer){ showToast('❌ Ingresá fecha y chofer'); return; }
+
+  var viajes = getViajesChasis();
+  if(id){
+    var v = viajes.find(function(x){return x.id===id;});
+    if(v){
+      v.fecha = _fechaISOtoDMY(fechaISO);
+      v.chofer = chofer; v.destino = destino; v.kms = kms;
+      v.gastoCombustible = comb; v.gastoFondoFijo = fondo; v.observaciones = obs;
+    }
+  } else {
+    viajes.push({
+      id: genMovId(), fecha: _fechaISOtoDMY(fechaISO), chofer: chofer, destino: destino,
+      kms: kms, gastoCombustible: comb, gastoFondoFijo: fondo, observaciones: obs
+    });
+  }
+  saveViajesChasis(viajes);
+  document.getElementById('chasis-form-box').innerHTML = '';
+  renderChasis();
+  showToast('✅ Viaje guardado');
+}
+
+function eliminarViajeChasis(id){
+  if(!confirm('¿Eliminar este viaje?')) return;
+  var viajes = getViajesChasis().filter(function(v){return v.id!==id;});
+  saveViajesChasis(viajes);
+  renderChasis();
+  showToast('🗑️ Viaje eliminado');
+}
+
+function _viajesChasisDelMes(mesFiltro){
+  return getViajesChasis().filter(function(v){
+    if(!mesFiltro) return true;
+    var p = (v.fecha||'').split('/'); // dd/mm/yyyy
+    if(p.length!==3) return false;
+    return (p[2]+'-'+p[1]) === mesFiltro;
+  });
+}
+
+function renderChasis(){
+  var mesSel = document.getElementById('chasis-mes-sel');
+  if(mesSel && !mesSel.value){
+    var d = new Date();
+    mesSel.value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  }
+  var mesFiltro = mesSel ? mesSel.value : '';
+
+  var viajes = _viajesChasisDelMes(mesFiltro).sort(function(a,b){
+    function toDate(f){ var p=f.split('/'); return new Date(p[2],p[1]-1,p[0]); }
+    return toDate(b.fecha)-toDate(a.fecha);
+  });
+
+  var totalKms = viajes.reduce(function(s,v){return s+(v.kms||0);},0);
+  var totalComb = viajes.reduce(function(s,v){return s+(v.gastoCombustible||0);},0);
+  var totalFondo = viajes.reduce(function(s,v){return s+(v.gastoFondoFijo||0);},0);
+  var costoPorKm = totalKms>0 ? (totalComb/totalKms) : 0;
+
+  var kpis = document.getElementById('chasis-kpis');
+  if(kpis){
+    kpis.innerHTML = `
+      <div class="prod-res-card"><div class="prod-res-val">${viajes.length}</div><div class="prod-res-lbl">Viajes</div></div>
+      <div class="prod-res-card"><div class="prod-res-val">${totalKms.toLocaleString('es-AR')}</div><div class="prod-res-lbl">KMs</div></div>
+      <div class="prod-res-card"><div class="prod-res-val" style="color:#d70015">${_fmtMoneda(totalComb)}</div><div class="prod-res-lbl">Combustible</div></div>
+      <div class="prod-res-card"><div class="prod-res-val" style="color:#ff9500">${_fmtMoneda(totalFondo)}</div><div class="prod-res-lbl">Fondo fijo</div></div>
+    `;
+  }
+
+  var cont = document.getElementById('chasis-lista');
+  if(!cont) return;
+  if(!viajes.length){
+    cont.innerHTML = '<div style="font-size:12px;color:#86868b;padding:20px 0;text-align:center">No hay viajes cargados para este mes. Usá "+ Nuevo viaje" para empezar.</div>';
+    return;
+  }
+
+  var consumoNota = totalKms>0
+    ? '<div style="font-size:11px;color:#86868b;margin-bottom:10px">⛽ Consumo: '+_fmtMoneda(costoPorKm)+' / km este mes</div>'
+    : '';
+
+  cont.innerHTML = consumoNota + viajes.map(function(v){
+    return `<div style="background:#fff;border:1px solid #e5e5ea;border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700">${v.chofer} — ${v.destino||'(sin destino)'}</div>
+          <div style="font-size:11px;color:#86868b;margin-top:2px">${v.fecha} · ${(v.kms||0).toLocaleString('es-AR')} km</div>
+          ${v.observaciones?'<div style="font-size:11px;color:#856404;margin-top:4px">📝 '+v.observaciones+'</div>':''}
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:13px;font-weight:700;color:#d70015">${_fmtMoneda(v.gastoCombustible||0)}</div>
+          <div style="font-size:11px;color:#86868b">Fondo: ${_fmtMoneda(v.gastoFondoFijo||0)}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+          <button onclick="abrirNuevoViajeChasis('${v.id}')" style="background:none;border:none;color:#0071e3;font-size:15px;cursor:pointer" title="Editar">✎</button>
+          <button onclick="eliminarViajeChasis('${v.id}')" style="background:none;border:none;color:#d2d2d7;font-size:15px;cursor:pointer" title="Eliminar">✕</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function exportarViajesChasis(){
+  var mesSel = document.getElementById('chasis-mes-sel');
+  var mesFiltro = mesSel ? mesSel.value : '';
+
+  var viajes = _viajesChasisDelMes(mesFiltro).sort(function(a,b){
+    function toDate(f){ var p=f.split('/'); return new Date(p[2],p[1]-1,p[0]); }
+    return toDate(a.fecha)-toDate(b.fecha);
+  });
+
+  if(!viajes.length){ showToast('❌ No hay viajes para exportar en este mes'); return; }
+
+  var totalKms = viajes.reduce(function(s,v){return s+(v.kms||0);},0);
+  var totalComb = viajes.reduce(function(s,v){return s+(v.gastoCombustible||0);},0);
+  var totalFondo = viajes.reduce(function(s,v){return s+(v.gastoFondoFijo||0);},0);
+
+  var aoa = [
+    ['VIAJES DE CHASIS'],
+    [],
+    ['FECHA','CHOFER','DESTINO/MOTIVO','KMS','GASTO COMBUSTIBLE','GASTO FONDO FIJO','OBSERVACIONES'],
+  ];
+  viajes.forEach(function(v){
+    aoa.push([v.fecha, v.chofer, v.destino||'', v.kms||0, v.gastoCombustible||0, v.gastoFondoFijo||0, v.observaciones||'']);
+  });
+  aoa.push([]);
+  aoa.push(['TOTALES','','',totalKms,totalComb,totalFondo,'']);
+
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:12},{wch:24},{wch:16},{wch:8},{wch:16},{wch:16},{wch:30}];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Viajes Chasis');
+  XLSX.writeFile(wb, 'VIAJES_CHASIS_'+(mesFiltro||'todo')+'.xlsx');
+  showToast('✅ Informe exportado');
 }
 
 </script>
