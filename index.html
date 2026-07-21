@@ -12281,8 +12281,9 @@ function renderPunteras(){
     html += violacionesLimite.map(function(v){
       var da = DATA.find(function(r){return String(r.art)===String(v.art);});
       var desc = da ? (da.med+' '+da.diseno) : '';
-      var buscable = (v.art+' '+desc).toLowerCase();
-      return '<div class="viol-puntera-line" data-buscar="'+buscable+'">• Art '+v.art+' '+desc+' — '+v.total+' un. (máx. '+v.limite.toFixed(1)+')</div>';
+      var ubic = buscarEnPunteras(v.art).ubicaciones.join(', ');
+      var buscable = (v.art+' '+desc+' '+ubic).toLowerCase();
+      return '<div class="viol-puntera-line" data-buscar="'+buscable+'">• Art '+v.art+' '+desc+' — '+v.total+' un. (máx. '+v.limite.toFixed(1)+') · 📍 '+ubic+'</div>';
     }).join('');
     html += '</div>';
     html += '</div>';
