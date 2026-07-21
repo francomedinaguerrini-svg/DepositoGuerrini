@@ -12814,7 +12814,7 @@ function abrirFormChecklist(equipoId, subtipo){
   const eq = equipos.find(e=>e.id===equipoId);
   if(!eq) return;
   const items = getChecklistItems(eq.tipo);
-  const necesitaTurno = eq.tipo==='maquina' || eq.tipo==='camion';
+  const esMaquina = eq.tipo==='maquina';
 
   let lastGrupo;
   const filas = items.map((it,i)=>{
@@ -12842,22 +12842,39 @@ function abrirFormChecklist(equipoId, subtipo){
     </div>`;
   }).join('');
 
-  const turnoHtml = necesitaTurno ? `
-    <div style="display:flex;gap:6px;margin-bottom:10px">
-      <button type="button" id="cl-turno-TM" class="prod-tipo-btn active" onclick="setClTurno('TM')" style="flex:1">🌅 Mañana</button>
-      <button type="button" id="cl-turno-TT" class="prod-tipo-btn" onclick="setClTurno('TT')" style="flex:1">🌇 Tarde</button>
+  const subtipoLabels = {diario:'diario', semanal:'semanal', evento:'por evento'};
+
+  const maquinaExtra = esMaquina ? `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div>
+        <div style="font-size:11px;color:#86868b;margin-bottom:3px">⏱️ Horas máquina</div>
+        <input type="number" id="cl-horas-maquina" placeholder="Ej: 1250" style="width:100%;padding:9px;border:1px solid #d2d2d7;border-radius:10px;font-size:13px;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:11px;color:#86868b;margin-bottom:3px">🔌 Carga / batería</div>
+        <div style="display:flex;gap:6px;height:37px">
+          <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;border:1px solid #d2d2d7;border-radius:10px;cursor:pointer">
+            <input type="radio" name="cl-falla-carga" value="ok" checked onchange="toggleClFallaCarga(false)"> ✅ OK
+          </label>
+          <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;border:1px solid #d2d2d7;border-radius:10px;cursor:pointer;color:#d70015">
+            <input type="radio" name="cl-falla-carga" value="falla" onchange="toggleClFallaCarga(true)"> ⚠️ Falla
+          </label>
+        </div>
+      </div>
+    </div>
+    <div id="cl-falla-carga-obs-box" style="display:none;margin-bottom:10px">
+      <input type="text" id="cl-falla-carga-obs" placeholder="¿Qué pasó con la carga/batería?" style="width:100%;padding:9px 12px;border:1px solid #d2d2d7;border-radius:10px;font-size:13px;box-sizing:border-box">
     </div>` : '';
-  window._clTurno = necesitaTurno ? 'TM' : null;
 
   const html = `<div id="checklist-form-inner" style="background:#fff;border:2px solid #0071e3;border-radius:12px;padding:14px;margin-bottom:14px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div>
         <div style="font-size:14px;font-weight:700;color:#1d1d1f">${eq.nombre} ${eq.interno?'· '+eq.interno:''}</div>
-        <div style="font-size:11px;color:#86868b">Checklist ${subtipo==='diario'?'diario':'por evento'} — ${new Date().toLocaleDateString('es-AR')}</div>
+        <div style="font-size:11px;color:#86868b">Checklist ${subtipoLabels[subtipo]||subtipo} — ${new Date().toLocaleDateString('es-AR')}</div>
       </div>
       <button onclick="cerrarFormChecklist()" style="background:none;border:none;font-size:18px;color:#86868b;cursor:pointer">✕</button>
     </div>
-    ${turnoHtml}
+    ${maquinaExtra}
     <input type="text" id="cl-responsable" placeholder="Responsable (nombre)" style="width:100%;padding:9px 12px;border:1px solid #d2d2d7;border-radius:10px;font-size:13px;margin-bottom:10px;box-sizing:border-box">
     <div style="max-height:340px;overflow-y:auto">${filas}</div>
     <textarea id="cl-obs" placeholder="Observaciones generales (opcional)" style="width:100%;padding:9px 12px;border:1px solid #d2d2d7;border-radius:10px;font-size:13px;margin-top:10px;box-sizing:border-box;min-height:50px"></textarea>
@@ -12874,11 +12891,9 @@ function toggleClDano(i, mostrar){
   if(el) el.style.display = mostrar ? 'flex' : 'none';
 }
 
-function setClTurno(t){
-  window._clTurno = t;
-  const btnTM = document.getElementById('cl-turno-TM'), btnTT = document.getElementById('cl-turno-TT');
-  if(btnTM) btnTM.classList.toggle('active', t==='TM');
-  if(btnTT) btnTT.classList.toggle('active', t==='TT');
+function toggleClFallaCarga(mostrar){
+  const el = document.getElementById('cl-falla-carga-obs-box');
+  if(el) el.style.display = mostrar ? 'block' : 'none';
 }
 
 function cerrarFormChecklist(){
@@ -12899,17 +12914,28 @@ function guardarChecklistForm(equipoId, subtipo){
     }
     return {grupo: it.grupo, item: it.nombre, estado, danos};
   });
-  const tieneFalla = detalle.some(d=>d.estado==='falla');
+  let tieneFalla = detalle.some(d=>d.estado==='falla');
   const obs = (document.getElementById('cl-obs').value||'').trim();
+
+  const horasMaquinaEl = document.getElementById('cl-horas-maquina');
+  const horasMaquina = horasMaquinaEl ? (parseFloat(horasMaquinaEl.value)||null) : null;
+
+  let fallaCarga = false, fallaCargaObs = '';
+  const fallaCargaRadios = document.getElementsByName('cl-falla-carga');
+  for(const r of fallaCargaRadios){ if(r.checked && r.value==='falla') fallaCarga = true; }
+  if(fallaCarga){
+    fallaCargaObs = (document.getElementById('cl-falla-carga-obs').value||'').trim();
+    tieneFalla = true;
+  }
 
   const registros = getChecklistRegistros();
   registros.unshift({
     id: 'cl_'+Date.now(),
     equipoId, subtipo,
-    turno: window._clTurno || null,
     fecha: new Date().toLocaleDateString('es-AR'),
     hora: new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),
-    responsable, detalle, obs, tieneFalla
+    responsable, detalle, obs, tieneFalla,
+    horasMaquina, fallaCarga, fallaCargaObs
   });
   saveChecklistRegistros(registros);
 
@@ -13009,10 +13035,12 @@ function renderChecklist(){
     const historial = regsEquipo.slice(0,10).map(r=>`
       <div style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:11px">
         <div style="display:flex;justify-content:space-between">
-          <span style="font-weight:600;color:${r.tieneFalla?'#d70015':'#1d1d1f'}">${r.fecha} ${r.hora} ${r.turno?'· '+r.turno:''} · ${r.subtipo==='diario'?'Diario':'Evento'} ${r.tieneFalla?'⚠️':'✅'}</span>
+          <span style="font-weight:600;color:${r.tieneFalla?'#d70015':'#1d1d1f'}">${r.fecha} ${r.hora} · ${({diario:'Diario',semanal:'Semanal',evento:'Evento'})[r.subtipo]||r.subtipo} ${r.tieneFalla?'⚠️':'✅'}</span>
           <span style="color:#86868b">${r.responsable}</span>
         </div>
         ${r.detalle.filter(d=>d.estado==='falla').map(d=>`<div style="color:#d70015;margin-top:2px">⚠️ ${d.grupo?d.grupo+' — ':''}${d.item}${d.danos&&d.danos.length?' ('+d.danos.join(', ')+')':''}</div>`).join('')}
+        ${r.horasMaquina?`<div style="color:#0071e3;margin-top:2px">⏱️ ${r.horasMaquina} hs máquina</div>`:''}
+        ${r.fallaCarga?`<div style="color:#d70015;margin-top:2px">🔌⚠️ Falla de carga${r.fallaCargaObs?': '+r.fallaCargaObs:''}</div>`:''}
         ${r.obs?`<div style="color:#86868b;margin-top:2px;font-style:italic">${r.obs}</div>`:''}
       </div>`).join('') || '<div style="font-size:11px;color:#86868b;padding:6px 0">Sin registros todavía</div>';
 
@@ -13028,8 +13056,8 @@ function renderChecklist(){
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-top:10px">
-        <button onclick="abrirFormChecklist('${eq.id}','diario')" style="flex:1;padding:8px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">📋 Checklist</button>
-
+        <button onclick="abrirFormChecklist('${eq.id}','diario')" style="flex:1;padding:8px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">📋 Diario</button>
+        <button onclick="abrirFormChecklist('${eq.id}','semanal')" style="flex:1;padding:8px;background:#7a3fb0;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">📆 Semanal</button>
         <button onclick="abrirFormChecklist('${eq.id}','evento')" style="flex:1;padding:8px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">⚡ Por evento</button>
         <button onclick="toggleHistorialEquipo('${eq.id}')" style="padding:8px 10px;background:#f5f5f7;color:#86868b;border:none;border-radius:8px;font-size:11px;cursor:pointer">🕒</button>
       </div>
@@ -13103,13 +13131,13 @@ function exportarInformeChecklist(){
   const fallasData = [
     ['FALLAS REGISTRADAS — histórico'],
     [],
-    ['FECHA','HORA','TURNO','TIPO','EQUIPO','INTERNO','GRUPO','ÍTEM','DAÑOS','RESPONSABLE','OBSERVACIONES'],
+    ['FECHA','HORA','TIPO CONTROL','TIPO','EQUIPO','INTERNO','GRUPO','ÍTEM','DAÑOS','RESPONSABLE','OBSERVACIONES'],
   ];
   registros.filter(r=>r.tieneFalla && equipos.some(e=>e.id===r.equipoId)).forEach(r=>{
     const eq = equipos.find(e=>e.id===r.equipoId);
     r.detalle.filter(d=>d.estado==='falla').forEach(d=>{
       fallasData.push([
-        r.fecha, r.hora, r.turno||'', eq?_checklistTipoLabel(eq.tipo):'', eq?eq.nombre:'(equipo eliminado)', eq?eq.interno:'',
+        r.fecha, r.hora, ({diario:'Diario',semanal:'Semanal',evento:'Evento'})[r.subtipo]||r.subtipo||'', eq?_checklistTipoLabel(eq.tipo):'', eq?eq.nombre:'(equipo eliminado)', eq?eq.interno:'',
         d.grupo||'', d.item, (d.danos&&d.danos.length)?d.danos.join(', '):'', r.responsable, r.obs||''
       ]);
     });
@@ -13122,22 +13150,28 @@ function exportarInformeChecklist(){
   ['maquina','camion','porton'].forEach(tipo=>{
     const eqsTipo = equipos.filter(e=>e.tipo===tipo);
     if(!eqsTipo.length) return;
+    const esMaquinaTipo = tipo==='maquina';
+    const headerBase = ['FECHA','HORA','TIPO CONTROL','EQUIPO','INTERNO','RESULTADO','RESPONSABLE'];
+    const headerExtra = esMaquinaTipo ? ['HORAS MÁQUINA','FALLA CARGA'] : [];
     const data = [[_checklistTipoLabel(tipo).toUpperCase()+' — HISTORIAL'],[],
-      ['FECHA','HORA','TURNO','EQUIPO','INTERNO','RESULTADO','RESPONSABLE','DETALLE FALLAS','OBSERVACIONES']];
+      [...headerBase, ...headerExtra, 'DETALLE FALLAS','OBSERVACIONES']];
     registros.filter(r=>{
       const eq = equipos.find(e=>e.id===r.equipoId);
       return eq && eq.tipo===tipo;
     }).forEach(r=>{
       const eq = equipos.find(e=>e.id===r.equipoId);
-      data.push([
-        r.fecha, r.hora, r.turno||'', eq.nombre, eq.interno||'',
-        r.tieneFalla?'CON FALLA':'OK', r.responsable,
-        r.detalle.filter(d=>d.estado==='falla').map(d=>d.item).join(', '),
-        r.obs||''
-      ]);
+      const fila = [
+        r.fecha, r.hora, ({diario:'Diario',semanal:'Semanal',evento:'Evento'})[r.subtipo]||r.subtipo||'', eq.nombre, eq.interno||'',
+        r.tieneFalla?'CON FALLA':'OK', r.responsable
+      ];
+      if(esMaquinaTipo) fila.push(r.horasMaquina||'', r.fallaCarga?('SÍ'+(r.fallaCargaObs?': '+r.fallaCargaObs:'')):'NO');
+      fila.push(r.detalle.filter(d=>d.estado==='falla').map(d=>d.item).join(', '), r.obs||'');
+      data.push(fila);
     });
     const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = [{wch:10},{wch:8},{wch:6},{wch:26},{wch:12},{wch:10},{wch:16},{wch:40},{wch:30}];
+    ws['!cols'] = esMaquinaTipo
+      ? [{wch:10},{wch:8},{wch:10},{wch:26},{wch:12},{wch:10},{wch:16},{wch:12},{wch:24},{wch:40},{wch:30}]
+      : [{wch:10},{wch:8},{wch:10},{wch:26},{wch:12},{wch:10},{wch:16},{wch:40},{wch:30}];
     XLSX.utils.book_append_sheet(wb, ws, _checklistTipoLabel(tipo));
   });
 
