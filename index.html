@@ -10071,6 +10071,10 @@ if('serviceWorker' in navigator){
       <input type="file" id="punteras-import-input" accept=".xlsx,.xls" style="display:none" onchange="importarPunterasArchivo(this.files[0])">
     </div>
     <div id="punt-import-resultado"></div>
+    <div style="margin-top:10px;border-top:1px solid #f0f0f0;padding-top:10px">
+      <input type="text" id="punt-buscar-general" placeholder="🔍 ¿Dónde está el artículo...? Buscá por código, medida o diseño" oninput="buscarEnTodasLasPunteras(this.value)" autocomplete="off" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #d2d2d7;border-radius:10px;font-size:13px">
+      <div id="punt-buscar-general-resultado"></div>
+    </div>
   </div>
   <div id="punteras-grid"></div>
 </div>
@@ -11958,6 +11962,37 @@ function capacidadUsada(items){
 
 // Tope de puntera por artículo: medio pallet, según la capacidad real del
 // artículo (max_pos) cargada en el módulo de paletizado.
+function buscarEnTodasLasPunteras(q){
+  const box = document.getElementById('punt-buscar-general-resultado');
+  if(!box) return;
+  const ql = (q||'').trim().toLowerCase();
+  if(ql.length<2){ box.innerHTML = ''; return; }
+
+  const punteras = getPunteras();
+  const encontrados = [];
+  Object.keys(punteras).forEach(function(id){
+    (punteras[id]||[]).forEach(function(it){
+      const da = DATA.find(function(r){ return String(r.art)===String(it.art); });
+      const texto = (it.art+' '+(da?da.med:'')+' '+(da?da.diseno:'')+' '+(da?da.prov:'')).toLowerCase();
+      if(texto.indexOf(ql)>=0){
+        encontrados.push({parrilla:id, art:it.art, unidades:it.unidades||0, da:da});
+      }
+    });
+  });
+
+  if(!encontrados.length){
+    box.innerHTML = '<div style="font-size:12px;color:#86868b;padding:8px 2px">Sin resultados en ninguna puntera.</div>';
+    return;
+  }
+  box.innerHTML = encontrados.map(function(e){
+    const desc = e.da ? (e.da.prov+' '+e.da.diseno+' ('+e.da.med+')') : '';
+    return '<div style="padding:8px;background:#f5f5f7;border-radius:8px;margin-top:6px;display:flex;justify-content:space-between;align-items:center">'
+      +'<div><b style="color:#0071e3">📍 '+e.parrilla+'</b> — Art '+e.art+' '+(desc?'· '+desc:'')+'</div>'
+      +'<div style="font-weight:700">'+e.unidades+' un.</div>'
+      +'</div>';
+  }).join('');
+}
+
 function filtrarViolacionesPuntera(q){
   var ql = (q||'').trim().toLowerCase();
   document.querySelectorAll('#viol-puntera-lista .viol-puntera-line').forEach(function(el){
