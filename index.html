@@ -11958,6 +11958,13 @@ function capacidadUsada(items){
 
 // Tope de puntera por artículo: medio pallet, según la capacidad real del
 // artículo (max_pos) cargada en el módulo de paletizado.
+function filtrarViolacionesPuntera(q){
+  var ql = (q||'').trim().toLowerCase();
+  document.querySelectorAll('#viol-puntera-lista .viol-puntera-line').forEach(function(el){
+    el.style.display = (!ql || el.dataset.buscar.indexOf(ql)>=0) ? '' : 'none';
+  });
+}
+
 function capacidadMediaPuntera(artId){
   var da = DATA.find(function(r){ return String(r.art)===String(artId); });
   var maxPos = da ? (da.max_pos||32) : 32;
@@ -12268,12 +12275,16 @@ function renderPunteras(){
   const violacionesLimite = chequearLimitePunteras();
   if(violacionesLimite.length){
     html += '<div style="background:#ffe8e8;border:1px solid #ffb3b3;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#d70015">';
-    html += '🚨 <b>'+violacionesLimite.length+' artículo(s) superan medio pallet en puntera</b> — se creó una tarea obligatoria en Pendientes para moverlos a Mapa Racks:<br>';
+    html += '🚨 <b>'+violacionesLimite.length+' artículo(s) superan medio pallet en puntera</b> — se creó una tarea obligatoria en Pendientes para moverlos a Mapa Racks:';
+    html += '<input type="text" id="viol-puntera-search" placeholder="🔍 Buscar por art., medida o diseño..." oninput="filtrarViolacionesPuntera(this.value)" autocomplete="off" style="width:100%;box-sizing:border-box;margin:8px 0;padding:7px 10px;border:1px solid #ffb3b3;border-radius:8px;font-size:12px;color:#1d1d1f;background:#fff">';
+    html += '<div id="viol-puntera-lista">';
     html += violacionesLimite.map(function(v){
       var da = DATA.find(function(r){return String(r.art)===String(v.art);});
       var desc = da ? (da.med+' '+da.diseno) : '';
-      return '• Art '+v.art+' '+desc+' — '+v.total+' un. (máx. '+v.limite.toFixed(1)+')';
-    }).join('<br>');
+      var buscable = (v.art+' '+desc).toLowerCase();
+      return '<div class="viol-puntera-line" data-buscar="'+buscable+'">• Art '+v.art+' '+desc+' — '+v.total+' un. (máx. '+v.limite.toFixed(1)+')</div>';
+    }).join('');
+    html += '</div>';
     html += '</div>';
   }
 
@@ -12734,13 +12745,15 @@ function agregarEquipoChecklist(){
   const nombre = prompt('Nombre o identificación del equipo (ej. "Autoelevador 1", "Camión Ford Cargo", "Portón Sur 3")');
   if(!nombre || !nombre.trim()) return;
   const interno = prompt('Interno / patente / código (opcional)') || '';
+  const proximoService = prompt('Próxima fecha de service (DD/MM/AAAA, dejar vacío si no aplica):') || '';
 
   const equipos = getChecklistEquipos();
   equipos.push({
     id: 'eq_'+Date.now(),
     tipo: tipo.trim().toLowerCase(),
     nombre: nombre.trim(),
-    interno: interno.trim()
+    interno: interno.trim(),
+    proximoService: proximoService.trim()
   });
   saveChecklistEquipos(equipos);
   showToast('✅ Equipo agregado: '+nombre.trim());
@@ -12768,6 +12781,18 @@ function editarEquipoChecklist(id){
   eq.interno = interno.trim();
   saveChecklistEquipos(equipos);
   showToast('✅ Equipo actualizado');
+  renderChecklist();
+}
+
+function editarServiceEquipo(id){
+  const equipos = getChecklistEquipos();
+  const eq = equipos.find(e=>e.id===id);
+  if(!eq) return;
+  const fecha = prompt('Próxima fecha de service para '+eq.nombre+' (DD/MM/AAAA, vacío para borrarla):', eq.proximoService||'');
+  if(fecha===null) return;
+  eq.proximoService = fecha.trim();
+  saveChecklistEquipos(equipos);
+  showToast(fecha.trim() ? '✅ Próximo service: '+fecha.trim() : '🗑️ Fecha de service borrada');
   renderChecklist();
 }
 
@@ -12955,6 +12980,25 @@ function _parseFechaAR(f){
   return new Date(p[2], p[1]-1, p[0]);
 }
 
+function _diasHastaService(fechaDMY){
+  if(!fechaDMY) return null;
+  const p = fechaDMY.split('/').map(Number);
+  if(p.length!==3 || isNaN(p[0])) return null;
+  const fechaServ = new Date(p[2], p[1]-1, p[0]);
+  return Math.round((fechaServ.getTime() - new Date(new Date().toDateString()).getTime())/86400000);
+}
+
+function _serviceBadge(eq){
+  if(!eq.proximoService) return '';
+  const dias = _diasHastaService(eq.proximoService);
+  if(dias===null) return '';
+  let color, texto;
+  if(dias<0){ color='#d70015'; texto='🔧 SERVICE VENCIDO hace '+Math.abs(dias)+'d ('+eq.proximoService+')'; }
+  else if(dias<=7){ color='#ff9500'; texto='🔧 Service en '+dias+'d ('+eq.proximoService+')'; }
+  else { color='#86868b'; texto='🔧 Próximo service: '+eq.proximoService; }
+  return `<div style="margin-top:3px"><span style="background:${color}20;color:${color};font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px">${texto}</span></div>`;
+}
+
 function _estadoEquipoChecklist(eq, registros){
   const regs = registros.filter(r=>r.equipoId===eq.id); // ya vienen ordenados, más reciente primero
   if(!regs.length) return {estado:'nunca'};
@@ -13010,7 +13054,26 @@ function renderChecklist(){
         </div>` : `<div style="background:#e8f8ee;border:1px solid #b8e6c8;border-radius:10px;padding:10px;margin-bottom:12px;font-size:13px;font-weight:700;color:#1a7a3d">
           ✅ Todos los equipos controlados esta semana, sin fallas activas
         </div>`;
-      alertasBox.innerHTML = semaforoHtml + pendHtml;
+
+      // Listado de fechas de service, ordenado por más próximo/vencido primero
+      const conService = equipos
+        .filter(eq=>eq.proximoService)
+        .map(eq=>({eq, dias:_diasHastaService(eq.proximoService)}))
+        .filter(x=>x.dias!==null)
+        .sort((a,b)=>a.dias-b.dias);
+      const serviceHtml = conService.length ? `<div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:10px;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700;color:#1d1d1f;margin-bottom:8px">🔧 Fechas de Service</div>
+          ${conService.map(x=>{
+            const color = x.dias<0 ? '#d70015' : x.dias<=7 ? '#ff9500' : '#1d1d1f';
+            const texto = x.dias<0 ? 'VENCIDO hace '+Math.abs(x.dias)+'d' : x.dias===0 ? 'HOY' : 'en '+x.dias+'d';
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #f5f5f7;font-size:12px">
+              <span>${_checklistTipoIcon(x.eq.tipo)} ${x.eq.nombre}${x.eq.interno?' · '+x.eq.interno:''}</span>
+              <span style="color:${color};font-weight:700">${x.eq.proximoService} — ${texto}</span>
+            </div>`;
+          }).join('')}
+        </div>` : '';
+
+      alertasBox.innerHTML = semaforoHtml + pendHtml + serviceHtml;
     }
   }
 
@@ -13049,8 +13112,10 @@ function renderChecklist(){
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:700;color:#1d1d1f">${icon} ${eq.nombre} ${eq.interno?'<span style="color:#86868b;font-weight:400">· '+eq.interno+'</span>':''}</div>
           <div style="margin-top:4px">${badge}</div>
+          ${_serviceBadge(eq)}
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0">
+          <button onclick="editarServiceEquipo('${eq.id}')" style="background:none;border:none;color:#7a3fb0;font-size:14px;cursor:pointer" title="Fecha de service">🔧</button>
           <button onclick="editarEquipoChecklist('${eq.id}')" style="background:none;border:none;color:#0071e3;font-size:13px;cursor:pointer">✏️</button>
           <button onclick="eliminarEquipoChecklist('${eq.id}')" style="background:none;border:none;color:#c0c0c5;font-size:14px;cursor:pointer">✕</button>
         </div>
@@ -13107,7 +13172,7 @@ function exportarInformeChecklist(){
   const resumenData = [
     ['INFORME DE REVISIÓN DE EQUIPOS — '+hoy],
     [],
-    ['TIPO','EQUIPO','INTERNO','ESTADO HOY','ÚLTIMO CHECKLIST','RESPONSABLE','FALLAS RECIENTES'],
+    ['TIPO','EQUIPO','INTERNO','ESTADO HOY','ÚLTIMO CHECKLIST','RESPONSABLE','PRÓXIMO SERVICE','FALLAS RECIENTES'],
   ];
   equipos.forEach(eq=>{
     const regsEquipo = registros.filter(r=>r.equipoId===eq.id);
@@ -13117,14 +13182,19 @@ function exportarInformeChecklist(){
     const fallasRecientes = regsEquipo.slice(0,5).filter(r=>r.tieneFalla)
       .map(r=>r.fecha+': '+r.detalle.filter(d=>d.estado==='falla').map(d=>d.item).join(', '))
       .join(' | ');
+    const diasServ = eq.proximoService ? _diasHastaService(eq.proximoService) : null;
+    const serviceTxt = !eq.proximoService ? '—'
+      : diasServ===null ? eq.proximoService
+      : diasServ<0 ? eq.proximoService+' (VENCIDO '+Math.abs(diasServ)+'d)'
+      : eq.proximoService+' (en '+diasServ+'d)';
     resumenData.push([
       _checklistTipoLabel(eq.tipo), eq.nombre, eq.interno||'',
-      estado, ultimo?ultimo.fecha+' '+ultimo.hora+(ultimo.turno?' ('+ultimo.turno+')':''):'—',
-      ultimo?ultimo.responsable:'—', fallasRecientes||'—'
+      estado, ultimo?ultimo.fecha+' '+ultimo.hora:'—',
+      ultimo?ultimo.responsable:'—', serviceTxt, fallasRecientes||'—'
     ]);
   });
   const wsResumen = XLSX.utils.aoa_to_sheet(resumenData);
-  wsResumen['!cols'] = [{wch:10},{wch:26},{wch:14},{wch:14},{wch:22},{wch:16},{wch:50}];
+  wsResumen['!cols'] = [{wch:10},{wch:26},{wch:14},{wch:14},{wch:22},{wch:16},{wch:20},{wch:50}];
   XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen');
 
   // Hoja Fallas — histórico detallado
