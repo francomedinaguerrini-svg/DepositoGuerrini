@@ -1988,10 +1988,22 @@ function getUbicaciones(artId){
 
   const dataArt = DATA.find(r=>r.art==artId);
   const bloque = dataArt?dataArt.bloque:'';
+  const enPuntera = buscarEnPunteras(artId);
 
-  if(!posRacks.length && !bloque) return '<div style="font-size:12px;color:#d2d2d7;padding:4px 0">Sin ubicación asignada</div>';
+  if(!posRacks.length && !enPuntera.total && !bloque) return '<div style="font-size:12px;color:#d2d2d7;padding:4px 0">Sin ubicación asignada</div>';
 
   let html3 = '<div style="display:flex;flex-direction:column;gap:5px">';
+
+  // Puntera — si tiene stock ahí, es lo primero a mostrar (es la ubicación más ágil)
+  if(enPuntera.total>0){
+    html3 += `<div style="display:flex;align-items:center;justify-content:space-between;background:#f2e6ff;border-radius:8px;padding:7px 10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;font-weight:700;color:#fff;background:#7a3fb0;padding:2px 8px;border-radius:6px">PUNT</span>
+        <span style="font-size:13px;font-weight:700;color:#1d1d1f">${enPuntera.ubicaciones.join(', ')}</span>
+      </div>
+      <span style="font-size:14px;font-weight:700;color:#7a3fb0">${enPuntera.total} <span style="font-size:10px;font-weight:400;color:#86868b">un.</span></span>
+    </div>`;
+  }
 
   // Rack positions — cada una en su fila, bien visible
   posRacks.forEach(([pos,v])=>{
@@ -2007,8 +2019,11 @@ function getUbicaciones(artId){
     </div>`;
   });
 
-  // Bloque
-  if(bloque){
+  // Bloque — solo se muestra si el artículo NO está en el rack ni en
+  // puntera. Si ya tiene una de esas dos posiciones asignadas, ese es el
+  // único lugar físico real; mostrar también "BLQ" daba la impresión de
+  // que había stock duplicado en dos (o tres) lugares a la vez.
+  if(bloque && !posRacks.length && !enPuntera.total){
     html3 += `<div style="display:flex;align-items:center;justify-content:space-between;background:#fff3cd;border-radius:8px;padding:7px 10px">
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:11px;font-weight:700;color:#856404;background:#f5c842;padding:2px 8px;border-radius:6px">BLQ</span>
@@ -3986,6 +4001,25 @@ function esCamion(item){
 
 // Busca si un artículo tiene unidades cargadas en alguna puntera.
 // Devuelve el total y en qué parrilla(s) está, para mostrarlo y descontarlo.
+// Movidas acá arriba (antes vivían en un <script> posterior) porque
+// buscarEnPunteras() las necesita y se ejecuta desde el arranque inicial
+// (al renderizar la ubicación de cada artículo en Stock) — si quedaban
+// definidas en un tag de script posterior, tiraban "getPunteras is not
+// defined" apenas cargaba la página.
+function getPunteras(){ return JSON.parse(localStorage.getItem('wms_punteras')||'{}'); }
+function savePunteras(obj){ localStorage.setItem('wms_punteras', JSON.stringify(obj)); }
+function capacidadUsada(items){
+  return (items||[]).reduce(function(s,it){return s+(it.unidades||0);},0);
+}
+function articulosAsignadosSet(punteras, excluirParrilla){
+  var set = new Set();
+  Object.entries(punteras).forEach(function(e){
+    if(e[0]===excluirParrilla) return;
+    (e[1]||[]).forEach(function(it){ set.add(String(it.art)); });
+  });
+  return set;
+}
+
 function buscarEnPunteras(art){
   var punteras = getPunteras();
   var total = 0;
@@ -11899,9 +11933,6 @@ function getParrillaIds(){
   return ids;
 }
 
-function getPunteras(){ return JSON.parse(localStorage.getItem('wms_punteras')||'{}'); }
-function savePunteras(obj){ localStorage.setItem('wms_punteras', JSON.stringify(obj)); }
-
 function informePunteras(){
   const punteras = getPunteras();
   const ahora = new Date();
@@ -11996,10 +12027,6 @@ function informePunteras(){
 
   XLSX.writeFile(wb, 'informe_punteras_'+ahora.toISOString().split('T')[0]+'.xlsx');
   showToast('📊 Informe de punteras generado — '+totalArts+' arts cargados · '+candidatos.length+' sugeridos');
-}
-
-function capacidadUsada(items){
-  return (items||[]).reduce(function(s,it){return s+(it.unidades||0);},0);
 }
 
 // Tope de puntera por artículo: medio pallet, según la capacidad real del
@@ -12288,15 +12315,6 @@ function importarPunterasArchivo(file){
     }
   };
   reader.readAsArrayBuffer(file);
-}
-
-function articulosAsignadosSet(punteras, excluirParrilla){
-  var set = new Set();
-  Object.entries(punteras).forEach(function(e){
-    if(e[0]===excluirParrilla) return;
-    (e[1]||[]).forEach(function(it){ set.add(String(it.art)); });
-  });
-  return set;
 }
 
 function candidatosParaPuntera(){
