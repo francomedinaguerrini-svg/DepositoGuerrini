@@ -3668,6 +3668,17 @@ function renderAlertas(){
   const filas = alertasLiberar.map(a => {
     const color = '#86868b';
     const bg    = '#f5f5f7';
+    // ¿A dónde va el artículo una vez liberada la posición de rack?
+    // Mismo criterio que la sugerencia de puntera: <1 pallet, rotación
+    // baja, no excluido, no ya asignado en otra puntera.
+    const enPunteraYa = articulosAsignadosSet(getPunteras(), null).has(String(a.art.art));
+    const excluido = /\d+\.5/.test(a.art.med||'') || (a.art.prov==='SPEEDWAY') ||
+                     ['TT','TL','TLSB'].indexOf((a.art.uso||'').trim())>=0 ||
+                     ['AT51','AT52','MT51'].indexOf((a.art.diseno||'').trim())>=0;
+    let destinoTxt, destinoColor;
+    if(enPunteraYa){ destinoTxt = '✅ Ya está en puntera'; destinoColor = '#7a3fb0'; }
+    else if(a.pall < 1 && a.rotSem < 5.5 && !excluido){ destinoTxt = '🔚 Corresponde puntera — asignalo manualmente ahí'; destinoColor = '#7a3fb0'; }
+    else { destinoTxt = '🟡 Se queda en bloque '+a.bloque; destinoColor = '#856404'; }
     return `<div style="background:${bg};border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;gap:8px;align-items:center">
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:700;color:${color}">${a.pos}</div>
@@ -3675,10 +3686,11 @@ function renderAlertas(){
         <div style="font-size:10px;color:#86868b;margin-top:2px">
           Rack vacío · ${a.stockDisp} un. en bloque ${a.bloque} · rot: ${(a.rotSem||0).toFixed(2)}/sem · ${a.pall} pall.
         </div>
+        <div style="font-size:10px;font-weight:600;color:${destinoColor};margin-top:3px">${destinoTxt}</div>
       </div>
       <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:14px;font-weight:700;color:${color}">🔄 Liberar</div>
-        <div style="font-size:10px;color:#86868b">Barrer con datos nuevos</div>
+        <div style="font-size:14px;font-weight:700;color:${color}">🔄 Se libera al Reevaluar</div>
+        <div style="font-size:10px;color:#86868b">La posición queda libre para otro artículo</div>
       </div>
     </div>`;
   }).join('');
@@ -3689,7 +3701,7 @@ function renderAlertas(){
     </div>
     ${filas}
     <div style="font-size:10px;color:#86868b;margin-top:6px;border-top:1px solid #ffe082;padding-top:6px">
-      Criterio: artículo agotado en rack y ya no califica para baja rotación → liberar para reasignar
+      Criterio: artículo agotado en rack y ya no califica para baja rotación → la posición se libera al correr "Reevaluar". El artículo en sí no se mueve solo — arriba te indica si corresponde puntera o si se queda en bloque.
     </div>
   </div>`;
 
