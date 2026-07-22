@@ -10334,6 +10334,23 @@ function _transitoPosicionSugeridaBase(artId, cantEntrada){
     };
   }
 
+  // ── PUNTERA: si con esta entrada el artículo queda en menos de 1
+  // pallet (y no está ya ocupando una posición de rack), corresponde
+  // puntera, no bloque. Antes esta función solo sabía decidir entre
+  // rack y bloque, así que cualquier cosa por debajo de 1 pallet caía
+  // directo a bloque, ignorando el criterio real (mismo que usa la
+  // sugerencia de candidatos a puntera en Mapa Racks).
+  var BLOQUES_RACK_SUG = ['2N/3N','2S/2N','1N','1S'];
+  var yaEnBloqueRack = da.bloque && da.bloque.split('/').some(function(b){return BLOQUES_RACK_SUG.indexOf(b.trim())>=0;});
+  if(pallFuturo < 1 && stockFuturo > 0 && stockFuturo <= 1000 && rot < 5.5 && !yaEnBloqueRack){
+    return {
+      tipo:    'puntera',
+      pos:     '(asignar manualmente)',
+      detalle: 'Puntera — queda en '+pallFuturo.toFixed(2)+' pallets, asignar parrilla manualmente',
+      pallets: pallFuturo.toFixed(1),
+    };
+  }
+
   // ── PASO 2 + 3: buscar posición(es) vacía(s) o libres en ASIGN ──
   // Antes esto sugería UNA sola posición sin importar cuántos pallets
   // necesitaba el artículo — si entraban 4 pallets, hacía falta 4
@@ -10739,7 +10756,7 @@ function cydExportarPlanilla(id){
     var stockNuevo = (r.stockActual||0) + r.cant;
     var cantStr = '+'+r.cant;
     var cantColor = '#34c759';
-    var destColor = (sug.enPuntera || sug.rackUbic) ? '#d70015' : (sug.tipo==='rack' ? '#0071e3' : '#ff9500');
+    var destColor = (sug.enPuntera || sug.rackUbic) ? '#d70015' : (sug.tipo==='rack' ? '#0071e3' : sug.tipo==='puntera' ? '#7a3fb0' : '#ff9500');
     var rango = (typeof RANGOS !== 'undefined' && RANGOS[String(r.art)]) ? RANGOS[String(r.art)] : '—';
     var dataArtRow = DATA.find(function(x){ return x.art===r.art; });
     var maxPosRow = dataArtRow ? (dataArtRow.max_pos||32) : 32;
@@ -10963,7 +10980,7 @@ function cydRenderTransito(){
       } else {
         // INGRESO: igual que antes
         var sug = r.sugerencia||{};
-        var colorDest = sug.tipo==='rack'?'#0071e3':'#ff9500';
+        var colorDest = sug.tipo==='rack'?'#0071e3':sug.tipo==='puntera'?'#7a3fb0':'#ff9500';
         html += '<tr style="'+bg+'">';
         html += '<td style="padding:4px 8px;font-weight:600">'+r.art+'</td>';
         html += '<td style="padding:4px 8px">'+r.med+'</td>';
