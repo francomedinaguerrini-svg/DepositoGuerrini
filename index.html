@@ -4610,9 +4610,9 @@ function pedidoEnviarTransito(){
     var resP = descontarPunteraPorPedido(item.art, item.cant);
     var deP = resP.descontado;
     var restante = item.cant - deP;
-    if(restante>0) descontarRackPorPedido(item.art, restante);
+    var deRack = restante>0 ? descontarRackPorPedido(item.art, restante) : 0;
     item._punteraDetalle = resP.detalle;
-    item._rackRestante = restante;
+    item._rackRestante = deRack;
 
     var dataArt = DATA.find(function(r){ return r.art===item.art; });
     if(dataArt){
@@ -5100,6 +5100,25 @@ function cydPlanillaPicking(id){
     var nb = parseInt((b.posRack.split('-')[1]||'N4').replace('N',''))||4;
     if(na!==nb) return na-nb;
     return a.posRack.localeCompare(b.posRack);
+  });
+
+  // Ordenar bloques por recorrido físico real: bloque 1→10, y dentro de
+  // cada bloque, Sur antes que Norte (ej: 3S, 3N, 4S, 4N... 9S, 9N, 10).
+  // Sin esto quedaban en el orden en que se cargó el pedido — "cualquier cosa".
+  function bloqueOrdenKey(bloqueStr){
+    if(!bloqueStr) return 9999;
+    var primero = String(bloqueStr).split('/')[0].trim(); // "2S/2N" → "2S"
+    var m = primero.match(/^(\d+)\s*([NS]?)/i);
+    if(!m) return 9998;
+    var num = parseInt(m[1],10);
+    var suf = (m[2]||'').toUpperCase();
+    var sufOrden = suf==='S' ? 0 : (suf==='N' ? 1 : 0.5);
+    return num*10 + sufOrden;
+  }
+  enBloque.sort(function(a,b){
+    var ka = bloqueOrdenKey(a.bloque), kb = bloqueOrdenKey(b.bloque);
+    if(ka!==kb) return ka-kb;
+    return String(a.bloque||'').localeCompare(String(b.bloque||''));
   });
 
   function mkRow(r, seccion){
