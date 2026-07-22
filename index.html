@@ -5012,17 +5012,41 @@ function cydPlanillaPicking(id){
   var fecha = new Date().toLocaleDateString('es-AR');
   var hora  = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
 
-  // Separar por ubicación real usada. Se usan DOS señales para detectar
-  // puntera: el campo "tipo" (calculado al enviar a tránsito) Y también
-  // "punteraDetalle" (que se completa siempre que se descontó de una
-  // puntera, incluso en tránsitos generados antes de este arreglo).
-  function esDePuntera(r){
-    return (r.punteraDetalle && r.punteraDetalle.length>0) || r.tipo==='puntera';
+  // Reconstruir el desglose real de dónde sale cada artículo. Un artículo
+  // puede estar SOLO PARCIALMENTE en puntera (ej: 1 de 32 unidades) — antes
+  // esta planilla metía TODO el bulto en la sección de puntera con solo
+  // ver que punteraDetalle tenía algo, aunque fuera mínimo. Ahora arma el
+  // desglose exacto igual que ya hace la pantalla de preparación del pedido.
+  function construirFuentes(r){
+    var fuentes = [];
+    var totalCant = r.cantReal||r.cant;
+    var dePuntera = (r.punteraDetalle||[]).reduce(function(s,d){return s+(d.unidades||0);},0);
+    if(dePuntera>0){
+      fuentes.push({tipo:'puntera', ubic: r.punteraDetalle.map(function(d){return d.id+' ('+d.unidades+')';}).join(' + '), cant: dePuntera});
+    }
+    var rackCant = r.rackRestante||0;
+    if(rackCant>0 && r.posRack){
+      fuentes.push({tipo:'rack', ubic: r.posRack, cant: rackCant});
+    }
+    var resto = totalCant - dePuntera - rackCant;
+    if(resto>0 && r.bloque){
+      fuentes.push({tipo:'bloque', ubic: r.bloque, cant: resto});
+    }
+    if(!fuentes.length){
+      // Sin detalle guardado (tránsito viejo, de antes de este dato) —
+      // usar el tipo tal cual venía, como antes.
+      if(r.tipo==='rack' && r.posRack) fuentes.push({tipo:'rack', ubic:r.posRack, cant: totalCant});
+      else if(r.tipo==='bloque' && r.bloque) fuentes.push({tipo:'bloque', ubic:r.bloque, cant: totalCant});
+    }
+    return fuentes;
   }
-  var enPuntera = tr.items.filter(esDePuntera);
-  var enRack    = tr.items.filter(function(r){return !esDePuntera(r) && r.tipo==='rack';});
-  var enBloque  = tr.items.filter(function(r){return !esDePuntera(r) && r.tipo==='bloque';});
-  var sinUbic   = tr.items.filter(function(r){return !esDePuntera(r) && r.tipo!=='rack' && r.tipo!=='bloque';});
+  tr.items.forEach(function(r){ r._fuentes = construirFuentes(r); });
+
+  function tieneFuente(r, tipo){ return r._fuentes.some(function(f){return f.tipo===tipo;}); }
+  var enPuntera = tr.items.filter(function(r){ return tieneFuente(r,'puntera'); });
+  var enRack    = tr.items.filter(function(r){ return !tieneFuente(r,'puntera') && tieneFuente(r,'rack'); });
+  var enBloque  = tr.items.filter(function(r){ return !tieneFuente(r,'puntera') && !tieneFuente(r,'rack') && tieneFuente(r,'bloque'); });
+  var sinUbic   = tr.items.filter(function(r){ return !r._fuentes.length; });
 
   // Ordenar rack por nivel (N1→N4) y posición
   enRack.sort(function(a,b){
@@ -5036,13 +5060,21 @@ function cydPlanillaPicking(id){
     var cantReal = r.cantReal||r.cant;
     var diff = cantReal - r.cant;
     var alerta = r.stock < r.cant ? 'background:#fff3cd' : '';
-    var ubic = seccion==='puntera'
-      ? '<b style="color:#7a3fb0">🔚 '+((r.punteraDetalle&&r.punteraDetalle.length)?r.punteraDetalle.map(function(d){return d.id+' ('+d.unidades+')';}).join(' + '):'PUNTERA')+'</b>'
-      : seccion==='rack'
-      ? '<b style="color:#0071e3">'+r.posRack+'</b>'
-      : seccion==='bloque'
-      ? '<b style="color:#ff9500">'+r.bloque+'</b>'
-      : '<b style="color:#d70015">SIN UBIC.</b>';
+    var fuentes = r._fuentes||[];
+    var ubic;
+    if(fuentes.length>1){
+      var ICONOS = {puntera:'🔚', rack:'🔵', bloque:'🟡'};
+      ubic = '<div style="color:#d70015;font-weight:700;font-size:8.5px">⚠️ DIVIDIDO</div>'+fuentes.map(function(f){
+        return '<div>'+(ICONOS[f.tipo]||'')+' '+f.ubic+' <b>('+f.cant+')</b></div>';
+      }).join('');
+    } else if(fuentes.length===1){
+      var f = fuentes[0];
+      var color = f.tipo==='puntera'?'#7a3fb0':f.tipo==='rack'?'#0071e3':'#ff9500';
+      var icon = f.tipo==='puntera'?'🔚 ':'';
+      ubic = '<b style="color:'+color+'">'+icon+f.ubic+'</b>';
+    } else {
+      ubic = '<b style="color:#d70015">SIN UBIC.</b>';
+    }
     var rango = (typeof RANGOS !== 'undefined' && RANGOS[String(r.art)]) ? RANGOS[String(r.art)] : '—';
     return '<tr style="'+alerta+'">'+
       '<td style="font-weight:700">'+r.art+'</td>'+
