@@ -10300,61 +10300,59 @@ function _transitoPosicionSugeridaBase(artId, cantEntrada){
     };
   }
 
-  // ── PASO 2: buscar posición vacía existente en ASIGN para cualquier art ──
-  // Una posición "vacía" es la que tiene unidades=0 — quedó libre por pedidos
+  // ── PASO 2 + 3: buscar posición(es) vacía(s) o libres en ASIGN ──
+  // Antes esto sugería UNA sola posición sin importar cuántos pallets
+  // necesitaba el artículo — si entraban 4 pallets, hacía falta 4
+  // posiciones (una por pallet), no una sola.
   if(pallFuturo >= 1 && rot < 5.5){
     var nivelIdeal = rot<=0?4: rot<1.25?3: rot<2.5?2:1;
+    var pallNecesarios = Math.max(1, Math.ceil(pallFuturo));
 
-    // Primero: buscar posiciones en ASIGN con unidades=0 del nivel correcto
-    var posVaciasEnRack = [];
+    var posiciones = []; // {id, vacia:bool}
+
+    // Primero: posiciones en ASIGN con unidades=0 del nivel correcto
+    // (quedaron vacías por pedidos del día — hay que reutilizarlas)
     Object.entries(ASIGN).forEach(function(e){
       var posId=e[0], v=e[1];
-      if(!v||!v.art) return; // posición libre (nunca asignada) — no es "vacía por pedidos"
-      if((v.unidades||0) > 0) return; // tiene stock, no vacía
+      if(!v||!v.art) return;
+      if((v.unidades||0) > 0) return;
       var nivel = parseInt((posId.split('-')[1]||'N4').replace('N',''))||4;
-      if(nivel===nivelIdeal) posVaciasEnRack.push(posId);
+      if(nivel===nivelIdeal) posiciones.push({id:posId, vacia:true});
     });
 
-    if(posVaciasEnRack.length){
-      return {
-        tipo:    'rack',
-        pos:     posVaciasEnRack[0],
-        detalle: 'Rack: '+posVaciasEnRack[0]+' ← VACÍA POR PEDIDO (reutilizar)',
-        pallets: pallFuturo.toFixed(1),
-        exacto:  false,
-        posVacia: true,
-      };
-    }
-
-    // ── PASO 3: buscar primera posición libre genérica ──
-    var ocupadas = new Set(Object.keys(ASIGN));
-    var sugerida = null;
-    var ordenNiveles = [nivelIdeal, nivelIdeal===4?3:4, 2, 1];
-    ordenNiveles = ordenNiveles.filter(function(v,i,a){return a.indexOf(v)===i;});
-
-    for(var ni=0; ni<ordenNiveles.length && !sugerida; ni++){
-      var nv = ordenNiveles[ni];
-      for(var fi=0; fi<FRENTES.length && !sugerida; fi++){
-        var f = FRENTES[fi];
-        if(f.niveles.indexOf(nv)<0) continue;
-        for(var m=1; m<=f.modulos; m++){
-          var pid = f.id+'-N'+nv+'-P'+(m<10?'0'+m:''+m);
-          if(!ocupadas.has(pid)){
-            sugerida = pid;
-            break;
+    // Completar con posiciones libres (nunca asignadas) hasta cubrir todos
+    // los pallets necesarios, mismo orden de prioridad de niveles que antes
+    if(posiciones.length < pallNecesarios){
+      var ocupadas = new Set(Object.keys(ASIGN));
+      var yaElegidas = new Set(posiciones.map(function(p){return p.id;}));
+      var ordenNiveles = [nivelIdeal, nivelIdeal===4?3:4, 2, 1];
+      ordenNiveles = ordenNiveles.filter(function(v,i,a){return a.indexOf(v)===i;});
+      for(var ni=0; ni<ordenNiveles.length && posiciones.length<pallNecesarios; ni++){
+        var nv = ordenNiveles[ni];
+        for(var fi=0; fi<FRENTES.length && posiciones.length<pallNecesarios; fi++){
+          var f = FRENTES[fi];
+          if(f.niveles.indexOf(nv)<0) continue;
+          for(var m=1; m<=f.modulos && posiciones.length<pallNecesarios; m++){
+            var pid = f.id+'-N'+nv+'-P'+(m<10?'0'+m:''+m);
+            if(!ocupadas.has(pid) && !yaElegidas.has(pid)){
+              posiciones.push({id:pid, vacia:false});
+              yaElegidas.add(pid);
+            }
           }
         }
       }
     }
 
-    if(sugerida){
+    if(posiciones.length){
+      var posStr2 = posiciones.map(function(p){return p.id+(p.vacia?'★':'');}).join(', ');
+      var faltan = pallNecesarios - posiciones.length;
       return {
         tipo:    'rack',
-        pos:     sugerida,
-        detalle: 'Rack: '+sugerida+' (sugerido)',
+        pos:     posStr2,
+        detalle: 'Rack: '+posStr2+' — '+pallNecesarios+' pallet(s)'+(faltan>0?' (⚠️ faltan '+faltan+' posición(es) más, rack casi lleno)':''),
         pallets: pallFuturo.toFixed(1),
         exacto:  false,
-        posVacia: false,
+        posVacia: posiciones.some(function(p){return p.vacia;}),
       };
     }
 
@@ -10379,6 +10377,8 @@ function _transitoPosicionSugeridaBase(artId, cantEntrada){
 // otro lugar, hay que avisar para unificar en vez de dejarlo repartido.
 function transitoPosicionSugerida(artId, cantEntrada){
   var res = _transitoPosicionSugeridaBase(artId, cantEntrada);
+  var da = DATA.find(function(r){return r.art===artId;});
+  var stockViejo = da ? (da.stock||0) : 0;
 
   var enPuntera = buscarEnPunteras(artId);
   if(enPuntera && enPuntera.total>0){
@@ -10388,11 +10388,12 @@ function transitoPosicionSugerida(artId, cantEntrada){
 
   // Si el destino sugerido NO es rack pero el artículo ya tiene unidades
   // asignadas ahí, también hay que unificar (sacarlo del rack primero)
+  var unidadesEnRack = 0;
   if(res.tipo !== 'rack'){
     var posEnRack = [];
     Object.entries(ASIGN).forEach(function(e){
       var posId=e[0], v=e[1];
-      if(v && v.art===artId && (v.unidades||0)>0) posEnRack.push(posId+' ('+v.unidades+')');
+      if(v && v.art===artId && (v.unidades||0)>0){ posEnRack.push(posId+' ('+v.unidades+')'); unidadesEnRack += v.unidades; }
     });
     if(posEnRack.length){
       res.enRack = posEnRack.length;
@@ -10400,11 +10401,20 @@ function transitoPosicionSugerida(artId, cantEntrada){
     }
   }
 
+  // El resto del stock viejo que no está ni en puntera ni en rack (suelto
+  // en bloque/nave, sin bin puntual asignado) también hay que juntarlo —
+  // si no, el aviso queda incompleto y no explica qué hacer con esas unidades.
+  var suelto = stockViejo - (res.enPuntera||0) - unidadesEnRack;
+
   var avisos = [];
   if(res.enPuntera) avisos.push('sacar '+res.enPuntera+' un. de '+res.punteraUbic);
   if(res.rackUbic)  avisos.push('sacar del rack '+res.rackUbic);
-  if(avisos.length){
-    res.detalle = '⚠️ UNIFICAR: '+avisos.join(' + ')+' → '+res.detalle;
+  var avisoTexto = avisos.join(' + ');
+  if(suelto>0 && (res.enPuntera || res.rackUbic)){
+    avisoTexto += ' + '+suelto+' un. sueltas en '+(da&&da.bloque?da.bloque:'nave');
+  }
+  if(avisoTexto){
+    res.detalle = '⚠️ UNIFICAR: '+avisoTexto+' → '+res.detalle;
   }
   return res;
 }
