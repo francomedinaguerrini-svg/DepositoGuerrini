@@ -5836,7 +5836,7 @@ function imprimirMapa(){
     ['Sugerencia activa:', document.getElementById('sug-activa-badge')?.textContent||''],
     ['Fecha:', new Date().toLocaleDateString('es-AR')],
     [],
-    ['POSICIÓN','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','UNIDADES','CONDICIÓN','NIVEL'],
+    ['POSICIÓN','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','UNIDADES','STOCK FP','CONDICIÓN','NIVEL'],
   ];
 
   Object.entries(ASIGN).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([pos,v])=>{
@@ -5844,11 +5844,11 @@ function imprimirMapa(){
     const art = DATA.find(r=>r.art==v.art);
     if(!art) return;
     const nivel = pos.split('-')[1];
-    wsData.push([pos, art.art, art.med, art.diseno, art.prov, v.unidades||0, art.cond, nivel]);
+    wsData.push([pos, art.art, art.med, art.diseno, art.prov, v.unidades||0, art.stock||0, art.cond, nivel]);
   });
 
   const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [{wch:18},{wch:8},{wch:14},{wch:10},{wch:12},{wch:10},{wch:12},{wch:6}];
+  ws['!cols'] = [{wch:18},{wch:8},{wch:14},{wch:10},{wch:12},{wch:10},{wch:10},{wch:12},{wch:6}];
   ws['!pageSetup'] = {orientation:'landscape'};
   XLSX.utils.book_append_sheet(wb, ws, 'Mapa Racks');
 
