@@ -1562,7 +1562,7 @@ function chequearCambioUbicacion(art, stockAntes, stockDespues, cantIngreso){
     // Cruzó el umbral de 1 pallet — ¿le corresponde rack o bloque?
     // Rack: 1 a 6 pallets, no excluido (camión/Speedway/agrícola/AT51-AT52-MT51), rotación < 5.5/sem.
     // Si no entra en ese rango, recién ahí es bloque.
-    var excluido = /\d+\.5/.test(art.med||'') || (art.prov==='SPEEDWAY') ||
+    var excluido = /\d+\.\d+/.test(art.med||'') || (art.prov==='SPEEDWAY') ||
                    ['TT','TL','TLSB'].indexOf((art.uso||'').trim())>=0 ||
                    ['AT51','AT52','MT51'].indexOf((art.diseno||'').trim())>=0;
     var rotAlta = (art.rot_sem||0) >= 5.5;
@@ -2576,7 +2576,7 @@ function renderCobertura(){
   function getLlanta(med){ try{return parseFloat(med.trim().split(' ').pop())}catch{return 0} }
   const universo = DATA.filter(r => {
     var med = r.med||'';
-    if(/\d+\.5/.test(med)) return false;
+    if(/\d+\.\d+/.test(med)) return false;
     if(r.prov === 'SPEEDWAY') return false;
     var uso = (r.uso||'').trim();
     if(['TT','TL','TLSB'].indexOf(uso)>=0) return false;
@@ -2677,7 +2677,7 @@ function showModalOcupada(posId,art){
         <div class="unid-num" id="unid-num">${currentUnidades}</div>
         <button class="unid-btn mas" onclick="cambiarUnidades(1)">+</button>
       </div>
-      <div class="unid-max">Máximo: ${maxEfectivo} unidades${comp.length>0?' (mitad del pallet)':' por pallet'}</div>
+      <div class="unid-max">Referencia: ${maxEfectivo} un.${comp.length>0?' (mitad del pallet)':' por pallet'} — se puede superar si hay unidades sueltas</div>
       <div class="barra-pos"><div class="barra-pos-fill" id="barra-fill" style="width:${pct}%;background:${barColor}"></div></div>
     </div>
     ${(()=>{const comp=(ASIGN[posId]||{}).compartidos||[];if(!comp.length)return '';return '<div style="background:#f5f5f7;border-radius:10px;padding:10px 12px;margin-top:8px"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#86868b;margin-bottom:6px">Comparte posición con:</div>'+comp.map(c=>{const ca=DATA.find(r=>r.art==c.art);if(!ca)return '';return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:.5px solid #e5e5ea"><div><div style="font-size:12px;font-weight:600">'+ca.med+' — '+ca.diseno+'</div><div style="font-size:10px;color:#86868b">'+ca.prov+'</div></div><span style="font-size:12px;font-weight:700;color:#0071e3">'+c.unidades+' un.</span></div>';}).join('')+'</div>';})()}
@@ -2701,9 +2701,9 @@ function showModalVacia(posId){
 }
 
 function cambiarUnidades(delta){
-  currentUnidades=Math.max(0,Math.min(currentMax||999,currentUnidades+delta));
+  currentUnidades=Math.max(0,currentUnidades+delta);
   const _unum=document.getElementById('unid-num'); if(_unum) _unum.textContent=currentUnidades;
-  const pct=currentMax?Math.round((currentUnidades/currentMax)*100):0;
+  const pct=currentMax?Math.min(100,Math.round((currentUnidades/currentMax)*100)):0;
   const barColor=pct>=66?'#34c759':pct>=33?'#ff9500':'#d70015';
   const fill=document.getElementById('barra-fill');
   if(fill){fill.style.width=pct+'%';fill.style.background=barColor;}
@@ -2842,7 +2842,7 @@ function barridoCandidatosRack(){
   });
 
   function pasaFiltroBase(r){
-    if(/\d+\.5/.test(r.med||''))                    return false; // camión
+    if(/\d+\.\d+/.test(r.med||''))                    return false; // camión
     if(EXCLUIR_PROV.indexOf(r.prov)>=0)             return false; // Speedway
     if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0)  return false; // agrícola
     if(EXCLUIR_DISENO.indexOf((r.diseno||'').trim())>=0) return false; // AT51/AT52/MT51
@@ -2993,7 +2993,7 @@ function generarMotorAsignacion(){
           if(p.compartidos && p.compartidos.length >= 1) return; // ya tiene 2 arts
           var daExist = DATA.find(function(r){return r.art==p.artActual;});
           if(daExist){
-            if(/\d+\.5/.test(daExist.med||'')) return;
+            if(/\d+\.\d+/.test(daExist.med||'')) return;
             if(daExist.prov==='SPEEDWAY') return;
           }
           var mpExist = (daExist&&daExist.max_pos)||32;
@@ -3353,7 +3353,7 @@ function reevaluarRack(){
   var EXCLUIR_DIS2 = ['AT51','AT52','MT51'];
   function califica(art){
     if(!art) return false;
-    if(/\d+\.5/.test(art.med||'')) return false;
+    if(/\d+\.\d+/.test(art.med||'')) return false;
     if(EXCLUIR_PROV.indexOf(art.prov)>=0) return false;
     if(EXCLUIR_USO.indexOf((art.uso||'').trim())>=0) return false;
     if(EXCLUIR_DIS2.indexOf((art.diseno||'').trim())>=0) return false;
@@ -3675,7 +3675,7 @@ function renderAlertas(){
     // Mismo criterio que la sugerencia de puntera: <1 pallet, rotación
     // baja, no excluido, no ya asignado en otra puntera.
     const enPunteraYa = articulosAsignadosSet(getPunteras(), null).has(String(a.art.art));
-    const excluido = /\d+\.5/.test(a.art.med||'') || (a.art.prov==='SPEEDWAY') ||
+    const excluido = /\d+\.\d+/.test(a.art.med||'') || (a.art.prov==='SPEEDWAY') ||
                      ['TT','TL','TLSB'].indexOf((a.art.uso||'').trim())>=0 ||
                      ['AT51','AT52','MT51'].indexOf((a.art.diseno||'').trim())>=0;
     let destinoTxt, destinoColor;
@@ -3752,7 +3752,7 @@ function renderCandidatosEnNave(){
   // Candidatos en nave (no en rack)
   const candidatosEnNave = DATA.filter(function(r){
     if(enRack.has(String(r.art))) return false;
-    if(/\d+\.5/.test(r.med||'')) return false;
+    if(/\d+\.\d+/.test(r.med||'')) return false;
     if(EXCLUIR_PROV.indexOf(r.prov)>=0) return false;
     if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false;
     if((r.stock||0) <= 0) return false;
@@ -5870,7 +5870,7 @@ function imprimirMapa(){
 
   function motivoNoRackCompleto(r){
     if((r.stock||0) <= 0) return 'Sin stock';
-    if(/\d+\.5/.test(r.med||'')) return 'Medida de camión (.5) — no aplica a rack';
+    if(/\d+\.\d+/.test(r.med||'')) return 'Medida de camión (decimal en la medida) — no aplica a rack';
     if(r.prov==='SPEEDWAY') return 'Proveedor Speedway — excluido del rack';
     if(['TT','TL','TLSB'].indexOf((r.uso||'').trim())>=0) return 'Uso agrícola — excluido del rack';
     if(['AT51','AT52','MT51'].indexOf((r.diseno||'').trim())>=0) return 'Diseño de alta rotación — excluido siempre del rack';
@@ -5955,7 +5955,7 @@ function imprimirMapa(){
   }
   const candidatosNave = DATA.filter(r=>{
     if(enRack2.has(String(r.art))) return false;
-    if(/\d+\.5/.test(r.med||'')) return false;
+    if(/\d+\.\d+/.test(r.med||'')) return false;
     if(EXCLUIR_PROV2.indexOf(r.prov)>=0) return false;
     if(EXCLUIR_USO2.indexOf((r.uso||'').trim())>=0) return false;
     if(['AT51','AT52','MT51'].indexOf((r.diseno||'').trim())>=0) return false;
@@ -6240,7 +6240,7 @@ function _repoCalcTraer(art, unidActual, maxU){
   var traer = Math.max(0, meta - unidActual);
 
   // Verificar que el art califica para reposición desde bloque
-  var excluido = /\d+\.5/.test(art.med||'') ||
+  var excluido = /\d+\.\d+/.test(art.med||'') ||
                  art.prov==='SPEEDWAY' ||
                  ['TT','TL','TLSB'].indexOf((art.uso||'').trim())>=0 ||
                  ['AT51','AT52','MT51'].indexOf((art.diseno||'').trim())>=0;
@@ -9575,7 +9575,7 @@ function termoStats(){
 
   // Artículos que califican para el rack (misma lógica del motor)
   const candidatosRack = new Set(DATA.filter(r=>{
-    if(/\d+\.5/.test(r.med||'')) return false;
+    if(/\d+\.\d+/.test(r.med||'')) return false;
     if(r.prov==='SPEEDWAY') return false;
     const uso = (r.uso||'').trim();
     if(['TT','TL','TLSB','TT ','TL '].indexOf(uso)>=0) return false;
@@ -10439,7 +10439,7 @@ function _transitoPosicionSugeridaBase(artId, cantEntrada){
   var rot = da.rot_sem||0;
 
   // ── Filtros de exclusión (igual que el motor) ──
-  var excluido = /\d+\.5/.test(da.med||'') || (da.prov==='SPEEDWAY') ||
+  var excluido = /\d+\.\d+/.test(da.med||'') || (da.prov==='SPEEDWAY') ||
                  ['TT','TL','TLSB'].indexOf((da.uso||'').trim())>=0 ||
                  ['AT51','AT52','MT51'].indexOf((da.diseno||'').trim())>=0;
 
@@ -12492,7 +12492,7 @@ function candidatosParaPuntera(){
   return DATA.filter(function(r){
     if(enRack.has(String(r.art))) return false;
     if(enPunteraSet.has(String(r.art))) return false;
-    if(/\d+\.5/.test(r.med||'')) return false;
+    if(/\d+\.\d+/.test(r.med||'')) return false;
     if(EXCLUIR_PROV.indexOf(r.prov)>=0) return false;
     if(EXCLUIR_USO.indexOf((r.uso||'').trim())>=0) return false;
     if((r.stock||0) <= 0) return false;
