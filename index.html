@@ -889,9 +889,12 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
         <button onclick="aplicarSugerencia()" style="flex:1;padding:11px;background:#ff9500;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">📉 Aplicar Rotación Baja</button>
         <button onclick="reevaluarRack()" style="flex:1;padding:11px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer" title="Reevaluar posiciones libres y candidatos en nave">🔄 Reevaluar</button>
         <button onclick="imprimirMapa()" style="padding:11px 14px;background:#f5f5f7;color:#1d1d1f;border:none;border-radius:10px;font-size:13px;cursor:pointer" title="Exportar mapa">📥</button>
+        <button onclick="document.getElementById('mapa-import-input').click()" style="padding:11px 14px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:13px;cursor:pointer" title="Importar avance de carga desde el informe que devolvió el operario">📤 Avance</button>
+        <input type="file" id="mapa-import-input" accept=".xlsx,.xls" style="display:none" onchange="importarMapaRacksArchivo(this.files[0])">
         <button onclick="limpiarMapa()" style="padding:11px 14px;background:#ffd6d9;color:#d70015;border:none;border-radius:10px;font-size:13px;cursor:pointer">🗑️</button>
       </div>
     </div>
+    <div id="mapa-import-resultado"></div>
     <div id="alertas-box"></div>
     <div class="mapa-leyenda">
       <div class="ley-item"><div class="ley-dot" style="background:#34c759"></div>Lleno/casi lleno</div>
@@ -5997,6 +6000,119 @@ function imprimirMapa(){
 
   XLSX.writeFile(wb, `Mapa_Racks_${new Date().toLocaleDateString('es-AR').replace(/\//g,'-')}.xlsx`);
   showToast('✅ Mapa exportado · '+(candidatosNave.length||0)+' sin rack incluidos');
+}
+
+// === IMPORTAR AVANCE DE CARGA (racks) ===
+// El operario recibe el archivo que exporta imprimirMapa() (o uno con las
+// mismas columnas), completa la columna UNIDADES con lo que realmente
+// cargó en cada posición —no hace falta que llegue al 100%— y este import
+// actualiza el Mapa de Racks. Se puede re-importar el mismo archivo varias
+// veces (hoy 30%, mañana 70%, etc.) porque cada vez SETEA el valor de la
+// columna, no lo suma.
+function importarMapaRacksArchivo(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      const wb2 = XLSX.read(e.target.result, {type:'array'});
+      const wsName = wb2.SheetNames.indexOf('Mapa Racks')>=0 ? 'Mapa Racks' : wb2.SheetNames[0];
+      const ws2 = wb2.Sheets[wsName];
+      const raw = XLSX.utils.sheet_to_json(ws2, {header:1, defval:''});
+      if(!raw.length){ showToast('❌ El archivo está vacío'); return; }
+
+      const ALIAS = {
+        POSICION: ['POSICIÓN','POSICION','POS'],
+        ART: ['ARTÍCULO','ARTICULO','ART','ART.','CODIGO','CÓDIGO'],
+        UNIDADES: ['UNIDADES','CANT','CANTIDAD']
+      };
+      function normCel(c){ return String(c||'').trim().toUpperCase(); }
+
+      let headerRowIdx = -1, colMap = {};
+      for(let i=0; i<Math.min(raw.length,20); i++){
+        const fila = raw[i].map(normCel);
+        if(fila.indexOf('POSICIÓN')>=0 || fila.indexOf('POSICION')>=0 || fila.indexOf('POS')>=0){
+          headerRowIdx = i;
+          Object.keys(ALIAS).forEach(function(key){
+            const idx = fila.findIndex(function(c){ return ALIAS[key].indexOf(c)>=0; });
+            if(idx>=0) colMap[key] = idx;
+          });
+          break;
+        }
+      }
+      if(headerRowIdx===-1){ showToast('❌ No encontré la columna "POSICIÓN" en el archivo'); return; }
+      if(colMap.POSICION===undefined || colMap.UNIDADES===undefined){
+        showToast('❌ Faltan columnas obligatorias (POSICIÓN y UNIDADES)'); return;
+      }
+
+      const dataRows = raw.slice(headerRowIdx+1);
+      const cambios = [];
+      const sinMatch = [];
+      let filasSinCambio = 0, filasEnCero = 0;
+
+      dataRows.forEach(function(r, i){
+        const rowNum = headerRowIdx + i + 2;
+        const get = function(key){ return colMap[key]!==undefined ? r[colMap[key]] : ''; };
+        const pos = String(get('POSICION')||'').trim();
+        const artCod = String(get('ART')||'').trim();
+        const cantRaw = get('UNIDADES');
+        if(!pos && !artCod && cantRaw==='') return; // fila vacía, se ignora en silencio
+
+        if(!pos){ sinMatch.push('Fila '+rowNum+': falta la posición'); return; }
+        if(String(cantRaw).trim()===''){ filasEnCero++; return; } // celda vacía = todavía no cargado, no se toca
+        const cant = parseInt(cantRaw);
+        if(isNaN(cant) || cant<0){ sinMatch.push('Fila '+rowNum+' ('+pos+'): cantidad inválida'); return; }
+        if(cant===0){ filasEnCero++; return; } // todavía no cargado en esa posición — no se toca
+
+        let art = null;
+        if(artCod) art = DATA.find(function(r2){ return String(r2.art)===artCod; });
+        if(!art && ASIGN[pos]) art = DATA.find(function(r2){ return String(r2.art)===String(ASIGN[pos].art); });
+        if(!art){ sinMatch.push('Fila '+rowNum+' ('+pos+'): no encontré el artículo "'+artCod+'"'); return; }
+
+        const yaIgual = ASIGN[pos] && ASIGN[pos].unidades===cant && String(ASIGN[pos].art)===String(art.art);
+        if(yaIgual){ filasSinCambio++; return; }
+
+        cambios.push({pos:pos, art:art.art, unidadesNuevas:cant, esNueva: !ASIGN[pos]});
+      });
+
+      if(!cambios.length){
+        document.getElementById('mapa-import-resultado').innerHTML =
+          '<div style="background:#fff3cd;color:#856404;border-radius:8px;padding:10px;margin-top:10px;font-size:12px">'
+          +(sinMatch.length ? '❌ Ninguna fila se pudo importar.<br>'+sinMatch.slice(0,15).join('<br>') : 'ℹ️ No hay cambios respecto a lo que ya está cargado.')
+          +'</div>';
+        return;
+      }
+
+      const totalUnidades = cambios.reduce(function(s,c){return s+c.unidadesNuevas;},0);
+      const nuevas = cambios.filter(function(c){return c.esNueva;}).length;
+      const actualizadas = cambios.length - nuevas;
+      if(!confirm('Se van a actualizar '+cambios.length+' posiciones ('+nuevas+' nuevas, '+actualizadas+' con cambio de cantidad) — '+totalUnidades+' unidades en total. ¿Continuar?')) return;
+
+      cambios.forEach(function(c){
+        const prevCompartidos = (ASIGN[c.pos] && String(ASIGN[c.pos].art)===String(c.art)) ? (ASIGN[c.pos].compartidos||[]) : [];
+        ASIGN[c.pos] = {art:c.art, unidades:c.unidadesNuevas, compartidos:prevCompartidos};
+        registrarMovimiento(c.pos, c.art, 'ajustar', c.unidadesNuevas);
+      });
+      saveAsign();
+      renderMapa();
+      if(document.getElementById('view-stock').classList.contains('active')) render();
+      if(document.getElementById('view-repo').classList.contains('active')) renderReposicion();
+      document.getElementById('mapa-import-input').value = '';
+
+      let resHtml = '<div style="background:#e8f9ec;color:#1d7a3c;border-radius:8px;padding:10px;margin-top:10px;font-size:12px">'
+        +'✅ Actualizado: '+cambios.length+' posiciones ('+nuevas+' nuevas, '+actualizadas+' con cambio) · '+totalUnidades+' un. en total'
+        +((filasSinCambio||filasEnCero) ? '<br>· '+filasSinCambio+' fila(s) ya estaban igual · '+filasEnCero+' fila(s) todavía en 0 (sin tocar)' : '')
+        +'</div>';
+      if(sinMatch.length){
+        resHtml += '<div style="background:#fff3cd;color:#856404;border-radius:8px;padding:10px;margin-top:6px;font-size:12px">⚠️ '+sinMatch.length+' fila(s) sin poder importar:<br>'+sinMatch.slice(0,15).join('<br>')+(sinMatch.length>15?'<br>… y '+(sinMatch.length-15)+' más':'')+'</div>';
+      }
+      document.getElementById('mapa-import-resultado').innerHTML = resHtml;
+      showToast('✅ Mapa de racks actualizado desde archivo');
+    } catch(err){
+      showToast('❌ Error al leer el archivo');
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 
