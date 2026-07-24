@@ -902,6 +902,8 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
       <div class="ley-item"><div class="ley-dot" style="background:#d70015"></div>Casi vacío</div>
       <div class="ley-item"><div class="ley-dot" style="background:#e5e5ea"></div>Vacía</div>
       <div class="ley-item"><div class="ley-dot" style="background:#ff9500;border:2px solid #d70015"></div>⚠️ Reponer</div>
+      <div class="ley-item"><div class="ley-dot" style="background:#fff;border:2px solid #d70015"></div>🔴 Ya no califica — Reevaluar lo va a liberar</div>
+      <div class="ley-item"><div class="ley-dot" style="background:#fff;border:2px solid #ff9500"></div>🟡 Menos de medio pallet — revisar/reubicar a puntera manualmente</div>
     </div>
     <!-- Filtro por nivel + exportar + expandir -->
     <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
@@ -2522,7 +2524,11 @@ function renderMapa(){
         const cls=celldaColor(unid,maxU);
         const pct=maxU?Math.round((unid/maxU)*100):0;
         const label=art?art.diseno.substring(0,5):'';
-        html+=`<div class="celda ${cls}" onclick="clickCelda('${posId}')" title="${posId}${art?' · '+art.med+' '+art.diseno:''}">
+        const motivoNC = art ? rackMotivoNoCalifica(art) : null;
+        const borde = motivoNC ? (motivoNC.severidad==='dura' ? '3px solid #d70015' : '3px solid #ff9500') : '';
+        const badge = motivoNC ? `<div style="position:absolute;top:2px;right:2px;font-size:10px" title="${motivoNC.motivo}">${motivoNC.severidad==='dura'?'🔴':'🟡'}</div>` : '';
+        html+=`<div class="celda ${cls}" style="${borde?'border:'+borde+';position:relative':'position:relative'}" onclick="clickCelda('${posId}')" title="${posId}${art?' · '+art.med+' '+art.diseno+(motivoNC?' · ⚠️ '+motivoNC.motivo:''):''}">
+          ${badge}
           ${label}
           ${art?`<div class="barra"><div class="barra-fill" style="width:${pct}%"></div></div>`:''}
         </div>`;
@@ -2849,7 +2855,7 @@ function barridoCandidatosRack(){
     if(enPuntera.has(String(r.art)))                return false; // ya está en puntera
     if((r.stock||0) <= 0)                           return false; // sin stock
     if((r.pall||0) > PALL_MAX)                      return false; // > 5 pallets → bloque
-    if((r.pall||0) < 1)                             return false; // menos de 1 pallet
+    if((r.stock||0) < (r.max_pos||32)/2)            return false; // menos de medio pallet → puntera
     if(r.bloque){
       var bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
       if(bs.some(function(b){ return BLOQUES_RACK.indexOf(b.trim())>=0; })) return false;
@@ -3338,66 +3344,61 @@ function setSugerencia(nombre, btn){
   }
 }
 
+// === Calificación para RACK — compartida entre Reevaluar y el color del mapa ===
+var RACK_EXCLUIR_PROV = ['SPEEDWAY'];
+var RACK_EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
+var RACK_EXCLUIR_DIS  = ['AT51','AT52','MT51'];
+var RACK_BLOQUES_EXCL = ['1N','1S','2N','2S'];
+var RACK_ROT_MAX  = 5.5;
+var RACK_PALL_MAX = 6;
+
+// Devuelve null si el artículo califica bien para estar en rack.
+// Si no califica, devuelve {motivo, severidad}:
+//   'dura'   → se libera automáticamente en Reevaluar (previa confirmación)
+//   'blanda' → NUNCA se libera sola; solo se marca en el mapa (amarillo) para
+//              que decidas vos si la reubicás a puntera (ej: quedó entre
+//              medio pallet y un pallet completo — todavía es cantidad real)
+function rackMotivoNoCalifica(art){
+  if(!art) return {motivo:'artículo no encontrado en el inventario actual', severidad:'dura'};
+  if(/\d+\.\d+/.test(art.med||'')) return {motivo:'medida de camión', severidad:'dura'};
+  if(RACK_EXCLUIR_PROV.indexOf(art.prov)>=0) return {motivo:'proveedor excluido ('+art.prov+')', severidad:'dura'};
+  if(RACK_EXCLUIR_USO.indexOf((art.uso||'').trim())>=0) return {motivo:'uso agrícola', severidad:'dura'};
+  if(RACK_EXCLUIR_DIS.indexOf((art.diseno||'').trim())>=0) return {motivo:'diseño excluido ('+art.diseno+')', severidad:'dura'};
+  if((art.stock||0) <= 0) return {motivo:'sin stock', severidad:'dura'};
+  if((art.rot_sem||0) >= RACK_ROT_MAX) return {motivo:'rotación alta ('+(art.rot_sem||0)+')', severidad:'dura'};
+  if((art.pall||0) > RACK_PALL_MAX) return {motivo:'más de '+RACK_PALL_MAX+' pallets ('+art.pall+')', severidad:'dura'};
+  var mitad = (art.max_pos||32)/2;
+  if((art.stock||0) < mitad) return {motivo:'menos de medio pallet ('+(art.stock||0)+'/'+(art.max_pos||32)+') — corresponde puntera', severidad:'blanda'};
+  if(art.bloque){
+    var bs = art.bloque.includes('/')?art.bloque.split('/'):[art.bloque];
+    if(bs.some(function(b){return RACK_BLOQUES_EXCL.indexOf(b.trim())>=0;})) return {motivo:'bloque 1/2 ('+art.bloque+')', severidad:'dura'};
+  }
+  return null;
+}
+function rackCalifica(art){ return rackMotivoNoCalifica(art)===null; }
+
 function reevaluarRack(){
   // Reevaluación incremental:
-  // 1. Libera posiciones de artículos que ya no califican
+  // 1. Libera posiciones de artículos que ya no califican (solo motivo "duro")
   // 2. Asigna candidatos pendientes a posiciones libres
   // 3. Actualiza mapa y informe
 
-  var EXCLUIR_PROV = ['SPEEDWAY'];
-  var EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
-  var BLOQUES_RACK = ['1N','1S','2N','2S'];
-  var ROT_MAX  = 5.5;
-  var PALL_MAX = 6;
-
-  var EXCLUIR_DIS2 = ['AT51','AT52','MT51'];
-  function califica(art){
-    if(!art) return false;
-    if(/\d+\.\d+/.test(art.med||'')) return false;
-    if(EXCLUIR_PROV.indexOf(art.prov)>=0) return false;
-    if(EXCLUIR_USO.indexOf((art.uso||'').trim())>=0) return false;
-    if(EXCLUIR_DIS2.indexOf((art.diseno||'').trim())>=0) return false;
-    if((art.stock||0) <= 0) return false;
-    if((art.rot_sem||0) >= ROT_MAX) return false;
-    if((art.pall||0) > PALL_MAX) return false;
-    if((art.pall||0) < 1) return false;
-    if(art.bloque){
-      var bs = art.bloque.includes('/')?art.bloque.split('/'):[art.bloque];
-      if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return false;
-    }
-    return true;
-  }
-
-  // Motivo puntual por el que un artículo dejó de calificar — para mostrarlo
-  // en el cartel de confirmación antes de liberar nada (nunca se libera en silencio).
-  function motivoLiberacion(art){
-    if(!art) return 'artículo no encontrado en el inventario actual';
-    if(/\d+\.\d+/.test(art.med||'')) return 'medida de camión';
-    if(EXCLUIR_PROV.indexOf(art.prov)>=0) return 'proveedor excluido ('+art.prov+')';
-    if(EXCLUIR_USO.indexOf((art.uso||'').trim())>=0) return 'uso agrícola';
-    if(EXCLUIR_DIS2.indexOf((art.diseno||'').trim())>=0) return 'diseño excluido ('+art.diseno+')';
-    if((art.stock||0) <= 0) return 'sin stock';
-    if((art.rot_sem||0) >= ROT_MAX) return 'rotación alta ('+(art.rot_sem||0)+')';
-    if((art.pall||0) > PALL_MAX) return 'más de '+PALL_MAX+' pallets ('+art.pall+')';
-    if((art.pall||0) < 1) return 'menos de 1 pallet';
-    if(art.bloque){
-      var bs = art.bloque.includes('/')?art.bloque.split('/'):[art.bloque];
-      if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return 'bloque 1/2 ('+art.bloque+')';
-    }
-    return 'ya no califica';
-  }
+  function califica(art){ return rackCalifica(art); }
 
   var liberadas = 0;
   var asignadas = 0;
 
-  // PASO 1: detectar posiciones que ya no califican — SIN borrar todavía
+  // PASO 1: detectar posiciones con motivo DURO — SIN borrar todavía.
+  // Los motivos "blandos" (menos de medio pallet) nunca entran acá: quedan
+  // en el mapa marcadas en amarillo para que las reubiques vos manualmente.
   var aLiberar = [];
   Object.keys(ASIGN).forEach(function(posId){
     var v = ASIGN[posId];
     if(!v || !v.art) return;
     var art = DATA.find(function(r){return r.art==v.art;});
-    if(!califica(art)){
-      aLiberar.push({posId:posId, art:v.art, motivo:motivoLiberacion(art)});
+    var motivo = rackMotivoNoCalifica(art);
+    if(motivo && motivo.severidad==='dura'){
+      aLiberar.push({posId:posId, art:v.art, motivo:motivo.motivo});
     }
   });
 
@@ -3714,7 +3715,7 @@ function renderAlertas(){
                      ['AT51','AT52','MT51'].indexOf((a.art.diseno||'').trim())>=0;
     let destinoTxt, destinoColor;
     if(enPunteraYa){ destinoTxt = '✅ Ya está en puntera'; destinoColor = '#7a3fb0'; }
-    else if(a.pall < 1 && a.rotSem < 5.5 && !excluido){ destinoTxt = '🔚 Corresponde puntera — asignalo manualmente ahí'; destinoColor = '#7a3fb0'; }
+    else if((a.art.stock||0) < (a.art.max_pos||32)/2 && a.rotSem < 5.5 && !excluido){ destinoTxt = '🔚 Corresponde puntera — asignalo manualmente ahí'; destinoColor = '#7a3fb0'; }
     else { destinoTxt = '🟡 Se queda en bloque '+a.bloque; destinoColor = '#856404'; }
     return `<div style="background:${bg};border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;gap:8px;align-items:center">
       <div style="flex:1;min-width:0">
@@ -3792,7 +3793,7 @@ function renderCandidatosEnNave(){
     if((r.stock||0) <= 0) return false;
     if((r.rot_sem||0) >= ROT_MAX) return false;
     if((r.pall||0) > PALL_MAX) return false;
-    if((r.pall||0) < 1) return false;
+    if((r.stock||0) < (r.max_pos||32)/2) return false;
     if(r.bloque){
       const bs = r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
       if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return false;
@@ -5914,7 +5915,7 @@ function imprimirMapa(){
     }
     if(parrillaPorArt[String(r.art)]) return 'Asignado a puntera '+parrillaPorArt[String(r.art)];
     if((r.pall||0) > 6) return 'Supera 6 pallets (máx. que admite el motor)';
-    if((r.pall||0) < 1) return 'Sugerencia puntera — stock < 1 pallet (asignación manual)';
+    if((r.stock||0) < (r.max_pos||32)/2) return 'Sugerencia puntera — stock < medio pallet (asignación manual)';
     if((r.rot_sem||0) >= 5.5) return 'Rotación semanal alta — no es candidato a rack';
     if(sinLugarFullSet.has(String(r.art))) return 'Candidato válido — rack sin lugar (límite 80%)';
     return 'Candidato válido — falta correr "Reevaluar"';
@@ -5996,7 +5997,7 @@ function imprimirMapa(){
     if((r.stock||0)<=0) return false;
     if((r.rot_sem||0)>=5.5) return false;
     if((r.pall||0)>6) return false;
-    if((r.pall||0)<1) return false;
+    if((r.stock||0) < (r.max_pos||32)/2) return false;
     if(r.bloque){
       const bs=r.bloque.includes('/')?r.bloque.split('/'):[r.bloque];
       if(bs.some(b=>BLOQUES_RACK2.indexOf(b.trim())>=0)) return false;
@@ -9628,7 +9629,8 @@ function termoStats(){
     if(['TT','TL','TLSB','TT ','TL '].indexOf(uso)>=0) return false;
     if((r.stock||0)<=0) return false;
     if((r.rot_sem||0)>=0.5) return false;
-    if((r.pall||0)>4 || (r.pall||0)<1) return false;
+    if((r.pall||0)>4) return false;
+    if((r.stock||0) < (r.max_pos||32)/2) return false;
     return true;
   }).map(r=>r.art));
 
