@@ -6093,6 +6093,19 @@ function importarMapaRacksArchivo(file){
         registrarMovimiento(c.pos, c.art, 'ajustar', c.unidadesNuevas);
       });
       saveAsign();
+      // Sincronizar rack_stock con lo recién importado — si no se hace esto,
+      // el próximo "Reevaluar" (paso 2) vuelve a pisar estas unidades con el
+      // valor teórico que dejó el último "Aplicar motor" (asumía todo cargado).
+      var rackStSync = loadRackStock();
+      cambios.forEach(function(c){
+        rackStSync[c.pos] = {
+          art: c.art,
+          stock: c.unidadesNuevas,
+          min_u: (rackStSync[c.pos] && rackStSync[c.pos].min_u) || 1,
+          compartidos: (ASIGN[c.pos] && ASIGN[c.pos].compartidos) || []
+        };
+      });
+      saveRackStock(rackStSync);
       renderMapa();
       if(document.getElementById('view-stock').classList.contains('active')) render();
       if(document.getElementById('view-repo').classList.contains('active')) renderReposicion();
