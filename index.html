@@ -3368,18 +3368,52 @@ function reevaluarRack(){
     return true;
   }
 
+  // Motivo puntual por el que un artículo dejó de calificar — para mostrarlo
+  // en el cartel de confirmación antes de liberar nada (nunca se libera en silencio).
+  function motivoLiberacion(art){
+    if(!art) return 'artículo no encontrado en el inventario actual';
+    if(/\d+\.\d+/.test(art.med||'')) return 'medida de camión';
+    if(EXCLUIR_PROV.indexOf(art.prov)>=0) return 'proveedor excluido ('+art.prov+')';
+    if(EXCLUIR_USO.indexOf((art.uso||'').trim())>=0) return 'uso agrícola';
+    if(EXCLUIR_DIS2.indexOf((art.diseno||'').trim())>=0) return 'diseño excluido ('+art.diseno+')';
+    if((art.stock||0) <= 0) return 'sin stock';
+    if((art.rot_sem||0) >= ROT_MAX) return 'rotación alta ('+(art.rot_sem||0)+')';
+    if((art.pall||0) > PALL_MAX) return 'más de '+PALL_MAX+' pallets ('+art.pall+')';
+    if((art.pall||0) < 1) return 'menos de 1 pallet';
+    if(art.bloque){
+      var bs = art.bloque.includes('/')?art.bloque.split('/'):[art.bloque];
+      if(bs.some(function(b){return BLOQUES_RACK.indexOf(b.trim())>=0;})) return 'bloque 1/2 ('+art.bloque+')';
+    }
+    return 'ya no califica';
+  }
+
   var liberadas = 0;
   var asignadas = 0;
 
-  // PASO 1: liberar posiciones de artículos que ya no califican
+  // PASO 1: detectar posiciones que ya no califican — SIN borrar todavía
+  var aLiberar = [];
   Object.keys(ASIGN).forEach(function(posId){
     var v = ASIGN[posId];
     if(!v || !v.art) return;
     var art = DATA.find(function(r){return r.art==v.art;});
     if(!califica(art)){
-      delete ASIGN[posId];
-      liberadas++;
+      aLiberar.push({posId:posId, art:v.art, motivo:motivoLiberacion(art)});
     }
+  });
+
+  if(aLiberar.length>0){
+    var detalle = aLiberar.slice(0,15).map(function(x){return x.posId+' — art '+x.art+' ('+x.motivo+')';}).join('\n');
+    var extra = aLiberar.length>15 ? '\n… y '+(aLiberar.length-15)+' más' : '';
+    if(!confirm('⚠️ Reevaluar va a LIBERAR '+aLiberar.length+' posición(es) porque el artículo ya no califica:\n\n'+detalle+extra+'\n\n¿Confirmás?')){
+      showToast('Reevaluación cancelada — no se modificó nada');
+      return;
+    }
+  }
+
+  // Recién ahora se liberan, ya confirmado
+  aLiberar.forEach(function(x){
+    delete ASIGN[x.posId];
+    liberadas++;
   });
 
   // PASO 2: sincronizar unidades de ASIGN con rackStock (sin borrar posiciones vacías)
@@ -3572,7 +3606,7 @@ function reevaluarRack(){
 }
 
 function aplicarSugerencia(){
-  if(!confirm('¿Aplicar sugerencia automática? Esto reemplaza las asignaciones actuales.')) return;
+  if(!confirm('⚠️ Esto BORRA todo lo cargado hasta ahora (incluido lo importado con "Avance") y arma las posiciones de cero con cantidades teóricas de pallet completo. Para el día a día usá "Reevaluar", que no te pisa el progreso. ¿Seguro que querés continuar?')) return;
   if(_sugActiva==='stock_bajo'){
     // Debug: mostrar distribución de candidatos antes de asignar
   var _cands = barridoCandidatosRack();
