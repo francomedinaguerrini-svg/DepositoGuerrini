@@ -2828,7 +2828,7 @@ function barridoCandidatosRack(){
   var PALL_MAX = 6;   // máximo 6 pallets
 
   // Bloques 1 y 2 son la zona física del rack — no se mueven
-  var BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
+  var BLOQUES_RACK = ['1N','1S','2N','2S'];
 
   // Diseños excluidos siempre (alta rotación aunque estén en bloque 3)
   var EXCLUIR_DISENO = ['AT51','AT52','MT51'];
@@ -3346,7 +3346,7 @@ function reevaluarRack(){
 
   var EXCLUIR_PROV = ['SPEEDWAY'];
   var EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
-  var BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
+  var BLOQUES_RACK = ['1N','1S','2N','2S'];
   var ROT_MAX  = 5.5;
   var PALL_MAX = 6;
 
@@ -3742,7 +3742,7 @@ function renderCandidatosEnNave(){
   // También buscar artículos que califican pero nunca fueron asignados (rack lleno desde el arranque)
   const EXCLUIR_PROV = ['SPEEDWAY'];
   const EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
-  const BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
+  const BLOQUES_RACK = ['1N','1S','2N','2S'];
   const ROT_MAX  = 5;
   const PALL_MAX = 12;
 
@@ -5861,7 +5861,7 @@ function imprimirMapa(){
   Object.entries(ASIGN).forEach(([pos,v])=>{ if(v&&v.art) posPorArt[String(v.art)] = pos; });
   const resFull = window._motorResumen || {};
   const sinLugarFullSet = new Set((resFull.sinUbicacionArts||[]).map(a=>String(a.art)));
-  const BLOQUES_RACK_FULL = ['2N/3N','2S/2N','1N','1S'];
+  const BLOQUES_RACK_FULL = ['1N','1S','2N','2S'];
   const punterasFull = getPunteras();
   const parrillaPorArt = {};
   Object.entries(punterasFull).forEach(function(e){
@@ -5942,7 +5942,7 @@ function imprimirMapa(){
   // Hoja: candidatos en nave sin lugar en rack
   const EXCLUIR_PROV2 = ['SPEEDWAY'];
   const EXCLUIR_USO2  = ['TT','TL','TLSB','TT ','TL '];
-  const BLOQUES_RACK2 = ['2N/3N','2S/2N','1N','1S'];
+  const BLOQUES_RACK2 = ['1N','1S','2N','2S'];
   const enRack2 = new Set(Object.values(ASIGN).filter(v=>v&&v.art).map(v=>String(v.art)));
   const resExp = window._motorResumen || {};
   const sinLugarExpSet = new Set((resExp.sinUbicacionArts||[]).map(a=>String(a.art)));
@@ -6244,7 +6244,7 @@ function _repoCalcTraer(art, unidActual, maxU){
                  art.prov==='SPEEDWAY' ||
                  ['TT','TL','TLSB'].indexOf((art.uso||'').trim())>=0 ||
                  ['AT51','AT52','MT51'].indexOf((art.diseno||'').trim())>=0;
-  var bloqueOk = art.bloque && !['2N/3N','2S/2N','1N','1S'].some(b=>art.bloque.includes(b));
+  var bloqueOk = art.bloque && !['1N','1S','2N','2S'].some(b=>art.bloque.includes(b));
   var hayStock = (art.stock||0) > unidActual; // hay más en bloque que lo que ya está en rack
 
   if(excluido || !bloqueOk || !hayStock) return null;
@@ -10487,7 +10487,7 @@ function _transitoPosicionSugeridaBase(artId, cantEntrada){
   // rack y bloque, así que cualquier cosa por debajo de 1 pallet caía
   // directo a bloque, ignorando el criterio real (mismo que usa la
   // sugerencia de candidatos a puntera en Mapa Racks).
-  var BLOQUES_RACK_SUG = ['2N/3N','2S/2N','1N','1S'];
+  var BLOQUES_RACK_SUG = ['1N','1S','2N','2S'];
   var yaEnBloqueRack = da.bloque && da.bloque.split('/').some(function(b){return BLOQUES_RACK_SUG.indexOf(b.trim())>=0;});
   if(pallFuturo < 1 && stockFuturo > 0 && stockFuturo <= 1000 && rot < 5.5 && !yaEnBloqueRack){
     return {
@@ -12484,7 +12484,7 @@ function importarPunterasArchivo(file){
 function candidatosParaPuntera(){
   const EXCLUIR_PROV = ['SPEEDWAY'];
   const EXCLUIR_USO  = ['TT','TL','TLSB','TT ','TL '];
-  const BLOQUES_RACK = ['2N/3N','2S/2N','1N','1S'];
+  const BLOQUES_RACK = ['1N','1S','2N','2S'];
   const ROT_MAX_PUNTERA = 5.5; // mismo umbral que usa el motor de rack
   const enRack = new Set(Object.values(ASIGN).filter(v=>v&&v.art).map(v=>String(v.art)));
   const punterasActuales = getPunteras();
