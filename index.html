@@ -904,6 +904,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
       <div class="ley-item"><div class="ley-dot" style="background:#ff9500;border:2px solid #d70015"></div>⚠️ Reponer</div>
       <div class="ley-item"><div class="ley-dot" style="background:#fff;border:2px solid #d70015"></div>🔴 Ya no califica — Reevaluar lo va a liberar</div>
       <div class="ley-item"><div class="ley-dot" style="background:#fff;border:2px solid #ff9500"></div>🟡 Menos de medio pallet — revisar/reubicar a puntera manualmente</div>
+      <div class="ley-item"><div class="ley-dot" style="background:#34c759"></div>🆕 Cargado en el último Avance importado (se apaga solo con el próximo)</div>
     </div>
     <!-- Filtro por nivel + exportar + expandir -->
     <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
@@ -2527,8 +2528,12 @@ function renderMapa(){
         const motivoNC = art ? rackMotivoNoCalifica(art) : null;
         const borde = motivoNC ? (motivoNC.severidad==='dura' ? '3px solid #d70015' : '3px solid #ff9500') : '';
         const badge = motivoNC ? `<div style="position:absolute;top:2px;right:2px;font-size:10px" title="${motivoNC.motivo}">${motivoNC.severidad==='dura'?'🔴':'🟡'}</div>` : '';
-        html+=`<div class="celda ${cls}" style="${borde?'border:'+borde+';position:relative':'position:relative'}" onclick="clickCelda('${posId}')" title="${posId}${art?' · '+art.med+' '+art.diseno+(motivoNC?' · ⚠️ '+motivoNC.motivo:''):''}">
+        const ultimoLoteAvance = Number(localStorage.getItem('wms_ultimo_lote_avance')||0);
+        const esDeUltimoLote = asig && asig.ultimoLote && asig.ultimoLote===ultimoLoteAvance;
+        const badgeNuevo = esDeUltimoLote ? `<div style="position:absolute;top:2px;left:2px;font-size:9px;background:#34c759;color:#fff;border-radius:3px;padding:0 2px" title="Cargado en el último Avance importado">🆕</div>` : '';
+        html+=`<div class="celda ${cls}" style="${borde?'border:'+borde+';position:relative':'position:relative'}" onclick="clickCelda('${posId}')" title="${posId}${art?' · '+art.med+' '+art.diseno+(motivoNC?' · ⚠️ '+motivoNC.motivo:''):''}${esDeUltimoLote?' · 🆕 cargado en el último Avance':''}">
           ${badge}
+          ${badgeNuevo}
           ${label}
           ${art?`<div class="barra"><div class="barra-fill" style="width:${pct}%"></div></div>`:''}
         </div>`;
@@ -6134,12 +6139,14 @@ function importarMapaRacksArchivo(file){
       const actualizadas = cambios.length - nuevas;
       if(!confirm('Se van a actualizar '+cambios.length+' posiciones ('+nuevas+' nuevas, '+actualizadas+' con cambio de cantidad) — '+totalUnidades+' unidades en total. ¿Continuar?')) return;
 
+      const loteTs = Date.now();
       cambios.forEach(function(c){
         const prevCompartidos = (ASIGN[c.pos] && String(ASIGN[c.pos].art)===String(c.art)) ? (ASIGN[c.pos].compartidos||[]) : [];
-        ASIGN[c.pos] = {art:c.art, unidades:c.unidadesNuevas, compartidos:prevCompartidos};
+        ASIGN[c.pos] = {art:c.art, unidades:c.unidadesNuevas, compartidos:prevCompartidos, ultimoLote:loteTs};
         registrarMovimiento(c.pos, c.art, 'ajustar', c.unidadesNuevas);
       });
       saveAsign();
+      localStorage.setItem('wms_ultimo_lote_avance', String(loteTs));
       // Sincronizar rack_stock con lo recién importado — si no se hace esto,
       // el próximo "Reevaluar" (paso 2) vuelve a pisar estas unidades con el
       // valor teórico que dejó el último "Aplicar motor" (asumía todo cargado).
