@@ -904,7 +904,7 @@ select{flex:1;padding:9px 8px;border:1px solid #d2d2d7;border-radius:10px;font-s
       <div class="ley-item"><div class="ley-dot" style="background:#ff9500;border:2px solid #d70015"></div>⚠️ Reponer</div>
       <div class="ley-item"><div class="ley-dot" style="background:#fff;border:2px solid #d70015"></div>🔴 Ya no califica — Reevaluar lo va a liberar</div>
       <div class="ley-item"><div class="ley-dot" style="background:#fff;border:2px solid #ff9500"></div>🟡 Menos de medio pallet — revisar/reubicar a puntera manualmente</div>
-      <div class="ley-item"><div class="ley-dot" style="background:#34c759"></div>🆕 Cargado en el último Avance importado (se apaga solo con el próximo)</div>
+      <div class="ley-item"><div class="ley-dot" style="background:#0071e3"></div>🆕 Sugerido por el motor — todavía sin confirmar con Avance</div>
     </div>
     <!-- Filtro por nivel + exportar + expandir -->
     <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
@@ -2528,10 +2528,9 @@ function renderMapa(){
         const motivoNC = art ? rackMotivoNoCalifica(art) : null;
         const borde = motivoNC ? (motivoNC.severidad==='dura' ? '3px solid #d70015' : '3px solid #ff9500') : '';
         const badge = motivoNC ? `<div style="position:absolute;top:2px;right:2px;font-size:10px" title="${motivoNC.motivo}">${motivoNC.severidad==='dura'?'🔴':'🟡'}</div>` : '';
-        const ultimoLoteAvance = Number(localStorage.getItem('wms_ultimo_lote_avance')||0);
-        const esDeUltimoLote = asig && asig.ultimoLote && asig.ultimoLote===ultimoLoteAvance;
-        const badgeNuevo = esDeUltimoLote ? `<div style="position:absolute;top:2px;left:2px;font-size:9px;background:#34c759;color:#fff;border-radius:3px;padding:0 2px" title="Cargado en el último Avance importado">🆕</div>` : '';
-        html+=`<div class="celda ${cls}" style="${borde?'border:'+borde+';position:relative':'position:relative'}" onclick="clickCelda('${posId}')" title="${posId}${art?' · '+art.med+' '+art.diseno+(motivoNC?' · ⚠️ '+motivoNC.motivo:''):''}${esDeUltimoLote?' · 🆕 cargado en el último Avance':''}">
+        const faltaConfirmar = asig && asig.art && !asig.confirmadoAvance;
+        const badgeNuevo = faltaConfirmar ? `<div style="position:absolute;top:2px;left:2px;font-size:9px;background:#0071e3;color:#fff;border-radius:3px;padding:0 2px" title="Sugerido por el motor — todavía no confirmado con Avance">🆕</div>` : '';
+        html+=`<div class="celda ${cls}" style="${borde?'border:'+borde+';position:relative':'position:relative'}" onclick="clickCelda('${posId}')" title="${posId}${art?' · '+art.med+' '+art.diseno+(motivoNC?' · ⚠️ '+motivoNC.motivo:''):''}${faltaConfirmar?' · 🆕 sugerido, falta cargar avance':''}">
           ${badge}
           ${badgeNuevo}
           ${label}
@@ -2723,6 +2722,7 @@ function cambiarUnidades(delta){
 function guardarUnidades(){
   if(!ASIGN[currentPosId])return;
   ASIGN[currentPosId].unidades=currentUnidades;
+  ASIGN[currentPosId].confirmadoAvance=true;
   saveAsign();
   closeModalDirect();
   renderMapa();
@@ -5894,7 +5894,6 @@ function imprimirMapa(){
     ['POSICIÓN','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','UNIDADES','STOCK FP','CONDICIÓN','NIVEL','REFERENCIA'],
   ];
 
-  const ultimoLoteAvanceExp = Number(localStorage.getItem('wms_ultimo_lote_avance')||0);
   Object.entries(ASIGN).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([pos,v])=>{
     if(!v) return;
     const art = DATA.find(r=>r.art==v.art);
@@ -5902,7 +5901,7 @@ function imprimirMapa(){
     const nivel = pos.split('-')[1];
     const motivoNCexp = rackMotivoNoCalifica(art);
     let referencia = '';
-    if(v.ultimoLote && v.ultimoLote===ultimoLoteAvanceExp) referencia = '🆕 NUEVO (último Avance)';
+    if(!v.confirmadoAvance) referencia = '🆕 SUGERIDO — falta cargar y confirmar';
     else if(motivoNCexp && motivoNCexp.severidad==='dura') referencia = '🔴 YA NO CALIFICA — se libera';
     else if(motivoNCexp && motivoNCexp.severidad==='blanda') referencia = '🟡 MENOS DE MEDIO PALLET — revisar';
     wsData.push([pos, art.art, art.med, art.diseno, art.prov, v.unidades||0, art.stock||0, art.cond, nivel, referencia]);
@@ -6145,14 +6144,12 @@ function importarMapaRacksArchivo(file){
       const actualizadas = cambios.length - nuevas;
       if(!confirm('Se van a actualizar '+cambios.length+' posiciones ('+nuevas+' nuevas, '+actualizadas+' con cambio de cantidad) — '+totalUnidades+' unidades en total. ¿Continuar?')) return;
 
-      const loteTs = Date.now();
       cambios.forEach(function(c){
         const prevCompartidos = (ASIGN[c.pos] && String(ASIGN[c.pos].art)===String(c.art)) ? (ASIGN[c.pos].compartidos||[]) : [];
-        ASIGN[c.pos] = {art:c.art, unidades:c.unidadesNuevas, compartidos:prevCompartidos, ultimoLote:loteTs};
+        ASIGN[c.pos] = {art:c.art, unidades:c.unidadesNuevas, compartidos:prevCompartidos, confirmadoAvance:true};
         registrarMovimiento(c.pos, c.art, 'ajustar', c.unidadesNuevas);
       });
       saveAsign();
-      localStorage.setItem('wms_ultimo_lote_avance', String(loteTs));
       // Sincronizar rack_stock con lo recién importado — si no se hace esto,
       // el próximo "Reevaluar" (paso 2) vuelve a pisar estas unidades con el
       // valor teórico que dejó el último "Aplicar motor" (asumía todo cargado).
