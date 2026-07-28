@@ -4565,7 +4565,7 @@ function buscarEnMapa(q){
   if(!q||q.length<2){ res.innerHTML=''; return; }
   const ql = q.toLowerCase();
 
-  // Buscar en ASIGN
+  // Buscar en ASIGN (rack)
   const encontrados = [];
   Object.entries(ASIGN).forEach(([pos,v])=>{
     if(!v) return;
@@ -4573,8 +4573,24 @@ function buscarEnMapa(q){
     if(!art) return;
     const s = (art.art+' '+art.med+' '+art.diseno+' '+art.prov+' '+art.tipo).toLowerCase();
     if(s.includes(ql)){
-      encontrados.push({pos, art, unidades: v.unidades});
+      encontrados.push({pos, art, unidades: v.unidades, tipo:'rack'});
     }
+  });
+
+  // Buscar también en las punteras — antes solo miraba el rack, así que un
+  // artículo que solo tuviera puntera (como una búsqueda por código exacto)
+  // siempre daba "sin resultados" aunque estuviera cargado ahí.
+  const punterasBuscar = getPunteras();
+  Object.entries(punterasBuscar).forEach(([parrillaId,items])=>{
+    (items||[]).forEach(function(it){
+      if(!it || !(it.unidades>0)) return;
+      const art = DATA.find(r=>r.art==it.art);
+      if(!art) return;
+      const s = (art.art+' '+art.med+' '+art.diseno+' '+art.prov+' '+(art.tipo||'')).toLowerCase();
+      if(s.includes(ql)){
+        encontrados.push({pos:parrillaId, art, unidades: it.unidades, tipo:'puntera'});
+      }
+    });
   });
 
   if(!encontrados.length){
@@ -4587,8 +4603,8 @@ function buscarEnMapa(q){
 
   res.innerHTML = `<div style="background:#fff;border-radius:10px;border:1px solid #e5e5ea;overflow:hidden;max-height:220px;overflow-y:auto">
     ${encontrados.slice(0,20).map(r=>`
-      <div onclick="irAPosicion('${r.pos}')" style="padding:8px 12px;border-bottom:1px solid #f5f5f7;cursor:pointer;display:flex;align-items:center;gap:10px">
-        <span style="font-size:11px;font-weight:700;color:#0071e3;background:#e8f0fe;padding:2px 8px;border-radius:4px;white-space:nowrap">${r.pos}</span>
+      <div onclick="${r.tipo==='puntera' ? `irAParrillaDesdeMapa('${r.pos}')` : `irAPosicion('${r.pos}')`}" style="padding:8px 12px;border-bottom:1px solid #f5f5f7;cursor:pointer;display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;font-weight:700;color:${r.tipo==='puntera'?'#7a3fb0':'#0071e3'};background:${r.tipo==='puntera'?'#f3e8ff':'#e8f0fe'};padding:2px 8px;border-radius:4px;white-space:nowrap">${r.tipo==='puntera'?'🔚 ':''}${r.pos}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:12px;font-weight:600">${r.art.med} ${r.art.diseno}</div>
           <div style="font-size:11px;color:#86868b">${r.art.prov} · ${r.unidades} un.</div>
