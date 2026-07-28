@@ -3370,7 +3370,10 @@ function rackMotivoNoCalifica(art){
   if(RACK_EXCLUIR_USO.indexOf((art.uso||'').trim())>=0) return {motivo:'uso agrícola', severidad:'dura'};
   if(RACK_EXCLUIR_DIS.indexOf((art.diseno||'').trim())>=0) return {motivo:'diseño excluido ('+art.diseno+')', severidad:'dura'};
   if((art.stock||0) <= 0) return {motivo:'sin stock', severidad:'dura'};
-  if((art.rot_sem||0) >= RACK_ROT_MAX) return {motivo:'rotación alta ('+(art.rot_sem||0)+')', severidad:'dura'};
+  if((art.rot_sem||0) >= RACK_ROT_MAX){
+    var pallSemMotivo = Math.round(((art.rot_sem||0)/(art.max_pos||32))*100)/100;
+    return {motivo:'rotación alta ('+(art.rot_sem||0)+' un./sem ≈ '+pallSemMotivo+' pallets/sem)', severidad:'dura'};
+  }
   if((art.pall||0) > RACK_PALL_MAX) return {motivo:'más de '+RACK_PALL_MAX+' pallets ('+art.pall+')', severidad:'dura'};
   var mitad = (art.max_pos||32)/2;
   if((art.stock||0) < mitad) return {motivo:'menos de medio pallet ('+(art.stock||0)+'/'+(art.max_pos||32)+') — corresponde puntera', severidad:'blanda'};
@@ -5948,11 +5951,12 @@ function imprimirMapa(){
     ['Total artículos: '+DATA.length],
     [resFull.fecha ? 'Último "Reevaluar"/motor corrido: '+resFull.fecha+' ('+(resFull.fuente||'—')+')' : '⚠️ Todavía no se corrió "Reevaluar" en esta sesión — el motivo puede estar desactualizado'],
     [],
-    ['ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','STOCK','PALLETS','ROT/SEM','EN RACK','POSICIÓN','BLOQUE (NAVE)','MOTIVO SI NO ESTÁ EN RACK'],
+    ['ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','STOCK','PALLETS','ROT/SEM','PALLETS/SEM','EN RACK','POSICIÓN','BLOQUE (NAVE)','MOTIVO SI NO ESTÁ EN RACK'],
     ...DATA.map(r=>{
       const enRack = enRackFull.has(String(r.art));
+      const pallSemStock = Math.round(((r.rot_sem||0)/(r.max_pos||32))*100)/100;
       return [
-        r.art, r.med, r.diseno, r.prov, r.stock||0, r.pall||0, (r.rot_sem||0).toFixed(2),
+        r.art, r.med, r.diseno, r.prov, r.stock||0, r.pall||0, (r.rot_sem||0).toFixed(2), pallSemStock,
         enRack?'SÍ':(parrillaPorArt[String(r.art)]?'PUNTERA':'NO'),
         enRack?(posPorArt[String(r.art)]||''):(parrillaPorArt[String(r.art)]||''),
         r.bloque||'',
@@ -8971,6 +8975,9 @@ function renderRotacion(){
     const rotApp = r.rot||0;
     const diffApp = rot.rot12 - rotApp;
     const diffPct = rotApp>0 ? Math.round(diffApp/rotApp*100) : 0;
+    const mp = r.max_pos||32;
+    const pallSem6  = mp ? Math.round((rot.rot6 /4.33/mp)*100)/100 : 0;
+    const pallSem12 = mp ? Math.round((rot.rot12/4.33/mp)*100)/100 : 0;
 
     return `<div class="rot-card">
       <div class="rot-info">
@@ -8982,11 +8989,15 @@ function renderRotacion(){
       <div class="rot-vals">
         <div class="rot-val">
           <div class="rot-val-num" style="color:#0071e3">${rot.rot12}</div>
-          <div class="rot-val-lbl">12 meses</div>
+          <div class="rot-val-lbl">un./mes (12m)</div>
         </div>
         <div class="rot-val">
           <div class="rot-val-num" style="color:#ff9500">${rot.rot6}</div>
-          <div class="rot-val-lbl">6 meses</div>
+          <div class="rot-val-lbl">un./mes (6m)</div>
+        </div>
+        <div class="rot-val">
+          <div class="rot-val-num" style="color:#7a3fb0">${pallSem6}</div>
+          <div class="rot-val-lbl">🔵 pallets/sem — así se compara contra Mapa Racks</div>
         </div>
         <div class="rot-trend" style="color:${trendColor}">${trend}</div>
       </div>
