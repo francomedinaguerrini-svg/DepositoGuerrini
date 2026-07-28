@@ -5130,7 +5130,16 @@ function cydPlanillaPicking(id){
     var totalCant = r.cantReal||r.cant;
     var dePuntera = (r.punteraDetalle||[]).reduce(function(s,d){return s+(d.unidades||0);},0);
     if(dePuntera>0){
-      fuentes.push({tipo:'puntera', ubic: r.punteraDetalle.map(function(d){return d.id+' ('+d.unidades+')';}).join(' + '), cant: dePuntera});
+      // Verificación en vivo: ¿esa puntera realmente tiene hoy este artículo?
+      // Si no, es porque cambió después de armar el pedido (se reubicó,
+      // se vació, etc.) — avisar en vez de mandar a buscar algo que no está.
+      var punterasHoy = (typeof getPunteras==='function') ? getPunteras() : {};
+      var noCoincide = r.punteraDetalle.some(function(d){
+        var items = punterasHoy[d.id]||[];
+        var it = items.find(function(x){ return String(x.art)===String(r.art); });
+        return !it || (it.unidades||0) < d.unidades;
+      });
+      fuentes.push({tipo:'puntera', ubic: r.punteraDetalle.map(function(d){return d.id+' ('+d.unidades+')';}).join(' + '), cant: dePuntera, advertencia: noCoincide});
     }
     var rackCant = r.rackRestante||0;
     if(rackCant>0 && r.posRack){
@@ -5201,6 +5210,14 @@ function cydPlanillaPicking(id){
       ubic = '<b style="color:'+color+'">'+icon+f.ubic+'</b>';
     } else {
       ubic = '<b style="color:#d70015">SIN UBIC.</b>';
+    }
+    // Aviso en vivo: si la puntera indicada ya no tiene este artículo (se
+    // reubicó o se vació después de armar el pedido), avisar acá en vez de
+    // mandar a buscar algo que ya no está — no se puede confiar ciegamente
+    // en el dato congelado al momento de crear el pedido.
+    var fuentePuntera = fuentes.find(function(f){return f.tipo==='puntera';});
+    if(fuentePuntera && fuentePuntera.advertencia){
+      ubic += '<div style="color:#d70015;font-weight:700;font-size:8px;margin-top:2px">⚠️ Verificar — puede haber cambiado desde que se armó el pedido</div>';
     }
     // Aviso de sobrante chico: si después de sacar esta cantidad del bloque
     // queda menos de medio pallet, sugerir llevar el resto a puntera —
