@@ -6092,6 +6092,28 @@ function imprimirMapa(){
     XLSX.utils.book_append_sheet(wb, wsN, 'En nave sin rack');
   }
 
+  // Hoja de Punteras — mismo formato que Mapa Racks, para poder bajarla,
+  // completar UNIDADES con lo que se cargó/quedó real, y volver a subirla
+  // con "📤 Avance" igual que el rack.
+  const wsPunt = [
+    ['PUNTERAS — WMS Depósito Halpern'],
+    ['Fecha:', new Date().toLocaleDateString('es-AR')],
+    [],
+    ['PARRILLA','ARTÍCULO','MEDIDA','DISEÑO','PROVEEDOR','UNIDADES','STOCK FP','CONDICIÓN'],
+  ];
+  const punterasExport = getPunteras();
+  Object.entries(punterasExport).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([parrillaId,items])=>{
+    (items||[]).forEach(function(it){
+      if(!it) return;
+      const art = DATA.find(r=>r.art==it.art);
+      if(!art) return;
+      wsPunt.push([parrillaId, art.art, art.med, art.diseno, art.prov, it.unidades||0, art.stock||0, art.cond||'']);
+    });
+  });
+  const wsP = XLSX.utils.aoa_to_sheet(wsPunt);
+  wsP['!cols'] = [{wch:12},{wch:8},{wch:14},{wch:10},{wch:12},{wch:10},{wch:10},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, wsP, 'Punteras');
+
   XLSX.writeFile(wb, `Mapa_Racks_${new Date().toLocaleDateString('es-AR').replace(/\//g,'-')}.xlsx`);
   showToast('✅ Mapa exportado · '+(candidatosNave.length||0)+' sin rack incluidos');
 }
@@ -6103,12 +6125,95 @@ function imprimirMapa(){
 // actualiza el Mapa de Racks. Se puede re-importar el mismo archivo varias
 // veces (hoy 30%, mañana 70%, etc.) porque cada vez SETEA el valor de la
 // columna, no lo suma.
+// Procesa la hoja "Punteras" del archivo importado, independiente de lo que
+// pase con la hoja "Mapa Racks" — así corre siempre, tenga o no cambios el rack.
+function procesarHojaPunterasImport(wb2){
+  if(wb2.SheetNames.indexOf('Punteras')<0) return;
+  const wsPuntImport = wb2.Sheets['Punteras'];
+  const rawPunt = XLSX.utils.sheet_to_json(wsPuntImport, {header:1, defval:''});
+  const ALIAS_P = {
+    PARRILLA: ['PARRILLA','POSICIÓN','POSICION'],
+    ART: ['ARTÍCULO','ARTICULO','ART','ART.','CODIGO','CÓDIGO'],
+    UNIDADES: ['UNIDADES','CANT','CANTIDAD']
+  };
+  function normCelP(c){ return String(c||'').trim().toUpperCase(); }
+  let headerRowIdxP = -1, colMapP = {};
+  for(let i=0;i<Math.min(rawPunt.length,20);i++){
+    const fila = rawPunt[i].map(normCelP);
+    if(fila.indexOf('PARRILLA')>=0 || fila.indexOf('POSICIÓN')>=0 || fila.indexOf('POSICION')>=0){
+      headerRowIdxP = i;
+      Object.keys(ALIAS_P).forEach(function(key){
+        const idx = fila.findIndex(function(c){ return ALIAS_P[key].indexOf(c)>=0; });
+        if(idx>=0) colMapP[key]=idx;
+      });
+      break;
+    }
+  }
+  if(headerRowIdxP<0 || colMapP.PARRILLA===undefined || colMapP.UNIDADES===undefined) return;
+
+  const dataRowsP = rawPunt.slice(headerRowIdxP+1);
+  const cambiosP = [];
+  const sinMatchP = [];
+  const punterasActuales = getPunteras();
+  dataRowsP.forEach(function(r,i){
+    const rowNum = headerRowIdxP+i+2;
+    const get = function(key){ return colMapP[key]!==undefined ? r[colMapP[key]] : ''; };
+    const parrilla = String(get('PARRILLA')||'').trim();
+    const artCod = String(get('ART')||'').trim();
+    const cantRaw = get('UNIDADES');
+    if(!parrilla && !artCod && cantRaw==='') return;
+    if(!parrilla || !artCod){ sinMatchP.push('Fila '+rowNum+': falta parrilla o artículo'); return; }
+    if(String(cantRaw).trim()===''){ return; } // celda vacía = sin tocar
+    const cant = parseInt(cantRaw);
+    if(isNaN(cant) || cant<0){ sinMatchP.push('Fila '+rowNum+' ('+parrilla+'): cantidad inválida'); return; }
+    const art = DATA.find(function(r2){ return String(r2.art)===artCod; });
+    if(!art){ sinMatchP.push('Fila '+rowNum+' ('+parrilla+'): no encontré el artículo "'+artCod+'"'); return; }
+    const itemsAct = punterasActuales[parrilla]||[];
+    const itAct = itemsAct.find(function(x){ return String(x.art)===artCod; });
+    const anterior = itAct ? (itAct.unidades||0) : null;
+    if(anterior===cant) return; // sin cambios
+    if(cant===0 && anterior===null) return; // no existe y pide 0 — nada que hacer
+    cambiosP.push({parrilla:parrilla, art:art.art, unidadesNuevas:cant, esNueva: anterior===null});
+  });
+
+  if(!cambiosP.length) return;
+
+  const totalP = cambiosP.reduce(function(s,c){return s+c.unidadesNuevas;},0);
+  const nuevasP = cambiosP.filter(function(c){return c.esNueva;}).length;
+  const actualizadasP = cambiosP.length-nuevasP;
+  if(!confirm('PUNTERAS: se van a actualizar '+cambiosP.length+' registros ('+nuevasP+' nuevos, '+actualizadasP+' con cambio) — '+totalP+' unidades en total. ¿Continuar?')) return;
+
+  cambiosP.forEach(function(c){
+    if(!punterasActuales[c.parrilla]) punterasActuales[c.parrilla]=[];
+    const idx = punterasActuales[c.parrilla].findIndex(function(x){return String(x.art)===String(c.art);});
+    if(c.unidadesNuevas<=0){
+      if(idx>=0) punterasActuales[c.parrilla].splice(idx,1);
+    } else if(idx>=0){
+      punterasActuales[c.parrilla][idx].unidades = c.unidadesNuevas;
+    } else {
+      punterasActuales[c.parrilla].push({art:c.art, unidades:c.unidadesNuevas});
+    }
+  });
+  savePunteras(punterasActuales);
+  renderMapa();
+
+  const resDiv = document.getElementById('mapa-import-resultado');
+  let resHtmlP = '<div style="background:#e8f9ec;color:#1d7a3c;border-radius:8px;padding:10px;margin-top:6px;font-size:12px">'
+    +'✅ Punteras actualizadas: '+cambiosP.length+' registros ('+nuevasP+' nuevos, '+actualizadasP+' con cambio) · '+totalP+' un. en total'
+    +'</div>';
+  if(sinMatchP.length){
+    resHtmlP += '<div style="background:#fff3cd;color:#856404;border-radius:8px;padding:10px;margin-top:6px;font-size:12px">⚠️ Punteras: '+sinMatchP.length+' fila(s) sin poder importar:<br>'+sinMatchP.slice(0,15).join('<br>')+'</div>';
+  }
+  if(resDiv) resDiv.innerHTML += resHtmlP;
+}
+
 function importarMapaRacksArchivo(file){
   if(!file) return;
   const reader = new FileReader();
   reader.onload = function(e){
     try {
       const wb2 = XLSX.read(e.target.result, {type:'array'});
+      procesarHojaPunterasImport(wb2);
       const wsName = wb2.SheetNames.indexOf('Mapa Racks')>=0 ? 'Mapa Racks' : wb2.SheetNames[0];
       const ws2 = wb2.Sheets[wsName];
       const raw = XLSX.utils.sheet_to_json(ws2, {header:1, defval:''});
