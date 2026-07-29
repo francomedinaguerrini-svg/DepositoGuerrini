@@ -3200,6 +3200,58 @@ function descontarRackPorPedido(art, cant){
   return descontado;
 }
 
+// Igual que descontarRackPorPedido, pero además devuelve el detalle por
+// posición (como ya hace descontarPunteraPorPedido) — para que el pedido
+// pueda saber exactamente de cuántas posiciones distintas salió la
+// mercadería, en vez de asumir que sale de una sola.
+function descontarRackPorPedidoDetalle(art, cant){
+  var descontado = 0;
+  var detalle = [];
+
+  var posDelArt = Object.entries(ASIGN).filter(function(e){
+    var v = e[1];
+    if(!v) return false;
+    if(v.art == art) return true;
+    if(v.compartidos && v.compartidos.some(function(c){return c.art==art;})) return true;
+    return false;
+  });
+
+  posDelArt = posDelArt.sort(function(a, b){
+    var ua = a[1].art==art ? (a[1].unidades||0) : ((a[1].compartidos||[]).find(function(c){return c.art==art;})||{unidades:0}).unidades;
+    var ub = b[1].art==art ? (b[1].unidades||0) : ((b[1].compartidos||[]).find(function(c){return c.art==art;})||{unidades:0}).unidades;
+    return ua - ub; // menor cantidad primero — vaciar posiciones enteras maximiza cuántas quedan libres
+  });
+
+  posDelArt.forEach(function(e){
+    if(descontado >= cant) return;
+    var posId = e[0], v = ASIGN[posId];
+    if(!v) return;
+
+    if(v.art == art){
+      var desc = Math.min(cant - descontado, v.unidades||0);
+      if(desc>0){
+        v.unidades = Math.max(0, (v.unidades||0) - desc);
+        descontado += desc;
+        detalle.push({id: posId, unidades: desc});
+      }
+    } else if(v.compartidos){
+      v.compartidos.forEach(function(c){
+        if(descontado >= cant || c.art != art) return;
+        var desc = Math.min(cant - descontado, c.unidades||0);
+        if(desc>0){
+          c.unidades = Math.max(0, (c.unidades||0) - desc);
+          descontado += desc;
+          detalle.push({id: posId, unidades: desc});
+        }
+      });
+    }
+  });
+
+  if(descontado > 0) saveAsign();
+
+  return {descontado: descontado, detalle: detalle};
+}
+
 // Inversa de descontarRackPorPedido — repone unidades cuando se ajusta una diferencia
 // (ej: se reservó más de lo que se despachó realmente). Prioriza la posición original
 // si se pasa posIdPreferida, si no, cualquier posición existente con ese art.
@@ -3218,6 +3270,28 @@ function reponerRackPorAjuste(art, cant, posIdPreferida){
     }
   }
 
+  if(repuesto>0) saveAsign();
+  return repuesto;
+}
+
+// Igual que reponerRackPorAjuste, pero repone en TODAS las posiciones
+// originales de un detalle multi-posición (como reponerPunteraPorDetalle
+// hace para puntera) — en vez de una sola posición preferida.
+function reponerRackPorDetalle(art, detalle){
+  if(!detalle || !detalle.length) return 0;
+  var repuesto = 0;
+  detalle.forEach(function(d){
+    if(!d || !d.unidades) return;
+    if(ASIGN[d.id] && ASIGN[d.id].art==art){
+      ASIGN[d.id].unidades = (ASIGN[d.id].unidades||0) + d.unidades;
+      repuesto += d.unidades;
+    } else {
+      // La posición original ya no tiene este artículo (se liberó/reasignó
+      // mientras tanto, ej. por Reevaluar) — no inventar una posición nueva
+      // ni pisar la que hay ahora; devolver lo que no se pudo reponer para
+      // que quien llama decida qué hacer con eso (ej. mandarlo a bloque).
+    }
+  });
   if(repuesto>0) saveAsign();
   return repuesto;
 }
@@ -4149,22 +4223,6 @@ function procesarPedido(pedido){
     item.med = dataArt?dataArt.med:`${item.diam} ${item.secc} ${item.llan}`;
     item.cond = dataArt?dataArt.cond:'';
 
-    // Buscar posición en rack — N1 primero, luego N2, N3, N4
-    // Dentro de cada nivel, preferir la posición con MENOS unidades (vaciar las mas chicas antes)
-    function posMenorStockEnNivel(nivel){
-      var candidatas = Object.entries(ASIGN).filter(function(e){
-        var pos=e[0], v=e[1];
-        return pos.includes('-'+nivel+'-') && v && v.art==item.art && (v.unidades||0) > 0;
-      }).sort(function(a,b){ return (a[1].unidades||0) - (b[1].unidades||0); });
-      return candidatas[0];
-    }
-    const posRackN1 = posMenorStockEnNivel('N1');
-    const posRackN2 = posMenorStockEnNivel('N2');
-    const posRackN3 = posMenorStockEnNivel('N3');
-    const posRackN4 = posMenorStockEnNivel('N4');
-    const posRack = posRackN1||posRackN2||posRackN3||posRackN4;
-    item.posRack = posRack?posRack[0]:'';
-
     // ¿Está en alguna puntera? Si tiene stock ahí, es lo más rápido de agarrar
     // (ya está en la punta del pasillo), así que va primero en prioridad.
     // OJO: la puntera puede no alcanzar para cubrir todo el pedido — en ese
@@ -4174,12 +4232,48 @@ function procesarPedido(pedido){
     const restante = item.cant - dePuntera;
     item.puntera = dePuntera>0 ? enPuntera.ubicaciones.join(' + ') : '';
 
+    // Buscar en rack — TODAS las posiciones que tengan el artículo, no solo
+    // una. Prioridad: nivel más bajo primero (N1 antes que N4), y dentro del
+    // mismo nivel, la posición con menos unidades primero (vaciar las
+    // chicas antes). Antes esto solo miraba UNA posición y asumía que ahí
+    // alcanzaba para todo el pedido — por eso podía mostrar "sacar 75" de
+    // una posición que en realidad tenía mucho menos.
+    const rackBusq = (function(){
+      if(restante<=0) return {total:0, detalle:[]};
+      var candidatas = Object.entries(ASIGN).filter(function(e){
+        var v=e[1];
+        return v && v.art==item.art && (v.unidades||0)>0;
+      });
+      candidatas.sort(function(a,b){
+        var na = parseInt((a[0].split('-')[1]||'N4').replace('N',''))||4;
+        var nb = parseInt((b[0].split('-')[1]||'N4').replace('N',''))||4;
+        if(na!==nb) return na-nb;
+        return (a[1].unidades||0)-(b[1].unidades||0); // menor cantidad primero — maximiza posiciones liberadas
+      });
+      var detalle=[], total=0;
+      candidatas.forEach(function(c){
+        if(total>=restante) return;
+        var tomar = Math.min(restante-total, c[1].unidades||0);
+        if(tomar>0){ detalle.push({id:c[0], unidades:tomar}); total+=tomar; }
+      });
+      return {total:total, detalle:detalle};
+    })();
+    item.posRack = rackBusq.detalle.length ? rackBusq.detalle.map(function(d){return d.id;}).join(' + ') : '';
+    item._rackDetallePreview = rackBusq.detalle;
+
     item.fuentes = [];
     if(dePuntera>0) item.fuentes.push({tipo:'puntera', ubic: enPuntera.ubicaciones.join(' + '), cant: dePuntera});
     if(restante>0){
-      if(item.posRack) item.fuentes.push({tipo:'rack', ubic:item.posRack, cant:restante});
-      else if(item.bloque) item.fuentes.push({tipo:'bloque', ubic:item.bloque, cant:restante});
-      else item.fuentes.push({tipo:'sinubic', ubic:'', cant:restante});
+      if(rackBusq.detalle.length){
+        item.fuentes.push({tipo:'rack', ubic: rackBusq.detalle.map(function(d){return d.id+' ('+d.unidades+')';}).join(' + '), cant: rackBusq.total});
+        var restoSinRack = restante - rackBusq.total;
+        if(restoSinRack>0 && item.bloque) item.fuentes.push({tipo:'bloque', ubic:item.bloque, cant:restoSinRack});
+        else if(restoSinRack>0) item.fuentes.push({tipo:'sinubic', ubic:'', cant:restoSinRack});
+      } else if(item.bloque){
+        item.fuentes.push({tipo:'bloque', ubic:item.bloque, cant:restante});
+      } else {
+        item.fuentes.push({tipo:'sinubic', ubic:'', cant:restante});
+      }
     }
 
     // Prioridad de sección: puntera > rack > bloque > sin ubicación
@@ -4672,9 +4766,10 @@ function pedidoEnviarTransito(){
     var resP = descontarPunteraPorPedido(item.art, item.cant);
     var deP = resP.descontado;
     var restante = item.cant - deP;
-    var deRack = restante>0 ? descontarRackPorPedido(item.art, restante) : 0;
+    var resR = restante>0 ? descontarRackPorPedidoDetalle(item.art, restante) : {descontado:0, detalle:[]};
     item._punteraDetalle = resP.detalle;
-    item._rackRestante = deRack;
+    item._rackRestante = resR.descontado;
+    item._rackDetalle = resR.detalle;
 
     var dataArt = DATA.find(function(r){ return r.art===item.art; });
     if(dataArt){
@@ -4737,7 +4832,8 @@ function pedidoEnviarTransito(){
         tipo: r.puntera ? 'puntera' : (r.posRack ? 'rack' : 'bloque'),
         rangos: r.rangos||[],
         punteraDetalle: r._punteraDetalle||[],
-        rackRestante: r._rackRestante||0
+        rackRestante: r._rackRestante||0,
+        rackDetalle: r._rackDetalle||[]
       };
     })
   };
@@ -5141,9 +5237,14 @@ function cydPlanillaPicking(id){
       });
       fuentes.push({tipo:'puntera', ubic: r.punteraDetalle.map(function(d){return d.id+' ('+d.unidades+')';}).join(' + '), cant: dePuntera, advertencia: noCoincide});
     }
-    var rackCant = r.rackRestante||0;
-    if(rackCant>0 && r.posRack){
-      fuentes.push({tipo:'rack', ubic: r.posRack, cant: rackCant});
+    // Rack: si el tránsito ya tiene el detalle multi-posición (rackDetalle),
+    // usarlo — si es un tránsito viejo de antes de este arreglo, caer al
+    // único posRack que tenía guardado, como antes.
+    var rackDetalleArr = (r.rackDetalle && r.rackDetalle.length) ? r.rackDetalle
+      : (r.posRack ? [{id:r.posRack, unidades:r.rackRestante||0}] : []);
+    var rackCant = rackDetalleArr.reduce(function(s,d){return s+(d.unidades||0);},0);
+    if(rackCant>0 && rackDetalleArr.length){
+      fuentes.push({tipo:'rack', ubic: rackDetalleArr.map(function(d){return d.id+' ('+d.unidades+')';}).join(' + '), cant: rackCant});
     }
     var resto = totalCant - dePuntera - rackCant;
     if(resto>0 && r.bloque){
@@ -11061,6 +11162,7 @@ function cydEliminarTransito(id){
   if(!confirm(msgConfirm)) return;
 
   if(esCancelacionSalidaPendiente){
+    var sinReponerTotal = 0;
     tr0.items.forEach(function(item){
       var dataArt = DATA.find(function(r){ return r.art===item.art; });
       if(dataArt){
@@ -11069,10 +11171,20 @@ function cydEliminarTransito(id){
         recalcularCond(dataArt);
       }
       reponerPunteraPorDetalle(item.art, item.punteraDetalle);
-      if(item.rackRestante>0) reponerRackPorAjuste(item.art, item.rackRestante, item.posRack);
+      if(item.rackDetalle && item.rackDetalle.length){
+        var repuesto = reponerRackPorDetalle(item.art, item.rackDetalle);
+        var totalRack = item.rackDetalle.reduce(function(s,d){return s+(d.unidades||0);},0);
+        if(repuesto < totalRack) sinReponerTotal += (totalRack - repuesto);
+      } else if(item.rackRestante>0){
+        // Tránsito viejo, de antes de guardar el detalle multi-posición
+        var repuesto2 = reponerRackPorAjuste(item.art, item.rackRestante, item.posRack);
+        if(repuesto2 < item.rackRestante) sinReponerTotal += (item.rackRestante - repuesto2);
+      }
     });
     saveDataStock();
-    showToast('↩️ Pedido cancelado — stock devuelto a puntera/rack');
+    showToast(sinReponerTotal>0
+      ? '↩️ Pedido cancelado — '+sinReponerTotal+' un. no se pudieron reponer en su posición original (se liberó mientras tanto). El stock total ya está actualizado, pero revisá el rack manualmente.'
+      : '↩️ Pedido cancelado — stock devuelto a puntera/rack');
   }
 
   var lista = transitoGetAll().filter(function(t){return t.id!==id;});
