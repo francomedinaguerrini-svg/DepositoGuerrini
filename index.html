@@ -5330,6 +5330,18 @@ function cydPlanillaPicking(id){
       var restante = (r.stock||0) - cantReal;
       if(restante>0 && restante < maxPosArt/2){
         ubic += '<div style="color:#ff9500;font-weight:700;font-size:8px;margin-top:2px">⚠️ Quedan '+restante+' — llevar a puntera</div>';
+      } else if(restante>0 && artFull && typeof rackMotivoNoCalifica==='function'){
+        // Sugerencia de rack — NUNCA automática, solo informativa. Se
+        // confirma a mano en Mapa Racks. Solo tiene sentido si el artículo
+        // todavía no tiene ninguna posición de rack asignada.
+        var yaEnRack = (typeof ASIGN!=='undefined') && Object.values(ASIGN).some(function(v){return v && v.art==r.art;});
+        if(!yaEnRack){
+          var artSimulado = Object.assign({}, artFull, {stock: restante, pall: Math.floor(restante/maxPosArt)});
+          var motivoSimulado = rackMotivoNoCalifica(artSimulado);
+          if(!motivoSimulado){
+            ubic += '<div style="color:#0071e3;font-weight:700;font-size:8px;margin-top:2px">📦 Saldo ('+restante+' un.) califica para rack — asignar en Mapa Racks</div>';
+          }
+        }
       }
     }
     var rango = (typeof RANGOS !== 'undefined' && RANGOS[String(r.art)]) ? RANGOS[String(r.art)] : '—';
