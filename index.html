@@ -10801,15 +10801,49 @@ function _transitoPosicionSugeridaBase(artId, cantEntrada){
       var nb = parseInt((b.id.split('-')[1]||'N4').replace('N',''))||4;
       return na - nb;
     });
-    var mejorPos = posAsign[0];
+
+    // Si las posiciones ya asignadas no alcanzan para los pallets que hacen
+    // falta con esta entrada, hay que abrir posición(es) nueva(s) además —
+    // antes esto devolvía SIEMPRE solo las posiciones ya asignadas sin
+    // chequear cuántos pallets entraban, y el guardado terminaba pisando
+    // esa única posición con el total nuevo en vez de repartir en varias
+    var pallNecesarios = Math.max(1, Math.ceil(pallFuturo));
+    var faltanPos = pallNecesarios - posAsign.length;
+    var nuevasPos = [];
+    if(faltanPos > 0){
+      var nivelIdeal = rot<=0?4: rot<1.25?3: rot<2.5?2:1;
+      var ocupadas = new Set(Object.keys(ASIGN));
+      var yaElegidas = new Set(posAsign.map(function(p){return p.id;}));
+      var ordenNiveles = [nivelIdeal, nivelIdeal===4?3:4, 2, 1];
+      ordenNiveles = ordenNiveles.filter(function(v,i,a){return a.indexOf(v)===i;});
+      for(var ni=0; ni<ordenNiveles.length && nuevasPos.length<faltanPos; ni++){
+        var nv = ordenNiveles[ni];
+        for(var fi=0; fi<FRENTES.length && nuevasPos.length<faltanPos; fi++){
+          var f = FRENTES[fi];
+          if(f.niveles.indexOf(nv)<0) continue;
+          for(var m=1; m<=f.modulos && nuevasPos.length<faltanPos; m++){
+            var pid = f.id+'-N'+nv+'-P'+(m<10?'0'+m:''+m);
+            if(!ocupadas.has(pid) && !yaElegidas.has(pid)){
+              nuevasPos.push({id:pid, vacia:false, nueva:true});
+              yaElegidas.add(pid);
+            }
+          }
+        }
+      }
+    }
+
+    var todasPos = posAsign.concat(nuevasPos);
+    var mejorPos = todasPos[0];
     var vaciaLabel = mejorPos.vacia ? ' ← POSICIÓN VACÍA (prioridad)' : '';
-    var posStr = posAsign.map(function(p){return p.id+(p.vacia?'★':'');}).join(', ');
+    var posStr = todasPos.map(function(p){return p.id+(p.vacia?'★':(p.nueva?'🆕':''));}).join(', ');
+    var extraTxt = nuevasPos.length ? (' — '+pallNecesarios+' pallet(s), abrir '+nuevasPos.length+' posición(es) nueva(s)') : '';
+    var faltanAviso = (faltanPos>0 && nuevasPos.length<faltanPos) ? ' (⚠️ faltan '+(faltanPos-nuevasPos.length)+' posición(es) más, rack casi lleno)' : '';
     return {
       tipo:    'rack',
       pos:     posStr,
-      detalle: 'Rack: '+posStr+vaciaLabel,
+      detalle: 'Rack: '+posStr+vaciaLabel+extraTxt+faltanAviso,
       pallets: pallFuturo.toFixed(1),
-      exacto:  true,
+      exacto:  faltanPos<=0,
       posVacia: mejorPos.vacia,
     };
   }
@@ -11101,8 +11135,9 @@ function cydConfirmarDesdeTransito(id, grupo, inicio, fin, durMin, fechaReal){
   var fecha = new Date().toLocaleDateString('es-AR');
   var fechaISO = new Date().toISOString().split('T')[0];
 
-  // Sumar stock general + actualizar rack_stock para posiciones ya asignadas
-  var rackSt = loadRackStock();
+  // Sumar stock general únicamente. El Mapa de Racks (ASIGN/rack_stock) NO
+  // se toca automáticamente acá — la carga sigue siendo manual (Avance o
+  // modal de celda); esto solo deja la sugerencia (r.sugerencia) informativa
   tr.items.forEach(function(r){
     var da = DATA.find(function(d){return d.art===r.art;});
     if(da){
@@ -11110,27 +11145,7 @@ function cydConfirmarDesdeTransito(id, grupo, inicio, fin, durMin, fechaReal){
       da.pall  = Math.floor(da.stock / (da.max_pos||32));
       recalcularCond(da);
     }
-    // Actualizar rack_stock en todas las posiciones asignadas a este artículo
-    Object.keys(ASIGN).forEach(function(posId){
-      var v = ASIGN[posId];
-      if(!v) return;
-      // Posición principal
-      if(String(v.art) === String(r.art)){
-        if(!rackSt[posId]) rackSt[posId] = {art:r.art, stock:0};
-        rackSt[posId].stock = (rackSt[posId].stock||0) + r.cant;
-        rackSt[posId].art   = r.art;
-      }
-      // Compartidos
-      (v.compartidos||[]).forEach(function(c){
-        if(String(c.art) === String(r.art)){
-          var key = posId+'_c_'+c.art;
-          if(!rackSt[key]) rackSt[key] = {art:r.art, stock:0};
-          rackSt[key].stock = (rackSt[key].stock||0) + r.cant;
-        }
-      });
-    });
   });
-  saveRackStock(rackSt);
   saveDataStock();
 
   // Guardar en historial carga
@@ -11151,8 +11166,6 @@ function cydConfirmarDesdeTransito(id, grupo, inicio, fin, durMin, fechaReal){
   tr.horaConfirmacion  = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
   transitoSave(lista);
 
-  reevaluarRack();
-  saveAsign();
   transitoBadge();
   cydRenderTransito();
   var totalUn = tr.items.reduce(function(s,r){return s+r.cant;},0);
@@ -11160,7 +11173,7 @@ function cydConfirmarDesdeTransito(id, grupo, inicio, fin, durMin, fechaReal){
   if(typeof renderProdResumen==='function') renderProdResumen();
   if(typeof renderProdLista==='function') renderProdLista();
   if(typeof renderResumenProd==='function') renderResumenProd();
-  showToast('✅ Recepción confirmada — '+totalUn+' un. sumadas al stock · rack actualizado');
+  showToast('✅ Recepción confirmada — '+totalUn+' un. sumadas al stock · cargar rack a mano');
 }
 
 function cydEliminarTransito(id){
@@ -11857,9 +11870,7 @@ function cydConfirmar(tipo){
     Object.values(rems).forEach(function(rem){ hist.unshift(rem); });
     localStorage.setItem('wms_hist_carga', JSON.stringify(hist.slice(0,500)));
 
-    // Reevaluar rack
-    reevaluarRack();
-
+    // El Mapa de Racks NO se toca automáticamente — carga manual (Avance/celda)
     showToast('✅ Carga confirmada — '+_cydItems.length+' arts · '+_cydItems.reduce(function(s,r){return s+r.cant;},0)+' un.'+(sugUbicCarga?' · 📍 '+sugUbicCarga+' sugerencia'+(sugUbicCarga>1?'s':'')+' de ubicación':''));
 
   } else {
@@ -11885,8 +11896,7 @@ function cydConfirmar(tipo){
     });
     localStorage.setItem('wms_hist_descarga', JSON.stringify(hist2.slice(0,500)));
 
-    reevaluarRack();
-
+    // El Mapa de Racks NO se toca automáticamente — carga manual (Avance/celda)
     showToast('✅ Descarga confirmada — '+_cydItems.reduce(function(s,r){return s+r.cant;},0)+' un. sumadas al stock'+(sugUbicDesc?' · 📍 '+sugUbicDesc+' sugerencia'+(sugUbicDesc>1?'s':'')+' de ubicación':''));
   }
 
