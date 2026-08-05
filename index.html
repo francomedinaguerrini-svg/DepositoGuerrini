@@ -10762,7 +10762,13 @@ function transitoBadge(){
 }
 
 // Calcula posición sugerida para un artículo dado el stock ACTUAL (sin sumar el ingreso)
-function _transitoPosicionSugeridaBase(artId, cantEntrada){
+function _transitoPosicionSugeridaBase(artId, cantEntrada, loteUsadas){
+  // loteUsadas: Set compartido entre TODAS las filas de un mismo lote
+  // (planilla/tránsito) — evita que dos artículos distintos del mismo
+  // lote reciban la misma posición vacía o libre como sugerencia, ya que
+  // ASIGN todavía no cambió entre una fila y la siguiente (son solo
+  // sugerencias, nadie cargó nada todavía)
+  if(!loteUsadas) loteUsadas = new Set();
   var da = DATA.find(function(r){return r.art===artId;});
   if(!da) return {tipo:'desconocido', pos:'—', detalle:'Art no en DATA'};
 
@@ -10790,6 +10796,8 @@ function _transitoPosicionSugeridaBase(artId, cantEntrada){
     if(v.compartidos && v.compartidos.some(function(c){return c.art==artId;}))
       posAsign.push({id:posId, unidades:0, vacia:true});
   });
+  // Sacar las que ya se le repartieron a otro artículo de este mismo lote
+  posAsign = posAsign.filter(function(p){return !loteUsadas.has(p.id);});
 
   if(posAsign.length){
     // Priorizar posiciones vacías primero (quedaron vacías por pedidos del día)
@@ -10823,7 +10831,7 @@ function _transitoPosicionSugeridaBase(artId, cantEntrada){
           if(f.niveles.indexOf(nv)<0) continue;
           for(var m=1; m<=f.modulos && nuevasPos.length<faltanPos; m++){
             var pid = f.id+'-N'+nv+'-P'+(m<10?'0'+m:''+m);
-            if(!ocupadas.has(pid) && !yaElegidas.has(pid)){
+            if(!ocupadas.has(pid) && !yaElegidas.has(pid) && !loteUsadas.has(pid)){
               nuevasPos.push({id:pid, vacia:false, nueva:true});
               yaElegidas.add(pid);
             }
@@ -10833,6 +10841,7 @@ function _transitoPosicionSugeridaBase(artId, cantEntrada){
     }
 
     var todasPos = posAsign.concat(nuevasPos);
+    todasPos.forEach(function(p){loteUsadas.add(p.id);});
     var mejorPos = todasPos[0];
     var vaciaLabel = mejorPos.vacia ? ' ← POSICIÓN VACÍA (prioridad)' : '';
     var posStr = todasPos.map(function(p){return p.id+(p.vacia?'★':(p.nueva?'🆕':''));}).join(', ');
@@ -10881,6 +10890,7 @@ function _transitoPosicionSugeridaBase(artId, cantEntrada){
       var posId=e[0], v=e[1];
       if(!v||!v.art) return;
       if((v.unidades||0) > 0) return;
+      if(loteUsadas.has(posId)) return;
       var nivel = parseInt((posId.split('-')[1]||'N4').replace('N',''))||4;
       if(nivel===nivelIdeal) posiciones.push({id:posId, vacia:true});
     });
@@ -10899,7 +10909,7 @@ function _transitoPosicionSugeridaBase(artId, cantEntrada){
           if(f.niveles.indexOf(nv)<0) continue;
           for(var m=1; m<=f.modulos && posiciones.length<pallNecesarios; m++){
             var pid = f.id+'-N'+nv+'-P'+(m<10?'0'+m:''+m);
-            if(!ocupadas.has(pid) && !yaElegidas.has(pid)){
+            if(!ocupadas.has(pid) && !yaElegidas.has(pid) && !loteUsadas.has(pid)){
               posiciones.push({id:pid, vacia:false});
               yaElegidas.add(pid);
             }
@@ -10909,6 +10919,7 @@ function _transitoPosicionSugeridaBase(artId, cantEntrada){
     }
 
     if(posiciones.length){
+      posiciones.forEach(function(p){loteUsadas.add(p.id);});
       var posStr2 = posiciones.map(function(p){return p.id+(p.vacia?'★':'');}).join(', ');
       var faltan = pallNecesarios - posiciones.length;
       return {
@@ -10940,8 +10951,8 @@ function _transitoPosicionSugeridaBase(artId, cantEntrada){
 // Premisa: un artículo no puede tener stock físico en dos lugares a la vez —
 // si ya está en una puntera o en el rack, y el destino sugerido termina siendo
 // otro lugar, hay que avisar para unificar en vez de dejarlo repartido.
-function transitoPosicionSugerida(artId, cantEntrada){
-  var res = _transitoPosicionSugeridaBase(artId, cantEntrada);
+function transitoPosicionSugerida(artId, cantEntrada, loteUsadas){
+  var res = _transitoPosicionSugeridaBase(artId, cantEntrada, loteUsadas);
   var da = DATA.find(function(r){return r.art===artId;});
   var stockViejo = da ? (da.stock||0) : 0;
 
@@ -11039,10 +11050,13 @@ function cydConfirmarTransito(){
     hora:  ahora.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),
     fechaISO: ahora.toISOString().split('T')[0],
     estado: 'transito',
-    items: _cydItems.map(function(r){
-      var sug = transitoPosicionSugerida(r.art, r.cant);
-      return Object.assign({}, r, {sugerencia: sug});
-    })
+    items: (function(){
+      var loteUsadas = new Set();
+      return _cydItems.map(function(r){
+        var sug = transitoPosicionSugerida(r.art, r.cant, loteUsadas);
+        return Object.assign({}, r, {sugerencia: sug});
+      });
+    })()
   };
 
   var lista = transitoGetAll();
@@ -11248,13 +11262,14 @@ function cydExportarPlanilla(id){
   var win = window.open('','_blank');
   if(!win){ showToast('⚠️ Habilitá popups para imprimir'); return; }
 
+  var loteUsadas = new Set();
   var rows = tr.items.map(function(r){
     // Calcular sugerencia en tiempo real para garantizar datos frescos
     var sug;
     if(esCarga){
-      sug = transitoPosicionSugerida(r.art, r.cant);
+      sug = transitoPosicionSugerida(r.art, r.cant, loteUsadas);
     } else {
-      sug = transitoPosicionSugerida(r.art, r.cant);
+      sug = transitoPosicionSugerida(r.art, r.cant, loteUsadas);
     }
 
     var stockNuevo = (r.stockActual||0) + r.cant;
