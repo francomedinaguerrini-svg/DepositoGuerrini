@@ -3204,6 +3204,42 @@ function descontarRackPorPedido(art, cant){
 // posición (como ya hace descontarPunteraPorPedido) — para que el pedido
 // pueda saber exactamente de cuántas posiciones distintas salió la
 // mercadería, en vez de asumir que sale de una sola.
+// Versión de SOLO LECTURA de descontarRackPorPedidoDetalle — mismo criterio
+// de búsqueda/orden, para mostrar en la planilla de qué posición saldría
+// cada unidad, pero SIN tocar ASIGN. El descuento real en Mapa Racks lo
+// sigue haciendo el operador a mano (Avance / modal de celda).
+function previewRackParaPedido(art, cant){
+  var descontado = 0;
+  var detalle = [];
+  var posDelArt = Object.entries(ASIGN).filter(function(e){
+    var v = e[1];
+    if(!v) return false;
+    if(v.art == art) return true;
+    if(v.compartidos && v.compartidos.some(function(c){return c.art==art;})) return true;
+    return false;
+  });
+  posDelArt = posDelArt.sort(function(a, b){
+    var ua = a[1].art==art ? (a[1].unidades||0) : ((a[1].compartidos||[]).find(function(c){return c.art==art;})||{unidades:0}).unidades;
+    var ub = b[1].art==art ? (b[1].unidades||0) : ((b[1].compartidos||[]).find(function(c){return c.art==art;})||{unidades:0}).unidades;
+    return ua - ub;
+  });
+  posDelArt.forEach(function(e){
+    if(descontado >= cant) return;
+    var posId = e[0], v = e[1];
+    if(v.art == art){
+      var desc = Math.min(cant - descontado, v.unidades||0);
+      if(desc>0){ descontado += desc; detalle.push({id: posId, unidades: desc}); }
+    } else if(v.compartidos){
+      v.compartidos.forEach(function(c){
+        if(descontado >= cant || c.art != art) return;
+        var desc = Math.min(cant - descontado, c.unidades||0);
+        if(desc>0){ descontado += desc; detalle.push({id: posId, unidades: desc}); }
+      });
+    }
+  });
+  return {descontado: descontado, detalle: detalle};
+}
+
 function descontarRackPorPedidoDetalle(art, cant){
   var descontado = 0;
   var detalle = [];
@@ -4170,6 +4206,24 @@ function buscarEnPunteras(art){
 // Reparte entre las parrillas donde esté el artículo hasta cubrir "cant".
 // Devuelve {descontado, detalle:[{id,unidades}]} para poder revertirlo
 // si el pedido se cancela después de enviarlo a tránsito.
+// Versión de SOLO LECTURA de descontarPunteraPorPedido — arma el mismo
+// detalle (de qué parrilla saldría cada unidad, para mostrar en la
+// planilla) pero SIN tocar el storage de punteras. El descuento real en
+// Punteras lo sigue haciendo el operador a mano.
+function previewPunteraParaPedido(art, cant){
+  var punteras = getPunteras();
+  var descontado = 0;
+  var detalle = [];
+  Object.keys(punteras).forEach(function(id){
+    if(descontado>=cant) return;
+    var it = (punteras[id]||[]).find(function(x){ return String(x.art)===String(art); });
+    if(!it) return;
+    var desc = Math.min(cant-descontado, it.unidades||0);
+    if(desc>0){ descontado += desc; detalle.push({id:id, unidades:desc}); }
+  });
+  return {descontado:descontado, detalle:detalle};
+}
+
 function descontarPunteraPorPedido(art, cant){
   var punteras = getPunteras();
   var descontado = 0;
@@ -4761,12 +4815,16 @@ function pedidoEnviarTransito(){
   var ahora = new Date();
   var repoSugerido = [];
 
-  // Descontar stock real (puntera + rack + DATA) al momento de enviar a tránsito
+  // Actualizar SOLO el stock general (DATA) al enviar a tránsito. Punteras
+  // y Mapa Racks NO se tocan automáticamente — el operador los descuenta a
+  // mano cuando efectivamente saca la mercadería. Se guarda un preview de
+  // dónde saldría cada unidad (solo para mostrar en la planilla), sin mutar
+  // el storage real de punteras/ASIGN.
   todos.forEach(function(item){
-    var resP = descontarPunteraPorPedido(item.art, item.cant);
+    var resP = previewPunteraParaPedido(item.art, item.cant);
     var deP = resP.descontado;
     var restante = item.cant - deP;
-    var resR = restante>0 ? descontarRackPorPedidoDetalle(item.art, restante) : {descontado:0, detalle:[]};
+    var resR = restante>0 ? previewRackParaPedido(item.art, restante) : {descontado:0, detalle:[]};
     item._punteraDetalle = resP.detalle;
     item._rackRestante = resR.descontado;
     item._rackDetalle = resR.detalle;
@@ -4792,7 +4850,7 @@ function pedidoEnviarTransito(){
       }
     }
   });
-  saveAsign();
+  saveDataStock();
 
   if(repoSugerido.length){
     var histRepo = JSON.parse(localStorage.getItem('wms_repo_pendiente')||'[]');
@@ -4812,7 +4870,7 @@ function pedidoEnviarTransito(){
     id: 'TS-'+ahora.getTime(),
     flujo: 'salida',
     tipo: 'PEDIDO',
-    descontado: true, // el stock/rack ya se descontó acá, al enviar a tránsito
+    descontado: true, // el stock GENERAL ya se descontó acá, al enviar a tránsito — Mapa Racks/Punteras no se tocan automáticamente en ningún paso
     tipoLabel: modo==='chasis'?'Chasis':'Pedido cliente',
     tipoIcon: modo==='chasis'?'🚗':'📋',
     tte: tte,
@@ -4973,9 +5031,8 @@ function cydEjecutarDespacho(id){
     var cantReal = r.cantReal||r.cant;
 
     if(!tr.descontado){
-      // Flujo viejo: nunca se descontó, descontar todo ahora con la cantidad real
-      descontarRackPorPedido(r.art, cantReal);
-
+      // Flujo viejo: nunca se descontó, descontar el stock general ahora
+      // con la cantidad real (Mapa Racks NO se toca — carga/descuento manual)
       var da = DATA.find(function(d){return d.art===r.art;});
       if(da){
         da.stock = Math.max(0, (da.stock||0) - cantReal);
@@ -4990,25 +5047,16 @@ function cydEjecutarDespacho(id){
         }
       }
     } else if(cantReal !== r.cant){
-      // Ya se había descontado r.cant al enviar a tránsito.
-      // Ajustar SOLO la diferencia contra lo realmente despachado.
+      // Ya se había descontado r.cant del stock general al enviar a tránsito.
+      // Ajustar SOLO la diferencia contra lo realmente despachado (stock
+      // general — Mapa Racks no se toca automáticamente)
       var diff = cantReal - r.cant; // positivo: se llevó más → descontar de más
       var da2 = DATA.find(function(d){return d.art===r.art;});
 
-      if(diff > 0){
-        descontarRackPorPedido(r.art, diff);
-        if(da2){
-          da2.stock = Math.max(0, (da2.stock||0) - diff);
-          da2.pall  = Math.floor(da2.stock / (da2.max_pos||32));
-          recalcularCond(da2);
-        }
-      } else if(diff < 0){
-        reponerRackPorAjuste(r.art, -diff, r.posRack);
-        if(da2){
-          da2.stock = (da2.stock||0) + (-diff);
-          da2.pall  = Math.floor(da2.stock / (da2.max_pos||32));
-          recalcularCond(da2);
-        }
+      if(diff !== 0 && da2){
+        da2.stock = Math.max(0, (da2.stock||0) - diff);
+        da2.pall  = Math.floor(da2.stock / (da2.max_pos||32));
+        recalcularCond(da2);
       }
 
       if(da2 && da2.stock < (da2.max_pos||32) && da2.bloque){
@@ -5030,7 +5078,6 @@ function cydEjecutarDespacho(id){
   });
 
   saveDataStock();
-  saveAsign();
 
   if(diferencias.length){
     var histDif = JSON.parse(localStorage.getItem('wms_dif')||'[]');
@@ -5474,7 +5521,7 @@ function renderConfirmacion(){
         </div>`;
       }).join('')}
     </div>
-    <button onclick="confirmarDespacho()" style="width:100%;padding:12px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px">✅ Confirmar y descontar del mapa</button>
+    <button onclick="confirmarDespacho()" style="width:100%;padding:12px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px">✅ Confirmar despacho</button>
     <button class="btn-secondary" onclick="closeModalDirect()">Cancelar</button>
   `;
 }
@@ -5499,12 +5546,8 @@ function confirmarDespacho(){
   let sugUbicCount = 0;
 
   _confirmItems.forEach(item=>{
-    // Descontar primero de la puntera (si tenía stock ahí), el resto del rack_stock
-    const deP = descontarPunteraPorPedido(item.art, item.cantReal).descontado;
-    const restanteRack = item.cantReal - deP;
-    if(restanteRack>0) descontarRackPorPedido(item.art, restanteRack);
-
-    // NUEVO: Descontar de DATA (stock real)
+    // NUEVO: Descontar de DATA (stock real) — Mapa Racks/Punteras se
+    // cargan a mano, no se tocan automáticamente al confirmar despacho
     const dataArt = DATA.find(r=>r.art===item.art);
     if(dataArt){
       const stockAntesDespacho = dataArt.stock||0;
@@ -5544,8 +5587,6 @@ function confirmarDespacho(){
       });
     }
   });
-
-  saveAsign();
 
   // Guardar diferencias
   if(diferencias.length){
@@ -9605,7 +9646,7 @@ function confirmarColaPedido(idx){
   hist.push(mov);
   localStorage.setItem(mesKey, JSON.stringify(hist));
 
-  // ── DESCONTAR STOCK ──
+  // ── DESCONTAR STOCK GENERAL (Mapa Racks/Punteras se cargan a mano) ──
   if(p.pedidoData){
     const puntera = p.pedidoData.puntera || [];
     const items = [...puntera, ...(p.pedidoData.rack||[]), ...(p.pedidoData.bloque||[]), ...(p.pedidoData.sin||[])];
@@ -9615,20 +9656,9 @@ function confirmarColaPedido(idx){
       if(art){
         const cantReal = Math.round(item.cant * escala);
         art.stock = Math.max(0, (art.stock||0) - cantReal);
-        // Descontar primero de la puntera (si tenía stock ahí), el resto del rack
-        const deP = descontarPunteraPorPedido(item.art, cantReal).descontado;
-        const restante = cantReal - deP;
-        if(restante>0){
-          if(item.posRack && ASIGN[item.posRack] && ASIGN[item.posRack].art==item.art){
-            ASIGN[item.posRack].unidades = Math.max(0, (ASIGN[item.posRack].unidades||0) - restante);
-          } else {
-            descontarRackPorPedido(item.art, restante);
-          }
-        }
       }
     });
     saveDataStock();
-    localStorage.setItem('wms_asign2', JSON.stringify(ASIGN));
   }
 
   renderColaPedidos();
@@ -11196,12 +11226,11 @@ function cydEliminarTransito(id){
   var esCancelacionSalidaPendiente = tr0 && tr0.flujo==='salida' && tr0.estado==='transito' && tr0.descontado;
 
   var msgConfirm = esCancelacionSalidaPendiente
-    ? '¿Cancelar este pedido en tránsito? Se devuelve el stock descontado (puntera/rack).'
+    ? '¿Cancelar este pedido en tránsito? Se devuelve el stock general (Mapa Racks/Punteras no se tocan — no hubo descuento automático ahí).'
     : '¿Eliminar este tránsito? No se puede deshacer.';
   if(!confirm(msgConfirm)) return;
 
   if(esCancelacionSalidaPendiente){
-    var sinReponerTotal = 0;
     tr0.items.forEach(function(item){
       var dataArt = DATA.find(function(r){ return r.art===item.art; });
       if(dataArt){
@@ -11209,21 +11238,9 @@ function cydEliminarTransito(id){
         dataArt.pall = Math.floor(dataArt.stock / (dataArt.max_pos||32));
         recalcularCond(dataArt);
       }
-      reponerPunteraPorDetalle(item.art, item.punteraDetalle);
-      if(item.rackDetalle && item.rackDetalle.length){
-        var repuesto = reponerRackPorDetalle(item.art, item.rackDetalle);
-        var totalRack = item.rackDetalle.reduce(function(s,d){return s+(d.unidades||0);},0);
-        if(repuesto < totalRack) sinReponerTotal += (totalRack - repuesto);
-      } else if(item.rackRestante>0){
-        // Tránsito viejo, de antes de guardar el detalle multi-posición
-        var repuesto2 = reponerRackPorAjuste(item.art, item.rackRestante, item.posRack);
-        if(repuesto2 < item.rackRestante) sinReponerTotal += (item.rackRestante - repuesto2);
-      }
     });
     saveDataStock();
-    showToast(sinReponerTotal>0
-      ? '↩️ Pedido cancelado — '+sinReponerTotal+' un. no se pudieron reponer en su posición original (se liberó mientras tanto). El stock total ya está actualizado, pero revisá el rack manualmente.'
-      : '↩️ Pedido cancelado — stock devuelto a puntera/rack');
+    showToast('↩️ Pedido cancelado — stock general devuelto');
   }
 
   var lista = transitoGetAll().filter(function(t){return t.id!==id;});
