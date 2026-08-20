@@ -5057,6 +5057,15 @@ function cydEjecutarDespacho(id){
 
   tr.items.forEach(function(r){
     var cantReal = r.cantReal||r.cant;
+    var da0 = DATA.find(function(d){return d.art===r.art;});
+    // "cantSistema" = stock real que tenía que haber, ANTES de que se
+    // mandara este pedido — no el pedido en sí. Si el tránsito ya venía
+    // con el stock descontado (tr.descontado, el caso normal), el stock
+    // actual en DATA ya es "stock previo − pedido", así que hay que
+    // sumarle el pedido de vuelta para recuperar el stock real de
+    // referencia. Si nunca se descontó (flujo viejo), el stock actual ya
+    // ES el de referencia tal cual.
+    var cantSistema = da0 ? (tr.descontado ? (da0.stock||0) + r.cant : (da0.stock||0)) : r.cant;
 
     if(!tr.descontado){
       // Flujo viejo: nunca se descontó, descontar el stock general ahora
@@ -5096,11 +5105,11 @@ function cydEjecutarDespacho(id){
       }
     }
 
-    if(cantReal !== r.cant){
+    if(cantReal !== cantSistema){
       diferencias.push({
         art:r.art, med:r.med, diseno:r.diseno, prov:r.prov,
         posRack:r.posRack||'', bloque:r.bloque||'',
-        cantPedida:r.cant, cantReal:cantReal, diff:cantReal-r.cant
+        cantPedida:cantSistema, cantReal:cantReal, diff:cantReal-cantSistema
       });
     }
   });
@@ -5577,8 +5586,9 @@ function confirmarDespacho(){
     // NUEVO: Descontar de DATA (stock real) — Mapa Racks/Punteras se
     // cargan a mano, no se tocan automáticamente al confirmar despacho
     const dataArt = DATA.find(r=>r.art===item.art);
+    let stockAntesDespacho = item.cant; // fallback si el art no está en DATA
     if(dataArt){
-      const stockAntesDespacho = dataArt.stock||0;
+      stockAntesDespacho = dataArt.stock||0;
       dataArt.stock = Math.max(0, (dataArt.stock||0) - item.cantReal);
       dataArt.pall = Math.floor(dataArt.stock / (dataArt.max_pos||32));
       recalcularCond(dataArt);
@@ -5600,8 +5610,9 @@ function confirmarDespacho(){
       }
     }
 
-    // Registrar diferencia si hay
-    if(item.cantReal !== item.cant){
+    // Registrar diferencia contra el STOCK real del sistema (no contra el
+    // pedido) — es una diferencia de inventario, no una variación de despacho
+    if(item.cantReal !== stockAntesDespacho){
       diferencias.push({
         art: item.art,
         med: item.med,
@@ -5609,9 +5620,9 @@ function confirmarDespacho(){
         prov: item.prov,
         posRack: item.posRack||'',
         bloque: item.bloque||'',
-        cantPedida: item.cant,
+        cantPedida: stockAntesDespacho,
         cantReal: item.cantReal,
-        diff: item.cantReal - item.cant,
+        diff: item.cantReal - stockAntesDespacho,
       });
     }
   });
